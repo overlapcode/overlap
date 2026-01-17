@@ -142,15 +142,15 @@ import { Header } from '@components/Header';
             <span class="repo-url">${repo.remote_url || '(local only)'}</span>
           </div>
           ${isAdmin ? `
-          <div class="visibility-toggle">
-            <label style="display: flex; align-items: center; gap: var(--space-xs); cursor: pointer; font-size: 0.875rem;">
+          <div class="visibility-toggle" style="opacity: 0.5;">
+            <label style="display: flex; align-items: center; gap: var(--space-xs); cursor: not-allowed; font-size: 0.875rem;" title="Coming soon">
               <input
                 type="checkbox"
-                ${repo.is_public ? 'checked' : ''}
-                onchange="toggleVisibility('${repo.id}', this.checked)"
-                style="width: 16px; height: 16px;"
+                disabled
+                style="width: 16px; height: 16px; cursor: not-allowed;"
               />
               <span class="text-secondary">Public</span>
+              <span style="font-size: 0.6rem; color: var(--text-muted);">(soon)</span>
             </label>
           </div>
           ` : ''}

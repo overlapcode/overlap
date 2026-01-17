@@ -85,15 +85,17 @@ import { Header } from '@components/Header';
             />
           </div>
 
-          <div style="margin-bottom: var(--space-lg);">
-            <label style="display: flex; align-items: center; gap: var(--space-sm); cursor: pointer;">
+          <div style="margin-bottom: var(--space-lg); opacity: 0.5;">
+            <label style="display: flex; align-items: center; gap: var(--space-sm); cursor: not-allowed;">
               <input
                 type="checkbox"
                 id="is-public"
                 name="is_public"
-                style="width: 18px; height: 18px;"
+                disabled
+                style="width: 18px; height: 18px; cursor: not-allowed;"
               />
               <span style="font-weight: 500;">Public Timeline</span>
+              <span style="font-size: 0.7rem; color: var(--text-muted); background: var(--bg-elevated); padding: 2px 6px; border-radius: 4px;">Coming soon</span>
             </label>
             <p class="text-muted" style="font-size: 0.75rem; margin-top: var(--space-xs); margin-left: 26px;">
               Allow anyone to view your team's activity without authentication

@@ -10,7 +10,7 @@ CREATE TABLE IF NOT EXISTS teams (
   name TEXT NOT NULL,
   team_token TEXT NOT NULL UNIQUE,
   dashboard_password_hash TEXT,
-  is_public INTEGER NOT NULL DEFAULT 1,
+  is_public INTEGER NOT NULL DEFAULT 0,
   llm_provider TEXT DEFAULT 'heuristic',
   llm_model TEXT,
   llm_api_key_encrypted TEXT,
@@ -51,7 +51,7 @@ CREATE TABLE IF NOT EXISTS repos (
   name TEXT NOT NULL,
   remote_url TEXT,
   repo_token TEXT NOT NULL,
-  is_public INTEGER NOT NULL DEFAULT 1,
+  is_public INTEGER NOT NULL DEFAULT 0,
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
