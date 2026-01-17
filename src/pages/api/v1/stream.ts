@@ -56,7 +56,7 @@ export async function GET(context: APIContext) {
           // Send new events
           for (const session of newSessions) {
             const eventData = {
-              session_id: session.id,
+              id: session.id,
               user: session.user,
               device: {
                 id: session.device.id,
@@ -66,12 +66,14 @@ export async function GET(context: APIContext) {
               repo: session.repo,
               branch: session.branch,
               status: session.status,
+              started_at: session.started_at,
               last_activity_at: session.last_activity_at,
               activity: session.latest_activity
                 ? {
                     semantic_scope: session.latest_activity.semantic_scope,
                     summary: session.latest_activity.summary,
                     files: session.latest_activity.files,
+                    created_at: session.latest_activity.created_at,
                   }
                 : null,
             };

@@ -45,12 +45,14 @@ def main():
 
     # Check if configured
     if not is_configured():
+        print("[Overlap] Heartbeat: Not configured, skipping", file=sys.stderr)
         sys.exit(0)
 
     # Get current session
     session_id = get_current_session()
     if not session_id:
         # No active session
+        print("[Overlap] Heartbeat: No active session found in ~/.overlap/session.json, skipping", file=sys.stderr)
         sys.exit(0)
 
     # Extract file path from tool input
@@ -72,12 +74,16 @@ def main():
 
     try:
         # Send heartbeat with file info
-        api_request("POST", f"/api/v1/sessions/{session_id}/heartbeat", {
+        print(f"[Overlap] Heartbeat: Sending for session {session_id}, file: {file_path}", file=sys.stderr)
+        response = api_request("POST", f"/api/v1/sessions/{session_id}/heartbeat", {
             "files": [file_path],
         })
+        print(f"[Overlap] Heartbeat: Success - {response.get('data', {})}", file=sys.stderr)
     except Exception as e:
-        # Log error but don't block
+        # Log error with traceback
+        import traceback
         print(f"[Overlap] Heartbeat failed: {e}", file=sys.stderr)
+        print(f"[Overlap] Traceback: {traceback.format_exc()}", file=sys.stderr)
 
     sys.exit(0)
 

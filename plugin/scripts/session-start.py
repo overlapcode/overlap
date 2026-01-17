@@ -56,7 +56,7 @@ def main():
 
     try:
         # Start session on server
-        response = api_request("POST", "/api/v1/sessions/start", {
+        request_data = {
             "session_id": session_id,
             "device_name": device_name,
             "hostname": hostname,
@@ -65,11 +65,19 @@ def main():
             "remote_url": git_info.get("remote_url"),
             "branch": git_info.get("branch"),
             "worktree": cwd,
-        })
+        }
+        print(f"[Overlap] Starting session with data: {json.dumps(request_data)}", file=sys.stderr)
+
+        response = api_request("POST", "/api/v1/sessions/start", request_data)
+        print(f"[Overlap] Server response: {json.dumps(response)}", file=sys.stderr)
 
         # Save session ID for later hooks
-        if response.get("data", {}).get("session_id"):
-            save_current_session(response["data"]["session_id"])
+        server_session_id = response.get("data", {}).get("session_id")
+        if server_session_id:
+            save_current_session(server_session_id)
+            print(f"[Overlap] Saved session ID to local file: {server_session_id}", file=sys.stderr)
+        else:
+            print(f"[Overlap] WARNING: No session_id in response, cannot save locally", file=sys.stderr)
 
         # Output context for Claude (shown in SessionStart)
         output = {
@@ -81,8 +89,10 @@ def main():
         print(json.dumps(output))
 
     except Exception as e:
-        # Log error but don't block session
+        # Log error with full traceback
+        import traceback
         print(f"[Overlap] Failed to start session: {e}", file=sys.stderr)
+        print(f"[Overlap] Traceback: {traceback.format_exc()}", file=sys.stderr)
 
     sys.exit(0)
 

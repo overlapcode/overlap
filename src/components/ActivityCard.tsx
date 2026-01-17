@@ -1,3 +1,5 @@
+import { useState, useEffect } from 'react';
+
 type ActivityCardProps = {
   session: {
     id: string;
@@ -32,6 +34,24 @@ function formatRelativeTime(dateString: string): string {
   return date.toLocaleDateString();
 }
 
+function useRelativeTime(dateString: string): string {
+  const [relativeTime, setRelativeTime] = useState(() => formatRelativeTime(dateString));
+
+  useEffect(() => {
+    // Update immediately when dateString changes
+    setRelativeTime(formatRelativeTime(dateString));
+
+    // Update every 30 seconds for live timestamps
+    const interval = setInterval(() => {
+      setRelativeTime(formatRelativeTime(dateString));
+    }, 30000);
+
+    return () => clearInterval(interval);
+  }, [dateString]);
+
+  return relativeTime;
+}
+
 function getStatusLabel(status: string): string {
   switch (status) {
     case 'active': return 'ACTIVE';
@@ -43,6 +63,7 @@ function getStatusLabel(status: string): string {
 
 export function ActivityCard({ session }: ActivityCardProps) {
   const { user, device, repo, branch, status, last_activity_at, activity } = session;
+  const relativeTime = useRelativeTime(last_activity_at);
 
   return (
     <div className="card" style={{ marginBottom: 'var(--space-md)' }}>
@@ -67,7 +88,7 @@ export function ActivityCard({ session }: ActivityCardProps) {
           </span>
         </div>
         <span className="text-muted" style={{ fontSize: '0.875rem' }}>
-          {formatRelativeTime(last_activity_at)}
+          {relativeTime}
         </span>
       </div>
 

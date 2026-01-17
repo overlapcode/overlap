@@ -7,75 +7,166 @@ import { Header } from '@components/Header';
   <Header client:load />
 
   <main class="container" style="padding-top: var(--space-xl); padding-bottom: var(--space-xl);">
-    <div style="max-width: 800px; margin: 0 auto;">
+    <div style="max-width: 700px; margin: 0 auto;">
       <div style="display: flex; align-items: center; gap: var(--space-md); margin-bottom: var(--space-xl);">
         <a href="/settings" class="text-muted" style="text-decoration: none;">← Back</a>
-        <h1 style="font-size: 1.5rem;">Repositories</h1>
+        <h1 style="font-size: 1.5rem; margin: 0;">Repositories</h1>
       </div>
 
-      <div id="info-box" class="card" style="margin-bottom: var(--space-lg); background: var(--bg-elevated);">
-        <p class="text-secondary" style="font-size: 0.875rem;">
-          Loading...
-        </p>
+      <div id="repos-list">
+        <div class="loading-state">Loading...</div>
       </div>
 
-      <div id="repos-list" class="card">
-        <p class="text-secondary">Loading...</p>
-      </div>
-
-      <!-- Toast for error messages -->
-      <div id="toast" style="
-        position: fixed;
-        bottom: var(--space-lg);
-        left: 50%;
-        transform: translateX(-50%);
-        background: var(--bg-elevated);
-        border: 1px solid var(--accent-orange);
-        color: var(--accent-orange);
-        padding: var(--space-sm) var(--space-lg);
-        border-radius: var(--radius-md);
-        font-size: 0.875rem;
-        display: none;
-        z-index: 1000;
-      "></div>
+      <div id="toast" class="toast"></div>
     </div>
   </main>
 </Layout>
 
-<style>
-  .repo-row {
+<style is:global>
+  .loading-state {
+    color: var(--text-secondary);
+    padding: var(--space-lg);
+    text-align: center;
+  }
+
+  .section-header {
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-bottom: 12px;
+    padding-left: 4px;
+  }
+
+  .repos-section {
+    margin-bottom: 32px;
+  }
+
+  .repo-card {
+    background: var(--bg-surface);
+    border: 1px solid var(--border-default);
+    border-radius: 8px;
+    padding: 16px 20px;
+    margin-bottom: 8px;
+  }
+
+  .repo-card-inner {
     display: flex;
-    justify-content: space-between;
     align-items: center;
-    padding: var(--space-md) 0;
-    border-bottom: 1px solid var(--border-subtle);
+    justify-content: space-between;
+    gap: 16px;
   }
 
-  .repo-row:last-child {
-    border-bottom: none;
-  }
-
-  .repo-info {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-xs);
+  .repo-details {
+    flex: 1;
+    min-width: 0;
   }
 
   .repo-name {
     font-weight: 500;
+    font-size: 0.95rem;
+    color: var(--text-primary);
     font-family: var(--font-mono);
+    margin-bottom: 2px;
   }
 
   .repo-url {
     font-size: 0.75rem;
     color: var(--text-muted);
     font-family: var(--font-mono);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
-  .visibility-toggle {
-    display: flex;
-    align-items: center;
-    gap: var(--space-sm);
+  .repo-visibility {
+    flex-shrink: 0;
+  }
+
+  .badge {
+    display: inline-block;
+    font-size: 0.7rem;
+    font-weight: 500;
+    padding: 4px 10px;
+    border-radius: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+  }
+
+  .badge-local {
+    background: var(--bg-elevated);
+    color: var(--text-secondary);
+    border: 1px solid var(--border-default);
+  }
+
+  .badge-github {
+    background: rgba(255, 152, 0, 0.15);
+    color: var(--accent-orange);
+    border: 1px solid rgba(255, 152, 0, 0.3);
+  }
+
+  .info-box {
+    margin-top: 24px;
+    padding: 16px;
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-default);
+    border-radius: 8px;
+    text-align: center;
+  }
+
+  .info-box p {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    margin: 0;
+    line-height: 1.5;
+  }
+
+  .empty-state {
+    text-align: center;
+    padding: var(--space-xl);
+    color: var(--text-secondary);
+  }
+
+  .empty-state-icon {
+    font-size: 2rem;
+    margin-bottom: var(--space-md);
+    opacity: 0.5;
+  }
+
+  .toast {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--bg-elevated);
+    padding: 12px 24px;
+    border-radius: 8px;
+    font-size: 0.875rem;
+    display: none;
+    z-index: 1000;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  }
+
+  .toast.success {
+    border: 1px solid var(--accent-green);
+    color: var(--accent-green);
+  }
+
+  .toast.error {
+    border: 1px solid var(--accent-orange);
+    color: var(--accent-orange);
+  }
+
+  @media (max-width: 500px) {
+    .repo-card-inner {
+      flex-wrap: wrap;
+    }
+
+    .repo-details {
+      width: 100%;
+      margin-bottom: 8px;
+    }
   }
 </style>
 
@@ -88,15 +179,35 @@ import { Header } from '@components/Header';
   };
 
   const toast = document.getElementById('toast') as HTMLDivElement;
-  const infoBox = document.getElementById('info-box') as HTMLDivElement;
-  let isAdmin = false;
 
-  function showToast(message: string) {
+  function showToast(message: string, isError = true) {
     toast.textContent = message;
+    toast.className = `toast ${isError ? 'error' : 'success'}`;
     toast.style.display = 'block';
     setTimeout(() => {
       toast.style.display = 'none';
     }, 4000);
+  }
+
+  function escapeHtml(text: string): string {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+  }
+
+  function isGitHubUrl(url: string | null): boolean {
+    return url ? url.includes('github.com') : false;
+  }
+
+  function formatRemoteUrl(url: string | null): string {
+    if (!url) return 'Local repository';
+    // Shorten GitHub URLs
+    if (url.includes('github.com')) {
+      const match = url.match(/github\.com[/:]([^/]+\/[^/]+?)(?:\.git)?$/);
+      if (match) return match[1];
+    }
+    // Remove .git suffix and protocol
+    return url.replace(/\.git$/, '').replace(/^https?:\/\//, '');
   }
 
   async function loadRepos() {
@@ -111,78 +222,76 @@ import { Header } from '@components/Header';
       }
 
       const repos = result.data?.repos || [];
-      isAdmin = result.data?.is_admin ?? false;
-
-      // Update info box based on role
-      if (isAdmin) {
-        infoBox.innerHTML = `<p class="text-secondary" style="font-size: 0.875rem;">
-          As an admin, you can see all repositories connected to the team.
-          Repositories are automatically registered when team members work in them.
-          You can toggle visibility for each repository.
-        </p>`;
-      } else {
-        infoBox.innerHTML = `<p class="text-secondary" style="font-size: 0.875rem;">
-          These are the repositories you've worked on with the Overlap plugin.
-          Repositories are automatically registered when you start a session in them.
-        </p>`;
-      }
 
       if (repos.length === 0) {
-        const emptyMessage = isAdmin
-          ? 'No repositories tracked yet. They will appear here when team members start working.'
-          : 'No repositories tracked yet. They will appear here when you start working with the Overlap plugin.';
-        container.innerHTML = `<p class="text-secondary">${emptyMessage}</p>`;
+        container.innerHTML = `
+          <div class="empty-state">
+            <div class="empty-state-icon">📂</div>
+            <p style="margin-bottom: var(--space-sm);">No repositories tracked yet</p>
+            <p class="text-muted" style="font-size: 0.8rem;">
+              Repositories appear here automatically when you start<br>
+              working with the Overlap plugin installed.
+            </p>
+          </div>
+        `;
         return;
       }
 
-      container.innerHTML = repos.map((repo) => `
-        <div class="repo-row" data-repo-id="${repo.id}">
-          <div class="repo-info">
-            <span class="repo-name">${repo.name}</span>
-            <span class="repo-url">${repo.remote_url || '(local only)'}</span>
-          </div>
-          ${isAdmin ? `
-          <div class="visibility-toggle" style="opacity: 0.5;">
-            <label style="display: flex; align-items: center; gap: var(--space-xs); cursor: not-allowed; font-size: 0.875rem;" title="Coming soon">
-              <input
-                type="checkbox"
-                disabled
-                style="width: 16px; height: 16px; cursor: not-allowed;"
-              />
-              <span class="text-secondary">Public</span>
-              <span style="font-size: 0.6rem; color: var(--text-muted);">(soon)</span>
-            </label>
-          </div>
-          ` : ''}
-        </div>
-      `).join('');
-    } catch (error) {
-      container.innerHTML = `<p style="color: var(--accent-orange);">${error instanceof Error ? error.message : 'Failed to load repositories'}</p>`;
-      infoBox.innerHTML = '';
-    }
-  }
-
-  async function toggleVisibility(repoId: string, isPublic: boolean) {
-    try {
-      const response = await fetch(`/api/v1/admin/repos/${repoId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ is_public: isPublic }),
+      // Sort repos: GitHub repos first, then by name
+      const sortedRepos = repos.sort((a, b) => {
+        const aIsGitHub = isGitHubUrl(a.remote_url);
+        const bIsGitHub = isGitHubUrl(b.remote_url);
+        if (aIsGitHub && !bIsGitHub) return -1;
+        if (!aIsGitHub && bIsGitHub) return 1;
+        return a.name.localeCompare(b.name);
       });
 
-      if (!response.ok) {
-        const result = await response.json() as { error?: string };
-        throw new Error(result.error || 'Failed to update repository');
+      const gitHubRepos = sortedRepos.filter(r => isGitHubUrl(r.remote_url));
+      const localRepos = sortedRepos.filter(r => !isGitHubUrl(r.remote_url));
+
+      let html = '';
+
+      if (gitHubRepos.length > 0) {
+        html += `<div class="repos-section">
+          <div class="section-header">Connected Repositories (${gitHubRepos.length})</div>
+          ${gitHubRepos.map(repo => renderRepoCard(repo)).join('')}
+        </div>`;
       }
+
+      if (localRepos.length > 0) {
+        html += `<div class="repos-section">
+          <div class="section-header">Local Repositories (${localRepos.length})</div>
+          ${localRepos.map(repo => renderRepoCard(repo)).join('')}
+        </div>`;
+      }
+
+      html += `<div class="info-box">
+        <p>Repositories are automatically registered when team members<br>work in them with the Overlap plugin.</p>
+      </div>`;
+
+      container.innerHTML = html;
     } catch (error) {
-      showToast(error instanceof Error ? error.message : 'Failed to update repository');
-      loadRepos(); // Reload to reset state
+      container.innerHTML = `<div class="loading-state" style="color: var(--accent-orange);">${error instanceof Error ? error.message : 'Failed to load repositories'}</div>`;
     }
   }
 
-  // Make function global
-  (window as unknown as { toggleVisibility: typeof toggleVisibility }).toggleVisibility = toggleVisibility;
+  function renderRepoCard(repo: Repo): string {
+    const safeName = escapeHtml(repo.name);
+    const formattedUrl = escapeHtml(formatRemoteUrl(repo.remote_url));
+    const isGitHub = isGitHubUrl(repo.remote_url);
 
-  // Load repos on page load
+    return `<div class="repo-card">
+      <div class="repo-card-inner">
+        <div class="repo-details">
+          <div class="repo-name">${safeName}</div>
+          <div class="repo-url">${formattedUrl}</div>
+        </div>
+        <div class="repo-visibility">
+          <span class="badge badge-${isGitHub ? 'github' : 'local'}">${isGitHub ? 'GitHub' : 'Local'}</span>
+        </div>
+      </div>
+    </div>`;
+  }
+
   loadRepos();
 </script>
