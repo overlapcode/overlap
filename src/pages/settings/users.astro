@@ -7,97 +7,114 @@ import { Header } from '@components/Header';
   <Header client:load />
 
   <main class="container" style="padding-top: var(--space-xl); padding-bottom: var(--space-xl);">
-    <div style="max-width: 800px; margin: 0 auto;">
+    <div style="max-width: 700px; margin: 0 auto;">
       <div style="display: flex; align-items: center; gap: var(--space-md); margin-bottom: var(--space-xl);">
         <a href="/settings" class="text-muted" style="text-decoration: none;">← Back</a>
-        <h1 style="font-size: 1.5rem;">Team Members</h1>
+        <h1 style="font-size: 1.5rem; margin: 0;">Team Members</h1>
       </div>
 
       <div id="users-list">
-        <p class="text-secondary">Loading...</p>
+        <div class="loading-state">Loading...</div>
       </div>
 
-      <!-- Toast for messages -->
-      <div id="toast" style="
-        position: fixed;
-        bottom: var(--space-lg);
-        left: 50%;
-        transform: translateX(-50%);
-        background: var(--bg-elevated);
-        border: 1px solid var(--accent-orange);
-        color: var(--accent-orange);
-        padding: var(--space-sm) var(--space-lg);
-        border-radius: var(--radius-md);
-        font-size: 0.875rem;
-        display: none;
-        z-index: 1000;
-      "></div>
+      <div id="toast" class="toast"></div>
     </div>
   </main>
 </Layout>
 
 <style>
+  .loading-state {
+    color: var(--text-secondary);
+    padding: var(--space-lg);
+    text-align: center;
+  }
+
+  .section-header {
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-bottom: 12px;
+    padding-left: 4px;
+  }
+
+  .users-section {
+    margin-bottom: 32px;
+  }
+
   .user-card {
     background: var(--bg-surface);
     border: 1px solid var(--border-default);
-    border-radius: var(--radius-md);
-    padding: var(--space-md) var(--space-lg);
-    margin-bottom: var(--space-sm);
-    display: grid;
-    grid-template-columns: 1fr auto auto;
-    gap: var(--space-lg);
+    border-radius: 8px;
+    padding: 16px 20px;
+    margin-bottom: 8px;
+  }
+
+  .user-card-inner {
+    display: flex;
     align-items: center;
+    justify-content: space-between;
+    gap: 16px;
   }
 
-  .user-card:last-of-type {
-    margin-bottom: 0;
-  }
-
-  .user-info {
+  .user-details {
+    flex: 1;
     min-width: 0;
   }
 
   .user-name {
     font-weight: 500;
+    font-size: 0.95rem;
+    color: var(--text-primary);
     margin-bottom: 2px;
   }
 
   .user-email {
+    font-size: 0.8rem;
     color: var(--text-secondary);
-    font-size: 0.875rem;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
 
-  .role-badge {
+  .user-role {
+    flex-shrink: 0;
+  }
+
+  .badge {
     display: inline-block;
-    font-size: 0.75rem;
-    padding: 4px 12px;
-    border-radius: var(--radius-sm);
-    background: var(--bg-elevated);
-    border: 1px solid var(--border-default);
-    text-transform: capitalize;
+    font-size: 0.7rem;
+    font-weight: 500;
+    padding: 4px 10px;
+    border-radius: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
   }
 
-  .role-badge.admin {
-    border-color: var(--accent-orange);
+  .badge-admin {
+    background: rgba(255, 152, 0, 0.15);
     color: var(--accent-orange);
+    border: 1px solid rgba(255, 152, 0, 0.3);
   }
 
-  .role-badge.member {
+  .badge-member {
+    background: var(--bg-elevated);
     color: var(--text-secondary);
+    border: 1px solid var(--border-default);
   }
 
   .user-actions {
     display: flex;
-    gap: var(--space-xs);
+    gap: 8px;
+    flex-shrink: 0;
   }
 
-  .action-btn {
+  .btn-action {
     font-size: 0.75rem;
-    padding: 4px 10px;
-    border-radius: var(--radius-sm);
+    font-weight: 500;
+    padding: 6px 12px;
+    border-radius: 4px;
     border: 1px solid var(--border-default);
     background: var(--bg-elevated);
     color: var(--text-secondary);
@@ -105,45 +122,75 @@ import { Header } from '@components/Header';
     transition: all 0.15s ease;
   }
 
-  .action-btn:hover {
-    border-color: var(--text-secondary);
+  .btn-action:hover {
+    background: var(--bg-surface);
+    border-color: var(--text-muted);
     color: var(--text-primary);
   }
 
-  .action-btn.danger {
+  .btn-danger {
+    color: #e57373;
+    border-color: rgba(229, 115, 115, 0.3);
+  }
+
+  .btn-danger:hover {
+    background: rgba(229, 115, 115, 0.1);
+    border-color: #e57373;
+    color: #ef5350;
+  }
+
+  .info-box {
+    margin-top: 24px;
+    padding: 16px;
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-default);
+    border-radius: 8px;
+    text-align: center;
+  }
+
+  .info-box p {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    margin: 0;
+    line-height: 1.5;
+  }
+
+  .toast {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--bg-elevated);
+    padding: 12px 24px;
+    border-radius: 8px;
+    font-size: 0.875rem;
+    display: none;
+    z-index: 1000;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  }
+
+  .toast.success {
+    border: 1px solid var(--accent-green);
+    color: var(--accent-green);
+  }
+
+  .toast.error {
+    border: 1px solid var(--accent-orange);
     color: var(--accent-orange);
   }
 
-  .action-btn.danger:hover {
-    border-color: var(--accent-orange);
-    background: rgba(255, 152, 0, 0.1);
-  }
+  @media (max-width: 500px) {
+    .user-card-inner {
+      flex-wrap: wrap;
+    }
 
-  .section-label {
-    font-size: 0.75rem;
-    font-weight: 500;
-    color: var(--text-muted);
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    margin-bottom: var(--space-sm);
-    padding-left: var(--space-sm);
-  }
-
-  .users-section {
-    margin-bottom: var(--space-xl);
-  }
-
-  .users-section:last-child {
-    margin-bottom: 0;
-  }
-
-  @media (max-width: 600px) {
-    .user-card {
-      grid-template-columns: 1fr;
-      gap: var(--space-sm);
+    .user-details {
+      width: 100%;
+      margin-bottom: 12px;
     }
 
     .user-actions {
+      width: 100%;
       justify-content: flex-start;
     }
   }
@@ -164,12 +211,17 @@ import { Header } from '@components/Header';
 
   function showToast(message: string, isError = true) {
     toast.textContent = message;
-    toast.style.borderColor = isError ? 'var(--accent-orange)' : 'var(--accent-green)';
-    toast.style.color = isError ? 'var(--accent-orange)' : 'var(--accent-green)';
+    toast.className = `toast ${isError ? 'error' : 'success'}`;
     toast.style.display = 'block';
     setTimeout(() => {
       toast.style.display = 'none';
     }, 4000);
+  }
+
+  function escapeHtml(text: string): string {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
   }
 
   async function loadUsers() {
@@ -177,7 +229,10 @@ import { Header } from '@components/Header';
 
     try {
       const response = await fetch('/api/v1/admin/users');
-      const result = await response.json() as { data?: { users: User[], is_admin: boolean, current_user_id?: string }, error?: string };
+      const result = await response.json() as {
+        data?: { users: User[], is_admin: boolean, current_user_id?: string },
+        error?: string
+      };
 
       if (!response.ok) {
         throw new Error(result.error || 'Failed to load users');
@@ -188,76 +243,58 @@ import { Header } from '@components/Header';
       currentUserId = result.data?.current_user_id || '';
 
       if (users.length === 0) {
-        container.innerHTML = '<p class="text-secondary">No team members yet.</p>';
+        container.innerHTML = '<div class="loading-state">No team members yet.</div>';
         return;
       }
 
-      // Separate admins and members
       const admins = users.filter(u => u.role === 'admin').sort((a, b) => a.name.localeCompare(b.name));
       const members = users.filter(u => u.role === 'member').sort((a, b) => a.name.localeCompare(b.name));
 
       let html = '';
 
-      // Admins section
       if (admins.length > 0) {
-        html += `
-          <div class="users-section">
-            <div class="section-label">Admins (${admins.length})</div>
-            ${admins.map(user => renderUserCard(user)).join('')}
-          </div>
-        `;
+        html += `<div class="users-section">
+          <div class="section-header">Admins (${admins.length})</div>
+          ${admins.map(user => renderUserCard(user)).join('')}
+        </div>`;
       }
 
-      // Members section
       if (members.length > 0) {
-        html += `
-          <div class="users-section">
-            <div class="section-label">Members (${members.length})</div>
-            ${members.map(user => renderUserCard(user)).join('')}
-          </div>
-        `;
+        html += `<div class="users-section">
+          <div class="section-header">Members (${members.length})</div>
+          ${members.map(user => renderUserCard(user)).join('')}
+        </div>`;
       }
 
-      // Add info message for non-admins
       if (!isCurrentUserAdmin) {
-        html += `
-          <div style="
-            margin-top: var(--space-lg);
-            padding: var(--space-md);
-            background: var(--bg-elevated);
-            border: 1px solid var(--border-default);
-            border-radius: var(--radius-sm);
-            text-align: center;
-          ">
-            <p class="text-secondary" style="font-size: 0.875rem; margin: 0;">
-              Only admins can manage team members.<br/>
-              Contact your team admin if you need changes.
-            </p>
-          </div>
-        `;
+        html += `<div class="info-box">
+          <p>Only admins can manage team members.<br>Contact your team admin if you need changes.</p>
+        </div>`;
       }
 
       container.innerHTML = html;
     } catch (error) {
-      container.innerHTML = `<p style="color: var(--accent-orange);">${error instanceof Error ? error.message : 'Failed to load users'}</p>`;
+      container.innerHTML = `<div class="loading-state" style="color: var(--accent-orange);">${error instanceof Error ? error.message : 'Failed to load users'}</div>`;
     }
   }
 
   function renderUserCard(user: User): string {
     const isSelf = user.id === currentUserId;
+    const safeName = escapeHtml(user.name);
+    const safeEmail = user.email ? escapeHtml(user.email) : 'No email';
 
     let actionsHtml = '';
     if (isCurrentUserAdmin) {
       const buttons: string[] = [];
 
       if (user.role === 'member') {
-        buttons.push(`<button class="action-btn" onclick="promoteUser('${user.id}', '${user.name}')">Promote</button>`);
+        buttons.push(`<button class="btn-action" onclick="promoteUser('${user.id}', '${safeName}')">Promote</button>`);
       } else if (!isSelf) {
-        buttons.push(`<button class="action-btn" onclick="demoteUser('${user.id}', '${user.name}')">Demote</button>`);
+        buttons.push(`<button class="btn-action" onclick="demoteUser('${user.id}', '${safeName}')">Demote</button>`);
       }
 
       if (!isSelf) {
-        buttons.push(`<button class="action-btn danger" onclick="removeUser('${user.id}', '${user.name}')">Remove</button>`);
+        buttons.push(`<button class="btn-action btn-danger" onclick="removeUser('${user.id}', '${safeName}')">Remove</button>`);
       }
 
       if (buttons.length > 0) {
@@ -265,16 +302,18 @@ import { Header } from '@components/Header';
       }
     }
 
-    return `
-      <div class="user-card" data-user-id="${user.id}">
-        <div class="user-info">
-          <div class="user-name">${user.name}${isSelf ? ' (you)' : ''}</div>
-          <div class="user-email">${user.email || 'No email'}</div>
+    return `<div class="user-card">
+      <div class="user-card-inner">
+        <div class="user-details">
+          <div class="user-name">${safeName}${isSelf ? ' (you)' : ''}</div>
+          <div class="user-email">${safeEmail}</div>
         </div>
-        <span class="role-badge ${user.role}">${user.role}</span>
+        <div class="user-role">
+          <span class="badge badge-${user.role}">${user.role}</span>
+        </div>
         ${actionsHtml}
       </div>
-    `;
+    </div>`;
   }
 
   async function promoteUser(userId: string, userName: string) {
@@ -341,11 +380,9 @@ import { Header } from '@components/Header';
     }
   }
 
-  // Make functions global
   (window as unknown as { promoteUser: typeof promoteUser }).promoteUser = promoteUser;
   (window as unknown as { demoteUser: typeof demoteUser }).demoteUser = demoteUser;
   (window as unknown as { removeUser: typeof removeUser }).removeUser = removeUser;
 
-  // Load users on page load
   loadUsers();
 </script>
