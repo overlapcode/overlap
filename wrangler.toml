@@ -1,5 +1,6 @@
 name = "overlap"
 compatibility_date = "2025-01-15"
+compatibility_flags = ["nodejs_compat"]
 
 # For Workers-based deployment (used by Deploy button)
 main = "dist/_worker.js/index.js"
