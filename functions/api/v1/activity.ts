@@ -1,5 +1,5 @@
 import { authenticateRequest, errorResponse, successResponse } from '@lib/auth/middleware';
-import { getRecentActivity } from '@lib/db/queries';
+import { getRecentActivity, markStaleSessions, cleanupExpiredTokens } from '@lib/db/queries';
 
 type Env = {
   DB: D1Database;
@@ -21,6 +21,13 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
   const limit = limitParam ? Math.min(parseInt(limitParam, 10), 100) : 50;
 
   try {
+    // On-demand cleanup: mark stale sessions and clean up expired tokens
+    // This replaces the cron job since Pages doesn't support scheduled triggers
+    await Promise.all([
+      markStaleSessions(env.DB),
+      cleanupExpiredTokens(env.DB),
+    ]);
+
     const activity = await getRecentActivity(env.DB, team.id, limit);
 
     return successResponse({

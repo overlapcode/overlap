@@ -436,3 +436,63 @@ export async function checkForOverlaps(
       : null,
   }));
 }
+
+// ============================================================================
+// STALE SESSION CLEANUP (on-demand, since Pages doesn't support cron)
+// ============================================================================
+
+/**
+ * Mark sessions as stale if they haven't had activity within the configured timeout.
+ * This runs on-demand when fetching activity, rather than via cron.
+ * Returns the number of sessions marked as stale.
+ */
+export async function markStaleSessions(db: D1Database): Promise<number> {
+  // Get the default stale timeout from team settings
+  const team = await db
+    .prepare('SELECT stale_timeout_hours FROM teams LIMIT 1')
+    .first<{ stale_timeout_hours: number }>();
+
+  const defaultTimeout = team?.stale_timeout_hours ?? 8;
+
+  // Mark sessions as stale based on user-specific or team default timeout
+  // Uses COALESCE to prefer user's timeout, falling back to team default
+  const result = await db
+    .prepare(
+      `UPDATE sessions
+       SET status = 'stale'
+       WHERE status = 'active'
+       AND datetime(last_activity_at, '+' ||
+         COALESCE(
+           (SELECT stale_timeout_hours FROM users WHERE users.id = sessions.user_id),
+           ?
+         ) || ' hours'
+       ) < datetime('now')`
+    )
+    .bind(defaultTimeout)
+    .run();
+
+  return result.meta.changes ?? 0;
+}
+
+/**
+ * Clean up expired magic links and web sessions.
+ * Call this periodically (e.g., when fetching activity).
+ */
+export async function cleanupExpiredTokens(db: D1Database): Promise<void> {
+  // Clean up old magic links
+  await db
+    .prepare(
+      `DELETE FROM magic_links
+       WHERE expires_at < datetime('now')
+       OR used_at IS NOT NULL`
+    )
+    .run();
+
+  // Clean up old web sessions
+  await db
+    .prepare(
+      `DELETE FROM web_sessions
+       WHERE expires_at < datetime('now')`
+    )
+    .run();
+}
