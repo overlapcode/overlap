@@ -290,6 +290,94 @@ echo '{"hook_event_name":"PostToolUse","tool_name":"Write","tool_input":{"file_p
   python3 plugin/scripts/heartbeat.py
 ```
 
+## Versioning & Updates
+
+### Critical: User Deployments Depend On This Repo
+
+Users deploy Overlap by:
+1. Clicking Deploy to Cloudflare button → forks this repo
+2. Installing plugin via `/plugin marketplace add overlapcode/overlap`
+
+**When you push to main, users can sync their fork to get updates.** This means:
+- Breaking changes can break ALL user deployments
+- Database schema changes need migration support
+- API changes must be backward compatible (or versioned)
+- Plugin changes must work with older server versions
+
+### Version Locations (Keep In Sync)
+
+| File | Location | Purpose |
+|------|----------|---------|
+| `package.json` | `version` field | NPM version |
+| `functions/api/v1/version.ts` | `VERSION` constant | API reports this |
+| `plugin/.claude-plugin/plugin.json` | `version` field | Plugin version |
+
+**Always update all three when releasing.**
+
+### Database Migrations
+
+The database auto-migrates via `src/lib/db/migrate.ts` using `CREATE TABLE IF NOT EXISTS`.
+
+**Adding new tables:**
+1. Add to `migrations/001_initial.sql` (for new deployments)
+2. Add to `src/lib/db/migrate.ts` schema string (for auto-migration)
+3. Both must match exactly
+
+**Adding columns to existing tables:**
+1. Use `ALTER TABLE ... ADD COLUMN` with `IF NOT EXISTS` (SQLite 3.35+)
+2. Or use a check-then-alter pattern in migrate.ts
+3. New columns MUST have defaults or be nullable
+
+**Never do:**
+- Drop tables or columns (breaks existing data)
+- Rename tables or columns (breaks existing queries)
+- Change column types (data loss risk)
+
+### API Backward Compatibility
+
+**Safe changes:**
+- Adding new endpoints
+- Adding optional fields to responses
+- Adding optional parameters to requests
+
+**Breaking changes (avoid or version):**
+- Removing endpoints
+- Removing fields from responses
+- Changing required parameters
+- Changing response structure
+
+If you must make breaking changes, create a new API version (`/api/v2/`).
+
+### Plugin Compatibility
+
+The plugin calls the server API. Ensure:
+- Plugin works with servers running older versions
+- Server works with older plugin versions
+- Gracefully handle missing endpoints (check response, don't crash)
+
+### Release Checklist
+
+Before pushing significant changes:
+1. [ ] Update version in all 3 locations
+2. [ ] Test with fresh deployment (new D1 database)
+3. [ ] Test upgrade path (existing D1 database)
+4. [ ] Ensure plugin works with old server
+5. [ ] Update CHANGELOG.md if exists
+
+### How Users Update
+
+**Plugin:**
+```
+/plugin update overlap@overlapcode-overlap
+```
+
+**Cloudflare Service (Dashboard + API):**
+1. Go to their fork on GitHub
+2. Click "Sync fork" → "Update branch"
+3. Cloudflare auto-deploys from the synced fork
+
+The dashboard and API are the SAME deployment - they update together.
+
 ## Don't Do
 
 - Don't use `any` type - use `unknown` and narrow
@@ -300,6 +388,9 @@ echo '{"hook_event_name":"PostToolUse","tool_name":"Write","tool_input":{"file_p
 - Don't add Co-Authored-By or Claude attribution to commits
 - Don't create feature branches - commit to main
 - Don't interpolate user input into SQL - use prepared statements
+- Don't make breaking API changes without versioning (see Versioning section)
+- Don't drop or rename database columns/tables
+- Don't change version in one place without updating all three locations
 
 ## External Documentation
 
