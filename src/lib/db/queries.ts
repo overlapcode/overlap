@@ -226,20 +226,6 @@ export async function endSession(db: D1Database, sessionId: string): Promise<voi
     .run();
 }
 
-export async function markStaleSessions(db: D1Database, hoursThreshold: number): Promise<number> {
-  const result = await db
-    .prepare(
-      `UPDATE sessions
-       SET status = 'stale'
-       WHERE status = 'active'
-       AND datetime(last_activity_at, '+' || ? || ' hours') < datetime('now')`
-    )
-    .bind(hoursThreshold)
-    .run();
-
-  return result.meta.changes ?? 0;
-}
-
 export async function getActiveSessionsForUser(db: D1Database, userId: string): Promise<Session[]> {
   const result = await db
     .prepare("SELECT * FROM sessions WHERE user_id = ? AND status = 'active' ORDER BY last_activity_at DESC")
