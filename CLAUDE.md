@@ -1,13 +1,5 @@
 # Overlap Development Guidelines
 
-## Current Year: 2026
-
-**IMPORTANT**: The current year is 2026. When working on this project:
-- Use `compatibility_date = "2026-XX-XX"` in wrangler.toml
-- Use 2026 package versions (e.g., `@cloudflare/workers-types: ^4.2026XXXX.0`)
-- Check npm for latest package versions before adding dependencies
-- Do not use 2025 or earlier dates/versions
-
 ## Project Overview
 
 Overlap is a Claude Code plugin + self-hosted Cloudflare service that:

@@ -8,107 +8,197 @@ import { Header } from '@components/Header';
 
   <main class="container" style="padding-top: var(--space-xl); padding-bottom: var(--space-xl);">
     <div style="max-width: 500px; margin: 0 auto;">
-      <h1 style="font-size: 1.5rem; margin-bottom: var(--space-md);">Join Your Team</h1>
-      <p class="text-secondary" style="margin-bottom: var(--space-xl);">
-        Enter your team token to join an existing Overlap team.
-      </p>
+      <!-- Join Form -->
+      <div id="join-section">
+        <h1 style="font-size: 1.5rem; margin-bottom: var(--space-md);">Join Your Team</h1>
+        <p class="text-secondary" style="margin-bottom: var(--space-xl);">
+          Enter your team token to join an existing Overlap team.
+        </p>
 
-      <form id="join-form" class="card">
-        <div style="margin-bottom: var(--space-lg);">
-          <label
-            for="team-token"
-            style="display: block; margin-bottom: var(--space-sm); font-weight: 500;"
-          >
-            Team Token
-          </label>
-          <input
-            type="text"
-            id="team-token"
-            name="team_token"
-            required
-            placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
-            style="
-              width: 100%;
-              padding: var(--space-sm) var(--space-md);
-              background: var(--bg-elevated);
-              border: 1px solid var(--border-default);
-              border-radius: var(--radius-sm);
-              color: var(--text-primary);
-              font-family: var(--font-mono);
-              font-size: 0.875rem;
-            "
-          />
-          <p class="text-muted" style="font-size: 0.75rem; margin-top: var(--space-xs);">
-            Get this from your team admin
+        <form id="join-form" class="card">
+          <div style="margin-bottom: var(--space-lg);">
+            <label
+              for="team-token-input"
+              style="display: block; margin-bottom: var(--space-sm); font-weight: 500;"
+            >
+              Team Token
+            </label>
+            <input
+              type="text"
+              id="team-token-input"
+              name="team_token"
+              required
+              placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+              style="
+                width: 100%;
+                padding: var(--space-sm) var(--space-md);
+                background: var(--bg-elevated);
+                border: 1px solid var(--border-default);
+                border-radius: var(--radius-sm);
+                color: var(--text-primary);
+                font-family: var(--font-mono);
+                font-size: 0.875rem;
+              "
+            />
+            <p class="text-muted" style="font-size: 0.75rem; margin-top: var(--space-xs);">
+              Get this from your team admin
+            </p>
+          </div>
+
+          <div style="margin-bottom: var(--space-lg);">
+            <label
+              for="name"
+              style="display: block; margin-bottom: var(--space-sm); font-weight: 500;"
+            >
+              Your Name
+            </label>
+            <input
+              type="text"
+              id="name"
+              name="name"
+              required
+              placeholder="Jane Developer"
+              style="
+                width: 100%;
+                padding: var(--space-sm) var(--space-md);
+                background: var(--bg-elevated);
+                border: 1px solid var(--border-default);
+                border-radius: var(--radius-sm);
+                color: var(--text-primary);
+                font-size: 1rem;
+              "
+            />
+          </div>
+
+          <div style="margin-bottom: var(--space-lg);">
+            <label
+              for="email"
+              style="display: block; margin-bottom: var(--space-sm); font-weight: 500;"
+            >
+              Email (optional)
+            </label>
+            <input
+              type="email"
+              id="email"
+              name="email"
+              placeholder="jane@example.com"
+              style="
+                width: 100%;
+                padding: var(--space-sm) var(--space-md);
+                background: var(--bg-elevated);
+                border: 1px solid var(--border-default);
+                border-radius: var(--radius-sm);
+                color: var(--text-primary);
+                font-size: 1rem;
+              "
+            />
+          </div>
+
+          <button type="submit" class="btn btn-primary" style="width: 100%;" id="submit-btn">
+            Join Team
+          </button>
+
+          <p id="error-message" style="margin-top: var(--space-md); text-align: center; color: var(--accent-orange); display: none;"></p>
+        </form>
+      </div>
+
+      <!-- Success Section (hidden initially) -->
+      <div id="success-section" style="display: none;">
+        <div style="text-align: center; margin-bottom: var(--space-xl);">
+          <div style="
+            width: 64px;
+            height: 64px;
+            margin: 0 auto var(--space-lg);
+            background: var(--accent-green);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2rem;
+          ">
+            ✓
+          </div>
+          <h1 style="font-size: 1.5rem; margin-bottom: var(--space-sm);">Welcome to <span id="team-name-display">the Team</span>!</h1>
+          <p class="text-secondary">
+            Save your user token - you'll need it to configure the Claude Code plugin.
           </p>
         </div>
 
-        <div style="margin-bottom: var(--space-lg);">
-          <label
-            for="name"
-            style="display: block; margin-bottom: var(--space-sm); font-weight: 500;"
-          >
-            Your Name
-          </label>
-          <input
-            type="text"
-            id="name"
-            name="name"
-            required
-            placeholder="Jane Developer"
-            style="
-              width: 100%;
-              padding: var(--space-sm) var(--space-md);
-              background: var(--bg-elevated);
-              border: 1px solid var(--border-default);
-              border-radius: var(--radius-sm);
-              color: var(--text-primary);
-              font-size: 1rem;
-            "
-          />
+        <div class="card" style="margin-bottom: var(--space-lg);">
+          <div>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-sm);">
+              <label style="font-weight: 500; font-size: 0.875rem;">Your User Token</label>
+              <button type="button" class="copy-btn" data-target="user-token" style="
+                background: none;
+                border: 1px solid var(--border-default);
+                color: var(--text-secondary);
+                padding: 4px 8px;
+                border-radius: var(--radius-sm);
+                font-size: 0.75rem;
+                cursor: pointer;
+              ">
+                Copy
+              </button>
+            </div>
+            <input
+              type="text"
+              id="user-token"
+              readonly
+              style="
+                width: 100%;
+                padding: var(--space-sm) var(--space-md);
+                background: var(--bg-primary);
+                border: 1px solid var(--border-subtle);
+                border-radius: var(--radius-sm);
+                color: var(--text-primary);
+                font-family: var(--font-mono);
+                font-size: 0.875rem;
+              "
+            />
+            <p class="text-muted" style="font-size: 0.75rem; margin-top: var(--space-xs);">
+              Your personal token for the Claude Code plugin. Keep this private.
+            </p>
+          </div>
         </div>
 
-        <div style="margin-bottom: var(--space-lg);">
-          <label
-            for="email"
-            style="display: block; margin-bottom: var(--space-sm); font-weight: 500;"
-          >
-            Email (optional)
-          </label>
-          <input
-            type="email"
-            id="email"
-            name="email"
-            placeholder="jane@example.com"
-            style="
-              width: 100%;
-              padding: var(--space-sm) var(--space-md);
-              background: var(--bg-elevated);
-              border: 1px solid var(--border-default);
-              border-radius: var(--radius-sm);
-              color: var(--text-primary);
-              font-size: 1rem;
-            "
-          />
+        <div style="background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: var(--space-lg); margin-bottom: var(--space-lg);">
+          <h3 style="font-size: 1rem; margin-bottom: var(--space-md);">Next Steps</h3>
+          <ol style="padding-left: var(--space-lg); color: var(--text-secondary); font-size: 0.875rem; line-height: 1.8;">
+            <li>Install the Claude Code plugin: <code style="background: var(--bg-elevated); padding: 2px 6px; border-radius: 3px;">/plugin marketplace add overlapcode/overlap</code></li>
+            <li>Configure it with your token: <code style="background: var(--bg-elevated); padding: 2px 6px; border-radius: 3px;">/overlap:config</code></li>
+            <li>Start coding - your activity will appear on the dashboard!</li>
+          </ol>
         </div>
 
-        <button type="submit" class="btn btn-primary" style="width: 100%;">
-          Join Team
-        </button>
-      </form>
+        <a href="/" class="btn btn-primary" style="width: 100%; text-align: center; text-decoration: none;">
+          Go to Dashboard
+        </a>
+      </div>
     </div>
   </main>
 </Layout>
 
 <script>
   const form = document.getElementById('join-form') as HTMLFormElement;
+  const joinSection = document.getElementById('join-section') as HTMLDivElement;
+  const successSection = document.getElementById('success-section') as HTMLDivElement;
+  const errorMessage = document.getElementById('error-message') as HTMLParagraphElement;
+  const submitBtn = document.getElementById('submit-btn') as HTMLButtonElement;
+  const userTokenInput = document.getElementById('user-token') as HTMLInputElement;
+  const teamNameDisplay = document.getElementById('team-name-display') as HTMLSpanElement;
 
   form?.addEventListener('submit', async (e) => {
     e.preventDefault();
 
+    // Disable submit button
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Joining...';
+    errorMessage.style.display = 'none';
+
     const formData = new FormData(form);
+    const teamToken = formData.get('team_token') as string;
     const data = {
-      team_token: formData.get('team_token'),
+      team_token: teamToken,
       name: formData.get('name'),
       email: formData.get('email') || null,
     };
@@ -125,15 +215,68 @@ import { Header } from '@components/Header';
         throw new Error(errorData.error || 'Join failed');
       }
 
-      const result = await response.json() as { data: { user_token: string } };
+      const result = await response.json() as {
+        data: {
+          user_id: string;
+          user_token: string;
+          team_name: string;
+        }
+      };
 
-      // Show success with user token
-      alert(`Welcome to the team!\n\nYour User Token: ${result.data.user_token}\n\nSave this token - you'll need it to configure the Claude Code plugin.`);
+      // Show token in the success section
+      userTokenInput.value = result.data.user_token;
+      teamNameDisplay.textContent = result.data.team_name;
 
-      // Redirect to timeline
-      window.location.href = '/';
+      // Create a web session for the dashboard
+      try {
+        await fetch('/api/v1/auth/create-session', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            user_id: result.data.user_id,
+            user_token: result.data.user_token,
+            team_token: teamToken,
+          }),
+        });
+      } catch (sessionError) {
+        console.error('Failed to create session:', sessionError);
+        // Continue anyway - user can still use the token
+      }
+
+      // Hide form, show success
+      joinSection.style.display = 'none';
+      successSection.style.display = 'block';
+
     } catch (error) {
-      alert(error instanceof Error ? error.message : 'Join failed');
+      errorMessage.textContent = error instanceof Error ? error.message : 'Join failed';
+      errorMessage.style.display = 'block';
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Join Team';
     }
+  });
+
+  // Copy button handlers
+  document.querySelectorAll('.copy-btn').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      const targetId = (btn as HTMLButtonElement).dataset.target;
+      const input = document.getElementById(targetId!) as HTMLInputElement;
+
+      try {
+        await navigator.clipboard.writeText(input.value);
+        const originalText = btn.textContent;
+        btn.textContent = 'Copied!';
+        setTimeout(() => {
+          btn.textContent = originalText;
+        }, 2000);
+      } catch (err) {
+        // Fallback for older browsers
+        input.select();
+        document.execCommand('copy');
+        btn.textContent = 'Copied!';
+        setTimeout(() => {
+          btn.textContent = 'Copy';
+        }, 2000);
+      }
+    });
   });
 </script>

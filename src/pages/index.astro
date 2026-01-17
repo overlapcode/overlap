@@ -4,11 +4,21 @@ import { Header } from '@components/Header';
 import { UpdateBanner } from '@components/UpdateBanner';
 import { Timeline } from '@components/Timeline';
 import { getSessionUser } from '@lib/auth/session';
+import { getTeam } from '@lib/db/queries';
 
 // Get session data from cookie
 let sessionData = null;
+let teamExists = false;
+
 if (Astro.locals.runtime?.env?.DB) {
-  sessionData = await getSessionUser(Astro.cookies, Astro.locals.runtime.env.DB);
+  const db = Astro.locals.runtime.env.DB;
+  sessionData = await getSessionUser(Astro.cookies, db);
+
+  // Check if a team exists (for non-authenticated visitors)
+  if (!sessionData) {
+    const team = await getTeam(db);
+    teamExists = !!team;
+  }
 }
 
 const teamName = sessionData?.team.name;
@@ -26,6 +36,16 @@ const isAuthenticated = !!sessionData;
 
       {isAuthenticated ? (
         <Timeline client:load />
+      ) : teamExists ? (
+        <div class="card" style="text-align: center; padding: var(--space-xl);">
+          <h2 style="font-size: 1.25rem; margin-bottom: var(--space-md);">Welcome to Overlap</h2>
+          <p class="text-secondary" style="margin-bottom: var(--space-lg);">
+            Track what your team is working on across Claude Code sessions.
+          </p>
+          <div style="display: flex; gap: var(--space-md); justify-content: center;">
+            <a href="/join" class="btn btn-primary">Join Team</a>
+          </div>
+        </div>
       ) : (
         <div class="card" style="text-align: center; padding: var(--space-xl);">
           <h2 style="font-size: 1.25rem; margin-bottom: var(--space-md);">Welcome to Overlap</h2>
@@ -34,7 +54,6 @@ const isAuthenticated = !!sessionData;
           </p>
           <div style="display: flex; gap: var(--space-md); justify-content: center;">
             <a href="/setup" class="btn btn-primary">Set Up Team</a>
-            <a href="/join" class="btn btn-secondary">Join Team</a>
           </div>
         </div>
       )}

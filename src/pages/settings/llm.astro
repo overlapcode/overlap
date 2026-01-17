@@ -157,16 +157,64 @@ import { Header } from '@components/Header';
 <script>
   const form = document.getElementById('llm-form') as HTMLFormElement | null;
   const providerSelect = document.getElementById('provider') as unknown as HTMLSelectElement | null;
+  const modelInput = document.getElementById('model') as HTMLInputElement | null;
+  const apiKeyInput = document.getElementById('api-key') as HTMLInputElement | null;
   const modelSection = document.getElementById('model-section') as HTMLDivElement | null;
   const apiKeySection = document.getElementById('api-key-section') as HTMLDivElement | null;
   const statusMessage = document.getElementById('status-message') as HTMLParagraphElement | null;
 
   // Show/hide sections based on provider
-  providerSelect?.addEventListener('change', () => {
-    const isHeuristic = providerSelect.value === 'heuristic';
+  function updateSections() {
+    const isHeuristic = providerSelect?.value === 'heuristic';
     if (modelSection) modelSection.style.display = isHeuristic ? 'none' : 'block';
     if (apiKeySection) apiKeySection.style.display = isHeuristic ? 'none' : 'block';
-  });
+  }
+
+  providerSelect?.addEventListener('change', updateSections);
+
+  // Load current settings on page load
+  async function loadSettings() {
+    try {
+      const response = await fetch('/api/v1/admin/llm');
+      if (!response.ok) {
+        console.error('Failed to load LLM settings');
+        return;
+      }
+
+      const result = await response.json() as {
+        data?: {
+          provider: string;
+          model: string | null;
+          has_api_key: boolean;
+        }
+      };
+
+      if (result.data) {
+        // Set provider
+        if (providerSelect) {
+          providerSelect.value = result.data.provider;
+        }
+
+        // Set model
+        if (modelInput && result.data.model) {
+          modelInput.value = result.data.model;
+        }
+
+        // Show placeholder if API key is set
+        if (apiKeyInput && result.data.has_api_key) {
+          apiKeyInput.placeholder = '••••••••••••••••';
+        }
+
+        // Update section visibility
+        updateSections();
+      }
+    } catch (error) {
+      console.error('Error loading LLM settings:', error);
+    }
+  }
+
+  // Load settings on page load
+  loadSettings();
 
   form?.addEventListener('submit', async (e) => {
     e.preventDefault();

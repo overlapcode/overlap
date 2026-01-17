@@ -1,6 +1,6 @@
 import type { APIContext } from 'astro';
 import { z } from 'zod';
-import { authenticateRequest, requireAdmin, errorResponse, successResponse } from '@lib/auth/middleware';
+import { authenticateAny, requireAdmin, errorResponse, successResponse } from '@lib/auth/middleware';
 import { getUserById } from '@lib/db/queries';
 
 const UpdateUserSchema = z.object({
@@ -14,8 +14,8 @@ export async function PUT(context: APIContext) {
   const userId = params.id as string;
   const db = context.locals.runtime.env.DB;
 
-  // Authenticate and require admin
-  const authResult = await authenticateRequest(request, db);
+  // Authenticate (supports both web session and API tokens) and require admin
+  const authResult = await authenticateAny(request, db);
   if (!authResult.success) {
     return errorResponse(authResult.error, authResult.status);
   }
@@ -45,6 +45,18 @@ export async function PUT(context: APIContext) {
     const user = await getUserById(db, userId);
     if (!user) {
       return errorResponse('User not found', 404);
+    }
+
+    // Check if trying to demote from admin to member
+    if (input.role === 'member' && user.role === 'admin') {
+      // Count how many admins exist
+      const adminCount = await db
+        .prepare("SELECT COUNT(*) as count FROM users WHERE role = 'admin' AND is_active = 1")
+        .first<{ count: number }>();
+
+      if (adminCount && adminCount.count <= 1) {
+        return errorResponse('Cannot demote the only admin. Promote another user first.', 400);
+      }
     }
 
     // Build update query

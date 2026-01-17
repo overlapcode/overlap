@@ -23,6 +23,22 @@ import { Header } from '@components/Header';
       <div id="repos-list" class="card">
         <p class="text-secondary">Loading...</p>
       </div>
+
+      <!-- Toast for error messages -->
+      <div id="toast" style="
+        position: fixed;
+        bottom: var(--space-lg);
+        left: 50%;
+        transform: translateX(-50%);
+        background: var(--bg-elevated);
+        border: 1px solid var(--accent-orange);
+        color: var(--accent-orange);
+        padding: var(--space-sm) var(--space-lg);
+        border-radius: var(--radius-md);
+        font-size: 0.875rem;
+        display: none;
+        z-index: 1000;
+      "></div>
     </div>
   </main>
 </Layout>
@@ -71,6 +87,16 @@ import { Header } from '@components/Header';
     remote_url: string | null;
     is_public: boolean;
   };
+
+  const toast = document.getElementById('toast') as HTMLDivElement;
+
+  function showToast(message: string) {
+    toast.textContent = message;
+    toast.style.display = 'block';
+    setTimeout(() => {
+      toast.style.display = 'none';
+    }, 4000);
+  }
 
   async function loadRepos() {
     const container = document.getElementById('repos-list') as HTMLDivElement;
@@ -127,7 +153,7 @@ import { Header } from '@components/Header';
         throw new Error(result.error || 'Failed to update repository');
       }
     } catch (error) {
-      alert(error instanceof Error ? error.message : 'Failed to update repository');
+      showToast(error instanceof Error ? error.message : 'Failed to update repository');
       loadRepos(); // Reload to reset state
     }
   }
