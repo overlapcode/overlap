@@ -1,5 +1,5 @@
 name = "overlap"
-compatibility_date = "2025-01-15"
+compatibility_date = "2026-01-15"
 compatibility_flags = ["nodejs_compat"]
 
 # For Workers-based deployment (used by Deploy button)
