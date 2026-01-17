@@ -183,33 +183,8 @@ echo "📝 Updating wrangler.toml with resource IDs..." >&2
 echo "   D1_ID: $D1_ID" >&2
 echo "   KV_ID: $KV_ID" >&2
 
-# Use node to update wrangler.toml
-node -e "
-const fs = require('fs');
-let toml = fs.readFileSync('wrangler.toml', 'utf8');
-
-const d1Id = '$D1_ID';
-const kvId = '$KV_ID';
-
-// Add database_id if not present
-if (!toml.includes('database_id')) {
-  toml = toml.replace(
-    /database_name = \"overlap-db\"/,
-    'database_name = \"overlap-db\"\\ndatabase_id = \"' + d1Id + '\"'
-  );
-}
-
-// Add KV id if not present
-if (!/\\[\\[kv_namespaces\\]\\][^\\[]*id = \"/.test(toml)) {
-  toml = toml.replace(
-    /\\[\\[kv_namespaces\\]\\]\\s*\\nbinding = \"SESSION\"/,
-    '[[kv_namespaces]]\\nbinding = \"SESSION\"\\nid = \"' + kvId + '\"'
-  );
-}
-
-fs.writeFileSync('wrangler.toml', toml);
-console.log('✅ Updated wrangler.toml');
-"
+# Use external script to avoid escaping issues
+node scripts/update-wrangler.js "$D1_ID" "$KV_ID"
 
 echo "" >&2
 echo "🚀 Deploying to Cloudflare..." >&2
