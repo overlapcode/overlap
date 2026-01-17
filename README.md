@@ -210,38 +210,13 @@ In Claude Code, run:
 
 ### Update the Service
 
-The Deploy to Cloudflare button creates a **clone** of this repository in your GitHub account (not a fork). This means GitHub's "Sync fork" button won't appear. Here's how to update:
+**Automatic Updates:** Your cloned repository includes a GitHub Action that automatically syncs from upstream daily. When updates are available, they're merged and Cloudflare auto-deploys them. No action needed!
 
-**Option 1: Set up upstream and sync (Recommended)**
+**Manual sync:** If you want to update immediately:
+1. Go to your cloned repo on GitHub
+2. Click **Actions** → **Sync from Upstream** → **Run workflow**
 
-First time only - add the upstream remote:
-```bash
-cd your-overlap-clone
-git remote add upstream https://github.com/overlapcode/overlap.git
-```
-
-Then to update:
-```bash
-git fetch upstream
-git merge upstream/main
-git push origin main
-# Cloudflare will auto-deploy when you push
-```
-
-**Option 2: Convert clone to fork**
-1. Delete your cloned repository on GitHub
-2. Fork https://github.com/overlapcode/overlap instead
-3. In Cloudflare Dashboard → Workers & Pages → your project → Settings → Builds & deployments
-4. Disconnect and reconnect to your new fork
-5. Now "Sync fork" will work going forward
-
-**Option 3: Trigger manual deployment**
-1. Go to Cloudflare Dashboard → Workers & Pages → overlap
-2. Click "Create deployment"
-3. Select your branch and deploy
-
-**Option 4: Full redeploy**
-Delete your Cloudflare project and click the Deploy button again. Note: You'll need to reconfigure your team.
+**Disable auto-updates:** If you prefer manual control, go to Actions → Sync from Upstream → ⋯ → Disable workflow
 
 ### Check Current Version
 

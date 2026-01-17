@@ -1,0 +1,62 @@
+name: Sync from Upstream
+
+on:
+  schedule:
+    # Run daily at 00:00 UTC
+    - cron: '0 0 * * *'
+  workflow_dispatch:
+    # Allow manual trigger from Actions tab
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    # Only run if this is a clone (not the original repo)
+    if: github.repository != 'overlapcode/overlap'
+
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Add upstream remote
+        run: |
+          git remote add upstream https://github.com/overlapcode/overlap.git || true
+          git fetch upstream
+
+      - name: Check for updates
+        id: check
+        run: |
+          # Compare local main with upstream main
+          LOCAL=$(git rev-parse HEAD)
+          UPSTREAM=$(git rev-parse upstream/main)
+
+          if [ "$LOCAL" = "$UPSTREAM" ]; then
+            echo "Already up to date"
+            echo "has_updates=false" >> $GITHUB_OUTPUT
+          else
+            echo "Updates available"
+            echo "has_updates=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Merge upstream changes
+        if: steps.check.outputs.has_updates == 'true'
+        run: |
+          # Merge upstream/main into current branch
+          git merge upstream/main --no-edit -m "Sync with upstream overlapcode/overlap"
+
+      - name: Push changes
+        if: steps.check.outputs.has_updates == 'true'
+        run: |
+          git push origin main
+          echo "Successfully synced with upstream!"
+          echo "Cloudflare will auto-deploy the changes."
