@@ -1,0 +1,165 @@
+---
+import Layout from '@layouts/Layout.astro';
+import { Header } from '@components/Header';
+---
+
+<Layout title="Setup">
+  <Header client:load />
+
+  <main class="container" style="padding-top: var(--space-xl); padding-bottom: var(--space-xl);">
+    <div style="max-width: 500px; margin: 0 auto;">
+      <h1 style="font-size: 1.5rem; margin-bottom: var(--space-md);">Set Up Your Team</h1>
+      <p class="text-secondary" style="margin-bottom: var(--space-xl);">
+        Configure your Overlap instance. This creates your team and admin account.
+      </p>
+
+      <form id="setup-form" class="card">
+        <div style="margin-bottom: var(--space-lg);">
+          <label
+            for="team-name"
+            style="display: block; margin-bottom: var(--space-sm); font-weight: 500;"
+          >
+            Team Name
+          </label>
+          <input
+            type="text"
+            id="team-name"
+            name="team_name"
+            required
+            placeholder="My Awesome Team"
+            style="
+              width: 100%;
+              padding: var(--space-sm) var(--space-md);
+              background: var(--bg-elevated);
+              border: 1px solid var(--border-default);
+              border-radius: var(--radius-sm);
+              color: var(--text-primary);
+              font-size: 1rem;
+            "
+          />
+        </div>
+
+        <div style="margin-bottom: var(--space-lg);">
+          <label
+            for="admin-name"
+            style="display: block; margin-bottom: var(--space-sm); font-weight: 500;"
+          >
+            Your Name
+          </label>
+          <input
+            type="text"
+            id="admin-name"
+            name="admin_name"
+            required
+            placeholder="Jane Developer"
+            style="
+              width: 100%;
+              padding: var(--space-sm) var(--space-md);
+              background: var(--bg-elevated);
+              border: 1px solid var(--border-default);
+              border-radius: var(--radius-sm);
+              color: var(--text-primary);
+              font-size: 1rem;
+            "
+          />
+        </div>
+
+        <div style="margin-bottom: var(--space-lg);">
+          <label
+            for="admin-email"
+            style="display: block; margin-bottom: var(--space-sm); font-weight: 500;"
+          >
+            Email (optional)
+          </label>
+          <input
+            type="email"
+            id="admin-email"
+            name="admin_email"
+            placeholder="jane@example.com"
+            style="
+              width: 100%;
+              padding: var(--space-sm) var(--space-md);
+              background: var(--bg-elevated);
+              border: 1px solid var(--border-default);
+              border-radius: var(--radius-sm);
+              color: var(--text-primary);
+              font-size: 1rem;
+            "
+          />
+        </div>
+
+        <div style="margin-bottom: var(--space-lg);">
+          <label
+            for="dashboard-password"
+            style="display: block; margin-bottom: var(--space-sm); font-weight: 500;"
+          >
+            Dashboard Password
+          </label>
+          <input
+            type="password"
+            id="dashboard-password"
+            name="dashboard_password"
+            required
+            minlength="8"
+            placeholder="••••••••"
+            style="
+              width: 100%;
+              padding: var(--space-sm) var(--space-md);
+              background: var(--bg-elevated);
+              border: 1px solid var(--border-default);
+              border-radius: var(--radius-sm);
+              color: var(--text-primary);
+              font-size: 1rem;
+            "
+          />
+          <p class="text-muted" style="font-size: 0.75rem; margin-top: var(--space-xs);">
+            Used to access the web dashboard. Share with your team.
+          </p>
+        </div>
+
+        <button type="submit" class="btn btn-primary" style="width: 100%;">
+          Create Team
+        </button>
+      </form>
+    </div>
+  </main>
+</Layout>
+
+<script>
+  const form = document.getElementById('setup-form') as HTMLFormElement;
+
+  form?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+
+    const formData = new FormData(form);
+    const data = {
+      team_name: formData.get('team_name'),
+      admin_name: formData.get('admin_name'),
+      admin_email: formData.get('admin_email') || null,
+      dashboard_password: formData.get('dashboard_password'),
+    };
+
+    try {
+      const response = await fetch('/api/v1/setup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json() as { error?: string };
+        throw new Error(errorData.error || 'Setup failed');
+      }
+
+      const result = await response.json() as { data: { team_token: string; user_token: string } };
+
+      // Show success with tokens
+      alert(`Team created!\n\nTeam Token: ${result.data.team_token}\nUser Token: ${result.data.user_token}\n\nSave these tokens - you'll need them to configure the Claude Code plugin.`);
+
+      // Redirect to timeline
+      window.location.href = '/';
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'Setup failed');
+    }
+  });
+</script>

@@ -1,0 +1,118 @@
+---
+import Layout from '@layouts/Layout.astro';
+
+// Get token from query string
+const url = new URL(Astro.request.url);
+const token = url.searchParams.get('token');
+
+let error: string | null = null;
+let success = false;
+
+if (token && Astro.locals.runtime?.env?.DB) {
+  const db = Astro.locals.runtime.env.DB;
+
+  try {
+    // Find magic link
+    const magicLink = await db
+      .prepare(
+        `SELECT ml.*, u.name as user_name, u.team_id
+         FROM magic_links ml
+         JOIN users u ON ml.user_id = u.id
+         WHERE ml.token = ?
+         AND ml.used_at IS NULL
+         AND ml.expires_at > datetime('now')`
+      )
+      .bind(token)
+      .first();
+
+    if (!magicLink) {
+      error = 'Invalid or expired magic link';
+    } else {
+      // Mark as used
+      await db
+        .prepare("UPDATE magic_links SET used_at = datetime('now') WHERE id = ?")
+        .bind(magicLink.id)
+        .run();
+
+      // Create web session
+      const sessionId = crypto.randomUUID();
+      const sessionToken = crypto.randomUUID();
+
+      // Hash the token for storage
+      const encoder = new TextEncoder();
+      const data = encoder.encode(sessionToken);
+      const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+      const tokenHash = btoa(String.fromCharCode(...new Uint8Array(hashBuffer)));
+
+      // Session expires in 30 days
+      const expiresAt = new Date();
+      expiresAt.setDate(expiresAt.getDate() + 30);
+
+      await db
+        .prepare(
+          `INSERT INTO web_sessions (id, user_id, token_hash, expires_at)
+           VALUES (?, ?, ?, ?)`
+        )
+        .bind(sessionId, magicLink.user_id, tokenHash, expiresAt.toISOString())
+        .run();
+
+      // Set session cookie
+      Astro.cookies.set('overlap_session', sessionToken, {
+        path: '/',
+        httpOnly: true,
+        secure: true,
+        sameSite: 'lax',
+        expires: expiresAt,
+      });
+
+      success = true;
+    }
+  } catch (e) {
+    console.error('Magic link error:', e);
+    error = 'Failed to authenticate';
+  }
+} else if (!token) {
+  error = 'No token provided';
+}
+---
+
+<Layout title="Magic Link">
+  <main class="container" style="padding-top: var(--space-xl); padding-bottom: var(--space-xl);">
+    <div style="max-width: 500px; margin: 0 auto; text-align: center;">
+      {error ? (
+        <div class="card">
+          <h1 style="font-size: 1.5rem; margin-bottom: var(--space-md); color: var(--accent-orange);">
+            Authentication Failed
+          </h1>
+          <p class="text-secondary" style="margin-bottom: var(--space-lg);">
+            {error}
+          </p>
+          <a href="/" class="btn btn-secondary">Go Home</a>
+        </div>
+      ) : success ? (
+        <div class="card">
+          <h1 style="font-size: 1.5rem; margin-bottom: var(--space-md); color: var(--accent-green);">
+            Welcome!
+          </h1>
+          <p class="text-secondary" style="margin-bottom: var(--space-lg);">
+            You've been authenticated successfully.
+          </p>
+          <a href="/" class="btn btn-primary">Go to Timeline</a>
+        </div>
+      ) : (
+        <div class="card">
+          <p class="text-secondary">Authenticating...</p>
+        </div>
+      )}
+    </div>
+  </main>
+</Layout>
+
+{success && (
+  <script>
+    // Redirect to home after a short delay
+    setTimeout(() => {
+      window.location.href = '/';
+    }, 1500);
+  </script>
+)}

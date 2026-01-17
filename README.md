@@ -1,0 +1,198 @@
+# Overlap
+
+> See where your team's heads are at.
+
+Overlap is a **Claude Code plugin + self-hosted cloud service** that tracks what you and your team are working on across Claude Code sessions, detects overlapping work, and displays a real-time timeline of team activity.
+
+## Features
+
+- **Real-time Activity Feed** - See what everyone's working on as it happens
+- **Smart Overlap Detection** - File-level and semantic matching catches related work
+- **LLM-Powered Summaries** - AI summarizes what you're doing (BYOK)
+- **Personal History** - Searchable timeline of all your sessions
+- **Self-Hosted & Private** - Your data stays on your infrastructure
+- **Zero Platform Cost** - Deploy to Cloudflare free tier
+
+## Quick Start
+
+### Option A: One-Click Deploy
+
+[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/overlapcode/overlap)
+
+Click the button above to deploy Overlap to your Cloudflare account. The deploy process will:
+1. Fork the repository to your GitHub account
+2. Create a D1 database automatically
+3. Create a KV namespace for sessions
+4. Prompt you for the `TEAM_ENCRYPTION_KEY` secret (use a 32-character random string)
+5. Deploy the application
+
+After deployment, visit your URL and go to `/setup` to create your team.
+
+### Option B: Manual Deploy
+
+```bash
+# Clone the repository
+git clone https://github.com/overlapcode/overlap
+cd overlap
+
+# Install dependencies
+npm install
+
+# Create D1 database
+wrangler d1 create overlap-db
+# Copy the database_id to wrangler.toml
+
+# Create KV namespace for sessions
+wrangler kv:namespace create SESSION
+# Copy the id to wrangler.toml
+
+# Run migrations
+wrangler d1 execute overlap-db --remote --file=migrations/001_initial.sql
+
+# Set encryption key for API keys
+wrangler secret put TEAM_ENCRYPTION_KEY
+# Enter a 32-character secret key
+
+# Deploy
+npm run build
+wrangler pages deploy dist
+```
+
+### 2. Set Up Your Team
+
+1. Visit your deployed URL (e.g., `https://overlap.pages.dev`)
+2. Go to `/setup` to create your team
+3. Save the team token and your user token
+
+### 3. Install the Claude Code Plugin
+
+In Claude Code, run:
+
+```
+/plugin marketplace add overlapcode/overlap
+/plugin install overlap@overlapcode-overlap
+```
+
+That's it - no cloning required.
+
+### 4. Configure the Plugin
+
+Run `/overlap:config` in Claude Code and enter:
+- Your Overlap server URL
+- Team token
+- User token
+
+### 5. Start Coding
+
+That's it! Your activity will now be tracked. Use these commands:
+
+| Command | Description |
+|---------|-------------|
+| `/overlap:team` | See team activity |
+| `/overlap:status` | Check connection |
+| `/overlap:history` | Your personal timeline |
+| `/overlap:link` | Get dashboard access link |
+
+## Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    CLAUDE CODE PLUGIN                           │
+│   hooks/hooks.json → scripts/*.py → API calls                  │
+└───────────────────────────────┬─────────────────────────────────┘
+                                │
+                                ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                 CLOUDFLARE PAGES + FUNCTIONS                    │
+│   Astro + React frontend │ API endpoints │ SSE streaming       │
+└───────────────────────────────┬─────────────────────────────────┘
+                                │
+                                ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                      CLOUDFLARE D1                              │
+│   teams · users · devices · repos · sessions · activity        │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+## LLM Providers
+
+Configure an LLM provider for better activity classification:
+
+| Provider | Models | Cost |
+|----------|--------|------|
+| Heuristic | Path-based | Free |
+| Anthropic | Claude 3.5 Haiku, Sonnet, Opus | $-$$$ |
+| OpenAI | GPT-4o, GPT-4o Mini | $-$$ |
+| Google | Gemini 2.0 Flash, 1.5 Pro | $-$$ |
+| xAI | Grok 2 | $-$$ |
+
+Configure in Settings → LLM Classification.
+
+## Development
+
+```bash
+# Install dependencies
+npm install
+
+# Start dev server
+npm run dev
+
+# Run migrations locally
+npm run db:migrate:local
+
+# Type check
+npm run typecheck
+
+# Build
+npm run build
+```
+
+## Project Structure
+
+```
+overlap/
+├── src/                    # Astro frontend
+│   ├── pages/              # Routes
+│   ├── components/         # React components
+│   └── lib/                # Utilities
+├── functions/              # Cloudflare Functions (API)
+│   └── api/v1/             # API endpoints
+├── plugin/                 # Claude Code plugin
+│   ├── .claude-plugin/     # Plugin manifest
+│   ├── hooks/              # Hook configuration
+│   ├── scripts/            # Python hook scripts
+│   └── commands/           # Slash commands
+├── migrations/             # D1 schema
+└── wrangler.toml           # Cloudflare config
+```
+
+## API Endpoints
+
+### User Endpoints
+- `POST /api/v1/sessions/start` - Start a session
+- `POST /api/v1/sessions/:id/heartbeat` - Report activity
+- `POST /api/v1/sessions/:id/end` - End a session
+- `POST /api/v1/check` - Check for overlaps
+- `GET /api/v1/activity` - Get team activity
+- `GET /api/v1/users/me` - Get current user
+- `GET /api/v1/users/me/timeline` - Get personal timeline
+- `POST /api/v1/magic-link` - Generate magic link
+- `GET /api/v1/stream` - SSE activity stream
+
+### Admin Endpoints
+- `GET /api/v1/admin/users` - List users
+- `PUT /api/v1/admin/users/:id` - Update user
+- `GET /api/v1/admin/repos` - List repos
+- `PUT /api/v1/admin/repos/:id` - Update repo
+- `PUT /api/v1/admin/team` - Update team settings
+- `PUT /api/v1/admin/llm` - Update LLM settings
+
+## License
+
+MIT
+
+## Links
+
+- [Documentation](https://overlap.dev/docs)
+- [GitHub](https://github.com/overlapcode/overlap)
+- [Overlap](https://overlap.dev)

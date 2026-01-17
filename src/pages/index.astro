@@ -1,0 +1,43 @@
+---
+import Layout from '@layouts/Layout.astro';
+import { Header } from '@components/Header';
+import { Timeline } from '@components/Timeline';
+
+// For now, we'll use placeholder values
+// In production, these would come from session/auth
+const teamName = "My Team";
+const userName = "Developer";
+
+// These would be retrieved from cookies/session in production
+const userToken = "";
+const teamToken = "";
+---
+
+<Layout title="Timeline">
+  <Header teamName={teamName} userName={userName} client:load />
+
+  <main class="container" style="padding-top: var(--space-xl); padding-bottom: var(--space-xl);">
+    <div style="max-width: 800px; margin: 0 auto;">
+      <h1 style="font-size: 1.5rem; margin-bottom: var(--space-lg);">Team Activity</h1>
+
+      {userToken && teamToken ? (
+        <Timeline
+          userToken={userToken}
+          teamToken={teamToken}
+          client:load
+        />
+      ) : (
+        <div class="card" style="text-align: center; padding: var(--space-xl);">
+          <h2 style="font-size: 1.25rem; margin-bottom: var(--space-md);">Welcome to Overlap</h2>
+          <p class="text-secondary" style="margin-bottom: var(--space-lg);">
+            Track what your team is working on across Claude Code sessions.
+          </p>
+          <div style="display: flex; gap: var(--space-md); justify-content: center;">
+            <a href="/setup" class="btn btn-primary">Set Up Team</a>
+            <a href="/join" class="btn btn-secondary">Join Team</a>
+          </div>
+        </div>
+      )}
+    </div>
+  </main>
+</Layout>

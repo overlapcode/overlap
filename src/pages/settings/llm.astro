@@ -1,0 +1,217 @@
+---
+import Layout from '@layouts/Layout.astro';
+import { Header } from '@components/Header';
+---
+
+<Layout title="LLM Settings">
+  <Header client:load />
+
+  <main class="container" style="padding-top: var(--space-xl); padding-bottom: var(--space-xl);">
+    <div style="max-width: 600px; margin: 0 auto;">
+      <div style="display: flex; align-items: center; gap: var(--space-md); margin-bottom: var(--space-xl);">
+        <a href="/settings" class="text-muted" style="text-decoration: none;">← Back</a>
+        <h1 style="font-size: 1.5rem;">LLM Classification</h1>
+      </div>
+
+      <div class="card" style="margin-bottom: var(--space-lg); background: var(--bg-elevated);">
+        <p class="text-secondary" style="font-size: 0.875rem;">
+          Overlap can use AI to classify what you're working on. This provides better summaries
+          and more accurate overlap detection. Choose a provider or use the free heuristic mode.
+        </p>
+      </div>
+
+      <form id="llm-form" class="card">
+        <div style="margin-bottom: var(--space-lg);">
+          <label
+            for="provider"
+            style="display: block; margin-bottom: var(--space-sm); font-weight: 500;"
+          >
+            Provider
+          </label>
+          <select
+            id="provider"
+            name="provider"
+            style="
+              width: 100%;
+              padding: var(--space-sm) var(--space-md);
+              background: var(--bg-elevated);
+              border: 1px solid var(--border-default);
+              border-radius: var(--radius-sm);
+              color: var(--text-primary);
+              font-size: 1rem;
+            "
+          >
+            <option value="heuristic">Heuristic (Free - Path-based)</option>
+            <option value="anthropic">Anthropic (Claude)</option>
+            <option value="openai">OpenAI (GPT)</option>
+            <option value="google">Google (Gemini)</option>
+            <option value="xai">xAI (Grok)</option>
+          </select>
+        </div>
+
+        <div id="model-section" style="margin-bottom: var(--space-lg); display: none;">
+          <label
+            for="model"
+            style="display: block; margin-bottom: var(--space-sm); font-weight: 500;"
+          >
+            Model
+          </label>
+          <input
+            type="text"
+            id="model"
+            name="model"
+            placeholder="e.g., claude-3-5-haiku-latest"
+            style="
+              width: 100%;
+              padding: var(--space-sm) var(--space-md);
+              background: var(--bg-elevated);
+              border: 1px solid var(--border-default);
+              border-radius: var(--radius-sm);
+              color: var(--text-primary);
+              font-size: 1rem;
+            "
+          />
+          <p class="text-muted" style="font-size: 0.75rem; margin-top: var(--space-xs);">
+            Leave blank for default model
+          </p>
+        </div>
+
+        <div id="api-key-section" style="margin-bottom: var(--space-lg); display: none;">
+          <label
+            for="api-key"
+            style="display: block; margin-bottom: var(--space-sm); font-weight: 500;"
+          >
+            API Key
+          </label>
+          <input
+            type="password"
+            id="api-key"
+            name="api_key"
+            placeholder="sk-..."
+            style="
+              width: 100%;
+              padding: var(--space-sm) var(--space-md);
+              background: var(--bg-elevated);
+              border: 1px solid var(--border-default);
+              border-radius: var(--radius-sm);
+              color: var(--text-primary);
+              font-family: var(--font-mono);
+              font-size: 0.875rem;
+            "
+          />
+          <p class="text-muted" style="font-size: 0.75rem; margin-top: var(--space-xs);">
+            Your API key is encrypted before storage
+          </p>
+        </div>
+
+        <button type="submit" class="btn btn-primary" style="width: 100%;">
+          Save Settings
+        </button>
+
+        <p id="status-message" style="margin-top: var(--space-md); text-align: center; display: none;"></p>
+      </form>
+
+      <div class="card" style="margin-top: var(--space-lg);">
+        <h3 style="font-size: 1rem; margin-bottom: var(--space-md);">Provider Comparison</h3>
+        <table style="width: 100%; font-size: 0.875rem;">
+          <thead>
+            <tr class="text-muted">
+              <th style="text-align: left; padding: var(--space-xs) 0;">Provider</th>
+              <th style="text-align: left; padding: var(--space-xs) 0;">Cost</th>
+              <th style="text-align: left; padding: var(--space-xs) 0;">Quality</th>
+            </tr>
+          </thead>
+          <tbody class="text-secondary">
+            <tr>
+              <td style="padding: var(--space-xs) 0;">Heuristic</td>
+              <td style="padding: var(--space-xs) 0;">Free</td>
+              <td style="padding: var(--space-xs) 0;">Basic</td>
+            </tr>
+            <tr>
+              <td style="padding: var(--space-xs) 0;">Anthropic</td>
+              <td style="padding: var(--space-xs) 0;">$-$$$</td>
+              <td style="padding: var(--space-xs) 0;">Excellent</td>
+            </tr>
+            <tr>
+              <td style="padding: var(--space-xs) 0;">OpenAI</td>
+              <td style="padding: var(--space-xs) 0;">$-$$</td>
+              <td style="padding: var(--space-xs) 0;">Very Good</td>
+            </tr>
+            <tr>
+              <td style="padding: var(--space-xs) 0;">Google</td>
+              <td style="padding: var(--space-xs) 0;">$-$$</td>
+              <td style="padding: var(--space-xs) 0;">Good</td>
+            </tr>
+            <tr>
+              <td style="padding: var(--space-xs) 0;">xAI</td>
+              <td style="padding: var(--space-xs) 0;">$-$$</td>
+              <td style="padding: var(--space-xs) 0;">Good</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+</Layout>
+
+<script>
+  const form = document.getElementById('llm-form') as HTMLFormElement | null;
+  const providerSelect = document.getElementById('provider') as unknown as HTMLSelectElement | null;
+  const modelSection = document.getElementById('model-section') as HTMLDivElement | null;
+  const apiKeySection = document.getElementById('api-key-section') as HTMLDivElement | null;
+  const statusMessage = document.getElementById('status-message') as HTMLParagraphElement | null;
+
+  // Show/hide sections based on provider
+  providerSelect?.addEventListener('change', () => {
+    const isHeuristic = providerSelect.value === 'heuristic';
+    if (modelSection) modelSection.style.display = isHeuristic ? 'none' : 'block';
+    if (apiKeySection) apiKeySection.style.display = isHeuristic ? 'none' : 'block';
+  });
+
+  form?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+
+    const formData = new FormData(form);
+    const data: Record<string, unknown> = {
+      provider: formData.get('provider'),
+    };
+
+    if (data.provider !== 'heuristic') {
+      const model = formData.get('model');
+      if (model) data.model = model;
+
+      const apiKey = formData.get('api_key');
+      if (apiKey) data.api_key = apiKey;
+    }
+
+    try {
+      const response = await fetch('/api/v1/admin/llm', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+
+      const result = await response.json() as { data?: { message: string }, error?: string };
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to save');
+      }
+
+      if (statusMessage) {
+        statusMessage.textContent = 'LLM settings saved successfully!';
+        statusMessage.style.color = 'var(--accent-green)';
+        statusMessage.style.display = 'block';
+
+        setTimeout(() => {
+          statusMessage.style.display = 'none';
+        }, 3000);
+      }
+    } catch (error) {
+      if (statusMessage) {
+        statusMessage.textContent = error instanceof Error ? error.message : 'Failed to save';
+        statusMessage.style.color = 'var(--accent-orange)';
+        statusMessage.style.display = 'block';
+      }
+    }
+  });
+</script>

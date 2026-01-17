@@ -1,0 +1,30 @@
+name = "overlap"
+compatibility_date = "2025-01-15"
+
+# For Workers-based deployment (used by Deploy button)
+main = "dist/_worker.js/index.js"
+assets = { directory = "dist", binding = "ASSETS" }
+
+# D1 Database binding - auto-provisioned by Deploy button
+[[d1_databases]]
+binding = "DB"
+database_name = "overlap-db"
+# database_id will be set automatically during deployment
+# For local dev, run: wrangler d1 create overlap-db
+
+# KV namespace for sessions (required by Astro Cloudflare adapter)
+[[kv_namespaces]]
+binding = "SESSION"
+# id will be set automatically during deployment
+# For local dev, run: wrangler kv:namespace create SESSION
+
+# Scheduled trigger for stale session cleanup (runs every hour)
+[triggers]
+crons = ["0 * * * *"]
+
+# Environment variables
+[vars]
+ENVIRONMENT = "production"
+
+# Note: TEAM_ENCRYPTION_KEY must be set as a secret during setup
+# The deploy process will prompt for this

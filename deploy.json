@@ -1,0 +1,44 @@
+{
+  "$schema": "https://workers.cloudflare.com/schemas/deploy.json",
+  "name": "overlap",
+  "description": "Team activity tracking for Claude Code - see where your team's heads are at",
+  "icon": "https://raw.githubusercontent.com/overlapcode/overlap/main/public/favicon.svg",
+  "build": {
+    "command": "npm install && npm run build",
+    "output": "dist"
+  },
+  "deploy": {
+    "workers": [
+      {
+        "name": "overlap",
+        "main": "dist/_worker.js/index.js"
+      }
+    ],
+    "d1_databases": [
+      {
+        "binding": "DB",
+        "name": "overlap-db"
+      }
+    ],
+    "kv_namespaces": [
+      {
+        "binding": "SESSION"
+      }
+    ]
+  },
+  "secrets": {
+    "TEAM_ENCRYPTION_KEY": {
+      "description": "32-character encryption key for securing LLM API keys. Generate with: openssl rand -hex 16",
+      "required": true
+    }
+  },
+  "postDeploy": {
+    "migrations": [
+      {
+        "type": "d1",
+        "database": "DB",
+        "file": "migrations/001_initial.sql"
+      }
+    ]
+  }
+}

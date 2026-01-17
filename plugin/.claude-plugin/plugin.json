@@ -1,0 +1,11 @@
+{
+  "name": "overlap",
+  "description": "Track team activity and detect overlapping work across Claude Code sessions",
+  "version": "0.1.0",
+  "author": {
+    "name": "Overlap"
+  },
+  "homepage": "https://overlap.dev",
+  "repository": "https://github.com/overlapcode/overlap",
+  "license": "MIT"
+}

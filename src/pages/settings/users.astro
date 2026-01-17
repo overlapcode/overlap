@@ -1,0 +1,165 @@
+---
+import Layout from '@layouts/Layout.astro';
+import { Header } from '@components/Header';
+---
+
+<Layout title="Team Members">
+  <Header client:load />
+
+  <main class="container" style="padding-top: var(--space-xl); padding-bottom: var(--space-xl);">
+    <div style="max-width: 800px; margin: 0 auto;">
+      <div style="display: flex; align-items: center; gap: var(--space-md); margin-bottom: var(--space-xl);">
+        <a href="/settings" class="text-muted" style="text-decoration: none;">← Back</a>
+        <h1 style="font-size: 1.5rem;">Team Members</h1>
+      </div>
+
+      <div id="users-list" class="card">
+        <p class="text-secondary">Loading...</p>
+      </div>
+    </div>
+  </main>
+</Layout>
+
+<style>
+  .user-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--space-md) 0;
+    border-bottom: 1px solid var(--border-subtle);
+  }
+
+  .user-row:last-child {
+    border-bottom: none;
+  }
+
+  .user-info {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xs);
+  }
+
+  .user-name {
+    font-weight: 500;
+  }
+
+  .user-email {
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+  }
+
+  .user-actions {
+    display: flex;
+    gap: var(--space-sm);
+  }
+
+  .role-badge {
+    font-size: 0.75rem;
+    padding: 2px 8px;
+    border-radius: var(--radius-sm);
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-default);
+  }
+
+  .role-badge.admin {
+    border-color: var(--accent-orange);
+    color: var(--accent-orange);
+  }
+</style>
+
+<script>
+  type User = {
+    id: string;
+    name: string;
+    email: string | null;
+    role: 'admin' | 'member';
+    is_active: boolean;
+  };
+
+  async function loadUsers() {
+    const container = document.getElementById('users-list') as HTMLDivElement;
+
+    try {
+      const response = await fetch('/api/v1/admin/users');
+      const result = await response.json() as { data?: { users: User[] }, error?: string };
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to load users');
+      }
+
+      const users = result.data?.users || [];
+
+      if (users.length === 0) {
+        container.innerHTML = '<p class="text-secondary">No team members yet.</p>';
+        return;
+      }
+
+      container.innerHTML = users.map((user) => `
+        <div class="user-row" data-user-id="${user.id}">
+          <div class="user-info">
+            <span class="user-name">${user.name}</span>
+            <span class="user-email">${user.email || 'No email'}</span>
+          </div>
+          <div class="user-actions">
+            <span class="role-badge ${user.role}">${user.role}</span>
+            ${user.role === 'member'
+              ? `<button class="btn btn-secondary" onclick="promoteUser('${user.id}', '${user.name}')" style="font-size: 0.75rem; padding: 4px 8px;">Promote</button>`
+              : `<button class="btn btn-secondary" onclick="demoteUser('${user.id}', '${user.name}')" style="font-size: 0.75rem; padding: 4px 8px;">Demote</button>`
+            }
+          </div>
+        </div>
+      `).join('');
+    } catch (error) {
+      container.innerHTML = `<p style="color: var(--accent-orange);">${error instanceof Error ? error.message : 'Failed to load users'}</p>`;
+    }
+  }
+
+  async function promoteUser(userId: string, userName: string) {
+    if (!confirm(`Promote ${userName} to admin?`)) return;
+
+    try {
+      const response = await fetch(`/api/v1/admin/users/${userId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ role: 'admin' }),
+      });
+
+      if (!response.ok) {
+        const result = await response.json() as { error?: string };
+        throw new Error(result.error || 'Failed to promote user');
+      }
+
+      loadUsers();
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'Failed to promote user');
+    }
+  }
+
+  async function demoteUser(userId: string, userName: string) {
+    if (!confirm(`Demote ${userName} to member?`)) return;
+
+    try {
+      const response = await fetch(`/api/v1/admin/users/${userId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ role: 'member' }),
+      });
+
+      if (!response.ok) {
+        const result = await response.json() as { error?: string };
+        throw new Error(result.error || 'Failed to demote user');
+      }
+
+      loadUsers();
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'Failed to demote user');
+    }
+  }
+
+  // Make functions global
+  (window as unknown as { promoteUser: typeof promoteUser }).promoteUser = promoteUser;
+  (window as unknown as { demoteUser: typeof demoteUser }).demoteUser = demoteUser;
+
+  // Load users on page load
+  loadUsers();
+</script>

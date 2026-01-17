@@ -1,0 +1,5 @@
+# Copy this file to .dev.vars for local development
+# DO NOT commit .dev.vars to git
+
+# Encryption key for LLM API keys (must be 32 characters)
+TEAM_ENCRYPTION_KEY=your-32-character-encryption-key

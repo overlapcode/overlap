@@ -1,0 +1,68 @@
+---
+import Layout from '@layouts/Layout.astro';
+import { Header } from '@components/Header';
+---
+
+<Layout title="Settings">
+  <Header client:load />
+
+  <main class="container" style="padding-top: var(--space-xl); padding-bottom: var(--space-xl);">
+    <div style="max-width: 800px; margin: 0 auto;">
+      <h1 style="font-size: 1.5rem; margin-bottom: var(--space-xl);">Settings</h1>
+
+      <div style="display: grid; gap: var(--space-lg);">
+        <!-- Team Settings -->
+        <a href="/settings/team" class="card" style="text-decoration: none; color: inherit;">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <div>
+              <h2 style="font-size: 1.125rem; margin-bottom: var(--space-xs);">Team Settings</h2>
+              <p class="text-secondary" style="font-size: 0.875rem;">
+                Manage team name, visibility, and stale session timeout
+              </p>
+            </div>
+            <span class="text-muted" style="font-size: 1.5rem;">→</span>
+          </div>
+        </a>
+
+        <!-- LLM Settings -->
+        <a href="/settings/llm" class="card" style="text-decoration: none; color: inherit;">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <div>
+              <h2 style="font-size: 1.125rem; margin-bottom: var(--space-xs);">LLM Classification</h2>
+              <p class="text-secondary" style="font-size: 0.875rem;">
+                Configure AI provider for activity classification
+              </p>
+            </div>
+            <span class="text-muted" style="font-size: 1.5rem;">→</span>
+          </div>
+        </a>
+
+        <!-- Users -->
+        <a href="/settings/users" class="card" style="text-decoration: none; color: inherit;">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <div>
+              <h2 style="font-size: 1.125rem; margin-bottom: var(--space-xs);">Team Members</h2>
+              <p class="text-secondary" style="font-size: 0.875rem;">
+                Manage users, roles, and access
+              </p>
+            </div>
+            <span class="text-muted" style="font-size: 1.5rem;">→</span>
+          </div>
+        </a>
+
+        <!-- Repos -->
+        <a href="/settings/repos" class="card" style="text-decoration: none; color: inherit;">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <div>
+              <h2 style="font-size: 1.125rem; margin-bottom: var(--space-xs);">Repositories</h2>
+              <p class="text-secondary" style="font-size: 0.875rem;">
+                View and manage tracked repositories
+              </p>
+            </div>
+            <span class="text-muted" style="font-size: 1.5rem;">→</span>
+          </div>
+        </a>
+      </div>
+    </div>
+  </main>
+</Layout>

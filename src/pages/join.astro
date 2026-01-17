@@ -1,0 +1,139 @@
+---
+import Layout from '@layouts/Layout.astro';
+import { Header } from '@components/Header';
+---
+
+<Layout title="Join Team">
+  <Header client:load />
+
+  <main class="container" style="padding-top: var(--space-xl); padding-bottom: var(--space-xl);">
+    <div style="max-width: 500px; margin: 0 auto;">
+      <h1 style="font-size: 1.5rem; margin-bottom: var(--space-md);">Join Your Team</h1>
+      <p class="text-secondary" style="margin-bottom: var(--space-xl);">
+        Enter your team token to join an existing Overlap team.
+      </p>
+
+      <form id="join-form" class="card">
+        <div style="margin-bottom: var(--space-lg);">
+          <label
+            for="team-token"
+            style="display: block; margin-bottom: var(--space-sm); font-weight: 500;"
+          >
+            Team Token
+          </label>
+          <input
+            type="text"
+            id="team-token"
+            name="team_token"
+            required
+            placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+            style="
+              width: 100%;
+              padding: var(--space-sm) var(--space-md);
+              background: var(--bg-elevated);
+              border: 1px solid var(--border-default);
+              border-radius: var(--radius-sm);
+              color: var(--text-primary);
+              font-family: var(--font-mono);
+              font-size: 0.875rem;
+            "
+          />
+          <p class="text-muted" style="font-size: 0.75rem; margin-top: var(--space-xs);">
+            Get this from your team admin
+          </p>
+        </div>
+
+        <div style="margin-bottom: var(--space-lg);">
+          <label
+            for="name"
+            style="display: block; margin-bottom: var(--space-sm); font-weight: 500;"
+          >
+            Your Name
+          </label>
+          <input
+            type="text"
+            id="name"
+            name="name"
+            required
+            placeholder="Jane Developer"
+            style="
+              width: 100%;
+              padding: var(--space-sm) var(--space-md);
+              background: var(--bg-elevated);
+              border: 1px solid var(--border-default);
+              border-radius: var(--radius-sm);
+              color: var(--text-primary);
+              font-size: 1rem;
+            "
+          />
+        </div>
+
+        <div style="margin-bottom: var(--space-lg);">
+          <label
+            for="email"
+            style="display: block; margin-bottom: var(--space-sm); font-weight: 500;"
+          >
+            Email (optional)
+          </label>
+          <input
+            type="email"
+            id="email"
+            name="email"
+            placeholder="jane@example.com"
+            style="
+              width: 100%;
+              padding: var(--space-sm) var(--space-md);
+              background: var(--bg-elevated);
+              border: 1px solid var(--border-default);
+              border-radius: var(--radius-sm);
+              color: var(--text-primary);
+              font-size: 1rem;
+            "
+          />
+        </div>
+
+        <button type="submit" class="btn btn-primary" style="width: 100%;">
+          Join Team
+        </button>
+      </form>
+    </div>
+  </main>
+</Layout>
+
+<script>
+  const form = document.getElementById('join-form') as HTMLFormElement;
+
+  form?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+
+    const formData = new FormData(form);
+    const data = {
+      team_token: formData.get('team_token'),
+      name: formData.get('name'),
+      email: formData.get('email') || null,
+    };
+
+    try {
+      const response = await fetch('/api/v1/join', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json() as { error?: string };
+        throw new Error(errorData.error || 'Join failed');
+      }
+
+      const result = await response.json() as { data: { user_token: string } };
+
+      // Show success with user token
+      alert(`Welcome to the team!\n\nYour User Token: ${result.data.user_token}\n\nSave this token - you'll need it to configure the Claude Code plugin.`);
+
+      // Redirect to timeline
+      window.location.href = '/';
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'Join failed');
+    }
+  });
+</script>
