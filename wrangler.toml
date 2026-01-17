@@ -14,10 +14,6 @@ database_name = "overlap-db"
 [[kv_namespaces]]
 binding = "SESSION"
 
-# Scheduled trigger for stale session cleanup (runs every hour)
-[triggers]
-crons = ["0 * * * *"]
-
 # Environment variables
 [vars]
 ENVIRONMENT = "production"
