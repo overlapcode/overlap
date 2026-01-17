@@ -1,5 +1,5 @@
 import type { APIContext } from 'astro';
-import { authenticateRequest, errorResponse } from '@lib/auth/middleware';
+import { authenticateAny, errorResponse } from '@lib/auth/middleware';
 import { getRecentActivity } from '@lib/db/queries';
 
 const POLL_INTERVAL_MS = 5000; // Poll database every 5 seconds
@@ -9,8 +9,8 @@ export async function GET(context: APIContext) {
   const { request } = context;
   const db = context.locals.runtime.env.DB;
 
-  // Authenticate
-  const authResult = await authenticateRequest(request, db);
+  // Authenticate (supports both web session and API tokens)
+  const authResult = await authenticateAny(request, db);
   if (!authResult.success) {
     return errorResponse(authResult.error, authResult.status);
   }

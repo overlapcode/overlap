@@ -17,28 +17,19 @@ type Session = {
   } | null;
 };
 
-type TimelineProps = {
-  userToken: string;
-  teamToken: string;
-  apiBaseUrl?: string;
-};
-
-export function Timeline({ userToken, teamToken, apiBaseUrl = '' }: TimelineProps) {
+export function Timeline() {
   const [sessions, setSessions] = useState<Session[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [isConnected, setIsConnected] = useState(false);
 
   const fetchInitialData = useCallback(async () => {
     try {
-      const response = await fetch(`${apiBaseUrl}/api/v1/activity`, {
-        headers: {
-          Authorization: `Bearer ${userToken}`,
-          'X-Team-Token': teamToken,
-        },
-      });
+      // Uses session cookie for auth (automatically included)
+      const response = await fetch('/api/v1/activity');
 
       if (!response.ok) {
-        throw new Error('Failed to fetch activity');
+        const data = await response.json() as { error?: string };
+        throw new Error(data.error || 'Failed to fetch activity');
       }
 
       const data = await response.json() as { data: { sessions: Session[] } };
@@ -47,18 +38,14 @@ export function Timeline({ userToken, teamToken, apiBaseUrl = '' }: TimelineProp
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load activity');
     }
-  }, [userToken, teamToken, apiBaseUrl]);
+  }, []);
 
   useEffect(() => {
     // Fetch initial data
     fetchInitialData();
 
-    // Set up SSE connection
-    const eventSource = new EventSource(
-      `${apiBaseUrl}/api/v1/stream`,
-      // Note: EventSource doesn't support custom headers in the browser
-      // We'll need to use query params or cookies for auth in production
-    );
+    // Set up SSE connection (uses session cookie automatically)
+    const eventSource = new EventSource('/api/v1/stream');
 
     eventSource.addEventListener('connected', () => {
       setIsConnected(true);
@@ -96,7 +83,7 @@ export function Timeline({ userToken, teamToken, apiBaseUrl = '' }: TimelineProp
     return () => {
       eventSource.close();
     };
-  }, [fetchInitialData, apiBaseUrl]);
+  }, [fetchInitialData]);
 
   return (
     <div>

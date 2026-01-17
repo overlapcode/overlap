@@ -3,15 +3,17 @@ import Layout from '@layouts/Layout.astro';
 import { Header } from '@components/Header';
 import { UpdateBanner } from '@components/UpdateBanner';
 import { Timeline } from '@components/Timeline';
+import { getSessionUser } from '@lib/auth/session';
 
-// For now, we'll use placeholder values
-// In production, these would come from session/auth
-const teamName = "My Team";
-const userName = "Developer";
+// Get session data from cookie
+let sessionData = null;
+if (Astro.locals.runtime?.env?.DB) {
+  sessionData = await getSessionUser(Astro.cookies, Astro.locals.runtime.env.DB);
+}
 
-// These would be retrieved from cookies/session in production
-const userToken = "";
-const teamToken = "";
+const teamName = sessionData?.team.name;
+const userName = sessionData?.user.name;
+const isAuthenticated = !!sessionData;
 ---
 
 <Layout title="Timeline">
@@ -22,12 +24,8 @@ const teamToken = "";
     <div style="max-width: 800px; margin: 0 auto;">
       <h1 style="font-size: 1.5rem; margin-bottom: var(--space-lg);">Team Activity</h1>
 
-      {userToken && teamToken ? (
-        <Timeline
-          userToken={userToken}
-          teamToken={teamToken}
-          client:load
-        />
+      {isAuthenticated ? (
+        <Timeline client:load />
       ) : (
         <div class="card" style="text-align: center; padding: var(--space-xl);">
           <h2 style="font-size: 1.25rem; margin-bottom: var(--space-md);">Welcome to Overlap</h2>

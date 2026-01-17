@@ -1,13 +1,13 @@
 import type { APIContext } from 'astro';
-import { authenticateRequest, errorResponse, successResponse } from '@lib/auth/middleware';
+import { authenticateAny, errorResponse, successResponse } from '@lib/auth/middleware';
 import { getRecentActivity, markStaleSessions, cleanupExpiredTokens } from '@lib/db/queries';
 
 export async function GET(context: APIContext) {
   const { request } = context;
   const db = context.locals.runtime.env.DB;
 
-  // Authenticate
-  const authResult = await authenticateRequest(request, db);
+  // Authenticate (supports both web session and API tokens)
+  const authResult = await authenticateAny(request, db);
   if (!authResult.success) {
     return errorResponse(authResult.error, authResult.status);
   }
