@@ -21,17 +21,20 @@ Overlap is a **Claude Code plugin + self-hosted cloud service** that tracks what
 
 Click the button above to deploy Overlap to your Cloudflare account.
 
-**Important:** In the deploy configuration, change the **Deploy command** from `npx wrangler deploy` to:
-```
-npm run deploy
-```
+**Required Configuration:**
 
-The deploy process will:
-1. Fork the repository to your GitHub account
-2. Create a D1 database automatically
-3. Create a KV namespace for sessions
-4. Prompt you for the `TEAM_ENCRYPTION_KEY` secret (use a 32-character random string)
-5. Deploy the application
+1. Change **Deploy command** to: `npm run deploy`
+
+2. Add these **Environment variables**:
+   | Variable | Value | How to get it |
+   |----------|-------|---------------|
+   | `CLOUDFLARE_ACCOUNT_ID` | Your account ID | Dashboard URL: `dash.cloudflare.com/<THIS-IS-YOUR-ID>` |
+   | `CLOUDFLARE_API_TOKEN` | API token | [Create token](https://dash.cloudflare.com/profile/api-tokens) with D1 + KV permissions |
+   | `TEAM_ENCRYPTION_KEY` | Random 32-char string | Run `openssl rand -hex 16` |
+
+3. Click **Create and deploy**
+
+The deploy script will automatically create the D1 database and KV namespace if they don't exist.
 
 After deployment, visit your URL and go to `/setup` to create your team.
 
