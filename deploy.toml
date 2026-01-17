@@ -1,0 +1,10 @@
+# Configuration for Deploy to Cloudflare button
+# https://deploy.workers.cloudflare.com
+
+[deploy]
+# Build command - builds the Astro site
+build = "npm run build"
+
+# Deploy command - use 'true' (a no-op that always succeeds)
+# The actual deployment is handled by Cloudflare via pages_build_output_dir in wrangler.toml
+deploy = "true"
