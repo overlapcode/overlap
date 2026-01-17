@@ -21,7 +21,7 @@ Overlap is a **Claude Code plugin + self-hosted cloud service** that tracks what
 
 Click the button above to deploy Overlap to your Cloudflare account.
 
-**Important:** Set the **Deploy command** to `npm run deploy` (Cloudflare may default to `npx wrangler deploy` which won't work).
+**Important:** Clear the **Deploy command** field (leave it empty). Cloudflare will deploy automatically after building.
 
 The D1 database and KV namespace will be created automatically.
 
