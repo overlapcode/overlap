@@ -8,6 +8,7 @@
     "build": "astro check && astro build",
     "preview": "astro preview",
     "typecheck": "astro check && tsc --noEmit",
+    "deploy": "wrangler pages deploy dist --project-name overlap",
     "db:migrate:local": "wrangler d1 execute overlap-db --local --file=migrations/001_initial.sql",
     "db:migrate:remote": "wrangler d1 execute overlap-db --remote --file=migrations/001_initial.sql"
   },
