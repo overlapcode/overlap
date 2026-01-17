@@ -183,8 +183,8 @@ echo "📝 Updating wrangler.toml with resource IDs..." >&2
 echo "   D1_ID: $D1_ID" >&2
 echo "   KV_ID: $KV_ID" >&2
 
-# Use external script to avoid escaping issues
-node scripts/update-wrangler.js "$D1_ID" "$KV_ID"
+# Use external script to avoid escaping issues (.cjs for CommonJS in ESM project)
+node scripts/update-wrangler.cjs "$D1_ID" "$KV_ID"
 
 echo "" >&2
 echo "🚀 Deploying to Cloudflare..." >&2
