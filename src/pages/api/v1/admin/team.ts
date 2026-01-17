@@ -1,3 +1,4 @@
+import type { APIContext } from 'astro';
 import { z } from 'zod';
 import { authenticateRequest, requireAdmin, errorResponse, successResponse } from '@lib/auth/middleware';
 import { hashPassword } from '@lib/utils/crypto';
@@ -9,15 +10,12 @@ const UpdateTeamSchema = z.object({
   dashboard_password: z.string().min(8).optional(),
 });
 
-type Env = {
-  DB: D1Database;
-};
-
-export const onRequestPut: PagesFunction<Env> = async (context) => {
-  const { request, env } = context;
+export async function PUT(context: APIContext) {
+  const { request } = context;
+  const db = context.locals.runtime.env.DB;
 
   // Authenticate and require admin
-  const authResult = await authenticateRequest(request, env.DB);
+  const authResult = await authenticateRequest(request, db);
   if (!authResult.success) {
     return errorResponse(authResult.error, authResult.status);
   }
@@ -73,7 +71,7 @@ export const onRequestPut: PagesFunction<Env> = async (context) => {
     updates.push("updated_at = datetime('now')");
     values.push(team.id);
 
-    await env.DB
+    await db
       .prepare(`UPDATE teams SET ${updates.join(', ')} WHERE id = ?`)
       .bind(...values)
       .run();
@@ -83,4 +81,4 @@ export const onRequestPut: PagesFunction<Env> = async (context) => {
     console.error('Update team error:', error);
     return errorResponse('Failed to update team settings', 500);
   }
-};
+}

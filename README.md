@@ -33,7 +33,7 @@ npm install
 
 # Build and deploy (D1/KV auto-created on first deploy)
 npm run build
-wrangler pages deploy dist --project-name overlap
+wrangler deploy
 
 # Run database migrations
 wrangler d1 execute overlap-db --remote --file=migrations/001_initial.sql
@@ -41,7 +41,7 @@ wrangler d1 execute overlap-db --remote --file=migrations/001_initial.sql
 
 ### 2. Set Up Your Team
 
-1. Visit your deployed URL (e.g., `https://overlap.pages.dev`)
+1. Visit your deployed URL (e.g., `https://overlap.<account>.workers.dev`)
 2. Go to `/setup` to create your team
 3. Save the team token and your user token
 
@@ -84,7 +84,7 @@ That's it! Your activity will now be tracked. Use these commands:
                                 │
                                 ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│                 CLOUDFLARE PAGES + FUNCTIONS                    │
+│                   CLOUDFLARE WORKERS                            │
 │   Astro + React frontend │ API endpoints │ SSE streaming       │
 └───────────────────────────────┬─────────────────────────────────┘
                                 │
@@ -132,12 +132,11 @@ npm run build
 
 ```
 overlap/
-├── src/                    # Astro frontend
-│   ├── pages/              # Routes
+├── src/                    # Astro frontend + API
+│   ├── pages/              # Routes + API endpoints
+│   │   └── api/v1/         # API endpoints
 │   ├── components/         # React components
 │   └── lib/                # Utilities
-├── functions/              # Cloudflare Functions (API)
-│   └── api/v1/             # API endpoints
 ├── plugin/                 # Claude Code plugin
 │   ├── .claude-plugin/     # Plugin manifest
 │   ├── hooks/              # Hook configuration
@@ -191,7 +190,7 @@ In Claude Code, run:
 
 ### Check Current Version
 
-Visit `https://your-instance.pages.dev/api/v1/version` to see your deployed version.
+Visit `https://your-instance.workers.dev/api/v1/version` to see your deployed version.
 
 ## License
 

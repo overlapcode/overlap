@@ -2,8 +2,13 @@ name = "overlap"
 compatibility_date = "2026-01-15"
 compatibility_flags = ["nodejs_compat"]
 
-# Pages deployment - this tells Cloudflare to use Pages (not Workers)
-pages_build_output_dir = "dist"
+# Workers deployment - main entry point from Astro build
+main = "dist/_worker.js/index.js"
+
+# Static assets configuration
+[assets]
+directory = "dist"
+binding = "ASSETS"
 
 # D1 Database binding - auto-provisioned when no database_id is set
 [[d1_databases]]
@@ -19,4 +24,3 @@ binding = "SESSION"
 ENVIRONMENT = "production"
 
 # Note: TEAM_ENCRYPTION_KEY must be set as a secret during setup
-# The deploy process will prompt for this

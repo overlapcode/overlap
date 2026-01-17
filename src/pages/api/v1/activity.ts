@@ -1,15 +1,13 @@
+import type { APIContext } from 'astro';
 import { authenticateRequest, errorResponse, successResponse } from '@lib/auth/middleware';
 import { getRecentActivity, markStaleSessions, cleanupExpiredTokens } from '@lib/db/queries';
 
-type Env = {
-  DB: D1Database;
-};
-
-export const onRequestGet: PagesFunction<Env> = async (context) => {
-  const { request, env } = context;
+export async function GET(context: APIContext) {
+  const { request } = context;
+  const db = context.locals.runtime.env.DB;
 
   // Authenticate
-  const authResult = await authenticateRequest(request, env.DB);
+  const authResult = await authenticateRequest(request, db);
   if (!authResult.success) {
     return errorResponse(authResult.error, authResult.status);
   }
@@ -22,13 +20,13 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
 
   try {
     // On-demand cleanup: mark stale sessions and clean up expired tokens
-    // This replaces the cron job since Pages doesn't support scheduled triggers
+    // This replaces the cron job since Workers doesn't support scheduled triggers in deploy button
     await Promise.all([
-      markStaleSessions(env.DB),
-      cleanupExpiredTokens(env.DB),
+      markStaleSessions(db),
+      cleanupExpiredTokens(db),
     ]);
 
-    const activity = await getRecentActivity(env.DB, team.id, limit);
+    const activity = await getRecentActivity(db, team.id, limit);
 
     return successResponse({
       sessions: activity.map((session) => ({
@@ -58,4 +56,4 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
     console.error('Activity fetch error:', error);
     return errorResponse('Failed to fetch activity', 500);
   }
-};
+}

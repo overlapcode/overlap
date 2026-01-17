@@ -1,3 +1,4 @@
+import type { APIContext } from 'astro';
 import { z } from 'zod';
 import { errorResponse, successResponse } from '@lib/auth/middleware';
 import { getTeam, createTeam, createUser } from '@lib/db/queries';
@@ -12,35 +13,32 @@ const SetupSchema = z.object({
   dashboard_password: z.string().min(8),
 });
 
-type Env = {
-  DB: D1Database;
-};
-
 // GET: Check setup status and ensure database is migrated
-export const onRequestGet: PagesFunction<Env> = async (context) => {
-  const { env } = context;
+export async function GET(context: APIContext) {
+  const db = context.locals.runtime.env.DB;
 
   // Auto-migrate database
-  await ensureMigrated(env.DB);
+  await ensureMigrated(db);
 
   // Check if team already exists
-  const existingTeam = await getTeam(env.DB);
+  const existingTeam = await getTeam(db);
 
   return successResponse({
     initialized: !!existingTeam,
     team_name: existingTeam?.name ?? null,
   });
-};
+}
 
 // POST: Create team
-export const onRequestPost: PagesFunction<Env> = async (context) => {
-  const { request, env } = context;
+export async function POST(context: APIContext) {
+  const { request } = context;
+  const db = context.locals.runtime.env.DB;
 
   // Auto-migrate database on first setup
-  await ensureMigrated(env.DB);
+  await ensureMigrated(db);
 
   // Check if team already exists
-  const existingTeam = await getTeam(env.DB);
+  const existingTeam = await getTeam(db);
   if (existingTeam) {
     return errorResponse('Team already configured', 400);
   }
@@ -71,7 +69,7 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
     const passwordHash = await hashPassword(input.dashboard_password);
 
     // Create team
-    await createTeam(env.DB, {
+    await createTeam(db, {
       id: teamId,
       name: input.team_name,
       team_token: teamToken,
@@ -79,7 +77,7 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
     });
 
     // Create admin user
-    await createUser(env.DB, {
+    await createUser(db, {
       id: userId,
       team_id: teamId,
       user_token: userToken,
@@ -99,4 +97,4 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
     console.error('Setup error:', error);
     return errorResponse('Failed to create team', 500);
   }
-};
+}

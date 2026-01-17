@@ -1,15 +1,13 @@
+import type { APIContext } from 'astro';
 import { authenticateRequest, requireAdmin, errorResponse, successResponse } from '@lib/auth/middleware';
 import { getTeamRepos } from '@lib/db/queries';
 
-type Env = {
-  DB: D1Database;
-};
-
-export const onRequestGet: PagesFunction<Env> = async (context) => {
-  const { request, env } = context;
+export async function GET(context: APIContext) {
+  const { request } = context;
+  const db = context.locals.runtime.env.DB;
 
   // Authenticate and require admin
-  const authResult = await authenticateRequest(request, env.DB);
+  const authResult = await authenticateRequest(request, db);
   if (!authResult.success) {
     return errorResponse(authResult.error, authResult.status);
   }
@@ -22,7 +20,7 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
   const { team } = authResult.context;
 
   try {
-    const repos = await getTeamRepos(env.DB, team.id);
+    const repos = await getTeamRepos(db, team.id);
 
     return successResponse({
       repos: repos.map((repo) => ({
@@ -37,4 +35,4 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
     console.error('List repos error:', error);
     return errorResponse('Failed to list repos', 500);
   }
-};
+}

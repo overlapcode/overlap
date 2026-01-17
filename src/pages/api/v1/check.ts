@@ -1,3 +1,4 @@
+import type { APIContext } from 'astro';
 import { z } from 'zod';
 import { authenticateRequest, errorResponse, successResponse } from '@lib/auth/middleware';
 import { checkForOverlaps } from '@lib/db/queries';
@@ -7,16 +8,13 @@ const CheckSchema = z.object({
   files: z.array(z.string()),
 });
 
-type Env = {
-  DB: D1Database;
-  TEAM_ENCRYPTION_KEY?: string;
-};
-
-export const onRequestPost: PagesFunction<Env> = async (context) => {
-  const { request, env } = context;
+export async function POST(context: APIContext) {
+  const { request } = context;
+  const db = context.locals.runtime.env.DB;
+  const encryptionKey = context.locals.runtime.env.TEAM_ENCRYPTION_KEY;
 
   // Authenticate
-  const authResult = await authenticateRequest(request, env.DB);
+  const authResult = await authenticateRequest(request, db);
   if (!authResult.success) {
     return errorResponse(authResult.error, authResult.status);
   }
@@ -39,11 +37,11 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
 
   try {
     // Classify the files to get semantic scope
-    const classification = await classifyActivity(team, input.files, env.TEAM_ENCRYPTION_KEY);
+    const classification = await classifyActivity(team, input.files, encryptionKey);
 
     // Check for overlaps
     const overlaps = await checkForOverlaps(
-      env.DB,
+      db,
       team.id,
       user.id,
       input.files,
@@ -67,4 +65,4 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
     console.error('Check overlaps error:', error);
     return errorResponse('Failed to check overlaps', 500);
   }
-};
+}

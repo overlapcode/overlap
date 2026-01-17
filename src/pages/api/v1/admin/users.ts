@@ -1,15 +1,13 @@
+import type { APIContext } from 'astro';
 import { authenticateRequest, requireAdmin, errorResponse, successResponse } from '@lib/auth/middleware';
 import { getTeamUsers } from '@lib/db/queries';
 
-type Env = {
-  DB: D1Database;
-};
-
-export const onRequestGet: PagesFunction<Env> = async (context) => {
-  const { request, env } = context;
+export async function GET(context: APIContext) {
+  const { request } = context;
+  const db = context.locals.runtime.env.DB;
 
   // Authenticate and require admin
-  const authResult = await authenticateRequest(request, env.DB);
+  const authResult = await authenticateRequest(request, db);
   if (!authResult.success) {
     return errorResponse(authResult.error, authResult.status);
   }
@@ -22,7 +20,7 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
   const { team } = authResult.context;
 
   try {
-    const users = await getTeamUsers(env.DB, team.id);
+    const users = await getTeamUsers(db, team.id);
 
     return successResponse({
       users: users.map((user) => ({
@@ -39,4 +37,4 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
     console.error('List users error:', error);
     return errorResponse('Failed to list users', 500);
   }
-};
+}

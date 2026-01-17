@@ -1,3 +1,4 @@
+import type { APIContext } from 'astro';
 import { z } from 'zod';
 import { authenticateRequest, requireAdmin, errorResponse, successResponse } from '@lib/auth/middleware';
 import { updateTeamSettings } from '@lib/db/queries';
@@ -9,16 +10,13 @@ const UpdateLLMSchema = z.object({
   api_key: z.string().optional(),
 });
 
-type Env = {
-  DB: D1Database;
-  TEAM_ENCRYPTION_KEY?: string;
-};
-
-export const onRequestPut: PagesFunction<Env> = async (context) => {
-  const { request, env } = context;
+export async function PUT(context: APIContext) {
+  const { request } = context;
+  const db = context.locals.runtime.env.DB;
+  const encryptionKey = context.locals.runtime.env.TEAM_ENCRYPTION_KEY;
 
   // Authenticate and require admin
-  const authResult = await authenticateRequest(request, env.DB);
+  const authResult = await authenticateRequest(request, db);
   if (!authResult.success) {
     return errorResponse(authResult.error, authResult.status);
   }
@@ -49,13 +47,13 @@ export const onRequestPut: PagesFunction<Env> = async (context) => {
     // If provider is not heuristic and API key is provided, encrypt it
     let encryptedApiKey: string | null = null;
     if (input.provider !== 'heuristic' && input.api_key) {
-      if (!env.TEAM_ENCRYPTION_KEY) {
+      if (!encryptionKey) {
         return errorResponse('Encryption key not configured', 500);
       }
-      encryptedApiKey = await encrypt(input.api_key, env.TEAM_ENCRYPTION_KEY);
+      encryptedApiKey = await encrypt(input.api_key, encryptionKey);
     }
 
-    await updateTeamSettings(env.DB, team.id, {
+    await updateTeamSettings(db, team.id, {
       llm_provider: input.provider,
       llm_model: input.model ?? null,
       llm_api_key_encrypted: encryptedApiKey,
@@ -70,4 +68,4 @@ export const onRequestPut: PagesFunction<Env> = async (context) => {
     console.error('Update LLM error:', error);
     return errorResponse('Failed to update LLM settings', 500);
   }
-};
+}

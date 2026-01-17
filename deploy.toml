@@ -5,6 +5,6 @@
 # Build command - builds the Astro site
 build = "npm run build"
 
-# Deploy command - use 'true' (a no-op that always succeeds)
-# The actual deployment is handled by Cloudflare via pages_build_output_dir in wrangler.toml
-deploy = "true"
+# Deploy command - wrangler deploy reads main and assets from wrangler.toml
+# and deploys as a Workers project with static assets
+deploy = "npx wrangler deploy"

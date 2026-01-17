@@ -1,3 +1,4 @@
+import type { APIContext } from 'astro';
 import { z } from 'zod';
 import { authenticateRequest, errorResponse, successResponse } from '@lib/auth/middleware';
 import { createSession, getOrCreateDevice, getOrCreateRepo } from '@lib/db/queries';
@@ -14,15 +15,12 @@ const StartSessionSchema = z.object({
   worktree: z.string().optional(),
 });
 
-type Env = {
-  DB: D1Database;
-};
-
-export const onRequestPost: PagesFunction<Env> = async (context) => {
-  const { request, env } = context;
+export async function POST(context: APIContext) {
+  const { request } = context;
+  const db = context.locals.runtime.env.DB;
 
   // Authenticate
-  const authResult = await authenticateRequest(request, env.DB);
+  const authResult = await authenticateRequest(request, db);
   if (!authResult.success) {
     return errorResponse(authResult.error, authResult.status);
   }
@@ -46,7 +44,7 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
   try {
     // Get or create device
     const device = await getOrCreateDevice(
-      env.DB,
+      db,
       user.id,
       input.hostname,
       input.is_remote,
@@ -56,13 +54,13 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
     // Get or create repo if provided
     let repoId: string | null = null;
     if (input.repo_name) {
-      const repo = await getOrCreateRepo(env.DB, team.id, input.remote_url ?? null, input.repo_name);
+      const repo = await getOrCreateRepo(db, team.id, input.remote_url ?? null, input.repo_name);
       repoId = repo.id;
     }
 
     // Create session
     const sessionId = input.session_id ?? generateId();
-    const session = await createSession(env.DB, {
+    const session = await createSession(db, {
       id: sessionId,
       user_id: user.id,
       device_id: device.id,
@@ -80,4 +78,4 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
     console.error('Failed to start session:', error);
     return errorResponse('Failed to start session', 500);
   }
-};
+}

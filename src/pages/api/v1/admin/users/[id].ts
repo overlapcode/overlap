@@ -1,3 +1,4 @@
+import type { APIContext } from 'astro';
 import { z } from 'zod';
 import { authenticateRequest, requireAdmin, errorResponse, successResponse } from '@lib/auth/middleware';
 import { getUserById } from '@lib/db/queries';
@@ -8,16 +9,13 @@ const UpdateUserSchema = z.object({
   stale_timeout_hours: z.number().min(1).max(168).nullable().optional(),
 });
 
-type Env = {
-  DB: D1Database;
-};
-
-export const onRequestPut: PagesFunction<Env> = async (context) => {
-  const { request, env, params } = context;
+export async function PUT(context: APIContext) {
+  const { request, params } = context;
   const userId = params.id as string;
+  const db = context.locals.runtime.env.DB;
 
   // Authenticate and require admin
-  const authResult = await authenticateRequest(request, env.DB);
+  const authResult = await authenticateRequest(request, db);
   if (!authResult.success) {
     return errorResponse(authResult.error, authResult.status);
   }
@@ -44,7 +42,7 @@ export const onRequestPut: PagesFunction<Env> = async (context) => {
 
   try {
     // Get user to update
-    const user = await getUserById(env.DB, userId);
+    const user = await getUserById(db, userId);
     if (!user) {
       return errorResponse('User not found', 404);
     }
@@ -73,7 +71,7 @@ export const onRequestPut: PagesFunction<Env> = async (context) => {
     updates.push("updated_at = datetime('now')");
     values.push(userId);
 
-    await env.DB
+    await db
       .prepare(`UPDATE users SET ${updates.join(', ')} WHERE id = ?`)
       .bind(...values)
       .run();
@@ -83,4 +81,4 @@ export const onRequestPut: PagesFunction<Env> = async (context) => {
     console.error('Update user error:', error);
     return errorResponse('Failed to update user', 500);
   }
-};
+}

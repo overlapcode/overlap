@@ -1,16 +1,14 @@
+import type { APIContext } from 'astro';
 import { authenticateRequest, errorResponse, successResponse } from '@lib/auth/middleware';
 import { generateId, generateShortToken } from '@lib/utils/id';
 import { addDays } from '@lib/utils/time';
 
-type Env = {
-  DB: D1Database;
-};
-
-export const onRequestPost: PagesFunction<Env> = async (context) => {
-  const { request, env } = context;
+export async function POST(context: APIContext) {
+  const { request } = context;
+  const db = context.locals.runtime.env.DB;
 
   // Authenticate
-  const authResult = await authenticateRequest(request, env.DB);
+  const authResult = await authenticateRequest(request, db);
   if (!authResult.success) {
     return errorResponse(authResult.error, authResult.status);
   }
@@ -23,7 +21,7 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
     const expiresAt = addDays(new Date(), 7);
 
     // Store in database
-    await env.DB
+    await db
       .prepare(
         `INSERT INTO magic_links (id, token, user_id, expires_at)
          VALUES (?, ?, ?, ?)`
@@ -44,4 +42,4 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
     console.error('Magic link error:', error);
     return errorResponse('Failed to generate magic link', 500);
   }
-};
+}

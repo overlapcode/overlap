@@ -1,17 +1,15 @@
+import type { APIContext } from 'astro';
 import { authenticateRequest, requireAdmin, errorResponse, successResponse } from '@lib/auth/middleware';
 import { getUserById } from '@lib/db/queries';
 import { generateToken } from '@lib/utils/id';
 
-type Env = {
-  DB: D1Database;
-};
-
-export const onRequestPost: PagesFunction<Env> = async (context) => {
-  const { request, env, params } = context;
+export async function POST(context: APIContext) {
+  const { request, params } = context;
   const userId = params.id as string;
+  const db = context.locals.runtime.env.DB;
 
   // Authenticate and require admin
-  const authResult = await authenticateRequest(request, env.DB);
+  const authResult = await authenticateRequest(request, db);
   if (!authResult.success) {
     return errorResponse(authResult.error, authResult.status);
   }
@@ -23,7 +21,7 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
 
   try {
     // Get user
-    const user = await getUserById(env.DB, userId);
+    const user = await getUserById(db, userId);
     if (!user) {
       return errorResponse('User not found', 404);
     }
@@ -31,7 +29,7 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
     // Generate new token
     const newToken = generateToken();
 
-    await env.DB
+    await db
       .prepare("UPDATE users SET user_token = ?, updated_at = datetime('now') WHERE id = ?")
       .bind(newToken, userId)
       .run();
@@ -44,4 +42,4 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
     console.error('Rotate token error:', error);
     return errorResponse('Failed to rotate token', 500);
   }
-};
+}

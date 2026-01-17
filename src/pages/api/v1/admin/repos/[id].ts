@@ -1,3 +1,4 @@
+import type { APIContext } from 'astro';
 import { z } from 'zod';
 import { authenticateRequest, requireAdmin, errorResponse, successResponse } from '@lib/auth/middleware';
 
@@ -6,16 +7,13 @@ const UpdateRepoSchema = z.object({
   is_public: z.boolean().optional(),
 });
 
-type Env = {
-  DB: D1Database;
-};
-
-export const onRequestPut: PagesFunction<Env> = async (context) => {
-  const { request, env, params } = context;
+export async function PUT(context: APIContext) {
+  const { request, params } = context;
   const repoId = params.id as string;
+  const db = context.locals.runtime.env.DB;
 
   // Authenticate and require admin
-  const authResult = await authenticateRequest(request, env.DB);
+  const authResult = await authenticateRequest(request, db);
   if (!authResult.success) {
     return errorResponse(authResult.error, authResult.status);
   }
@@ -42,7 +40,7 @@ export const onRequestPut: PagesFunction<Env> = async (context) => {
 
   try {
     // Check repo exists
-    const repo = await env.DB
+    const repo = await db
       .prepare('SELECT id FROM repos WHERE id = ?')
       .bind(repoId)
       .first();
@@ -70,7 +68,7 @@ export const onRequestPut: PagesFunction<Env> = async (context) => {
 
     values.push(repoId);
 
-    await env.DB
+    await db
       .prepare(`UPDATE repos SET ${updates.join(', ')} WHERE id = ?`)
       .bind(...values)
       .run();
@@ -80,4 +78,4 @@ export const onRequestPut: PagesFunction<Env> = async (context) => {
     console.error('Update repo error:', error);
     return errorResponse('Failed to update repository', 500);
   }
-};
+}

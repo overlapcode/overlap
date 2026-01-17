@@ -1,18 +1,16 @@
+import type { APIContext } from 'astro';
 import { authenticateRequest, errorResponse } from '@lib/auth/middleware';
 import { getRecentActivity } from '@lib/db/queries';
-
-type Env = {
-  DB: D1Database;
-};
 
 const POLL_INTERVAL_MS = 5000; // Poll database every 5 seconds
 const KEEPALIVE_INTERVAL_MS = 30000; // Send keepalive every 30 seconds
 
-export const onRequestGet: PagesFunction<Env> = async (context) => {
-  const { request, env } = context;
+export async function GET(context: APIContext) {
+  const { request } = context;
+  const db = context.locals.runtime.env.DB;
 
   // Authenticate
-  const authResult = await authenticateRequest(request, env.DB);
+  const authResult = await authenticateRequest(request, db);
   if (!authResult.success) {
     return errorResponse(authResult.error, authResult.status);
   }
@@ -45,7 +43,7 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
       while (isActive) {
         try {
           // Check for new activity
-          const sessions = await getRecentActivity(env.DB, team.id, 20);
+          const sessions = await getRecentActivity(db, team.id, 20);
 
           // Filter to only new activity since last seen
           const newSessions = sessions.filter((s) => {
@@ -124,4 +122,4 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
       'Access-Control-Allow-Origin': '*',
     },
   });
-};
+}

@@ -1,3 +1,4 @@
+import type { APIContext } from 'astro';
 import { z } from 'zod';
 import { authenticateRequest, errorResponse, successResponse } from '@lib/auth/middleware';
 import { getSessionById, createActivity } from '@lib/db/queries';
@@ -8,17 +9,14 @@ const HeartbeatSchema = z.object({
   files: z.array(z.string()),
 });
 
-type Env = {
-  DB: D1Database;
-  TEAM_ENCRYPTION_KEY?: string;
-};
-
-export const onRequestPost: PagesFunction<Env> = async (context) => {
-  const { request, env, params } = context;
+export async function POST(context: APIContext) {
+  const { request, params } = context;
   const sessionId = params.id as string;
+  const db = context.locals.runtime.env.DB;
+  const encryptionKey = context.locals.runtime.env.TEAM_ENCRYPTION_KEY;
 
   // Authenticate
-  const authResult = await authenticateRequest(request, env.DB);
+  const authResult = await authenticateRequest(request, db);
   if (!authResult.success) {
     return errorResponse(authResult.error, authResult.status);
   }
@@ -41,7 +39,7 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
 
   try {
     // Verify session exists and belongs to user
-    const session = await getSessionById(env.DB, sessionId);
+    const session = await getSessionById(db, sessionId);
     if (!session) {
       return errorResponse('Session not found', 404);
     }
@@ -53,11 +51,11 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
     const classification = await classifyActivity(
       team,
       input.files,
-      env.TEAM_ENCRYPTION_KEY
+      encryptionKey
     );
 
     // Create activity record
-    const activity = await createActivity(env.DB, {
+    const activity = await createActivity(db, {
       id: generateId(),
       session_id: sessionId,
       files: JSON.stringify(input.files),
@@ -74,4 +72,4 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
     console.error('Heartbeat error:', error);
     return errorResponse('Failed to record activity', 500);
   }
-};
+}

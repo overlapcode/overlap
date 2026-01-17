@@ -1,3 +1,4 @@
+import type { APIContext } from 'astro';
 import { z } from 'zod';
 import { errorResponse, successResponse } from '@lib/auth/middleware';
 import { getTeam, createUser } from '@lib/db/queries';
@@ -9,12 +10,9 @@ const JoinSchema = z.object({
   email: z.string().email().nullable().optional(),
 });
 
-type Env = {
-  DB: D1Database;
-};
-
-export const onRequestPost: PagesFunction<Env> = async (context) => {
-  const { request, env } = context;
+export async function POST(context: APIContext) {
+  const { request } = context;
+  const db = context.locals.runtime.env.DB;
 
   // Parse body
   let body: unknown;
@@ -33,7 +31,7 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
 
   try {
     // Validate team token
-    const team = await getTeam(env.DB);
+    const team = await getTeam(db);
     if (!team) {
       return errorResponse('Team not found', 404);
     }
@@ -47,7 +45,7 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
     const userToken = generateToken();
 
     // Create user
-    await createUser(env.DB, {
+    await createUser(db, {
       id: userId,
       team_id: team.id,
       user_token: userToken,
@@ -66,4 +64,4 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
     console.error('Join error:', error);
     return errorResponse('Failed to join team', 500);
   }
-};
+}

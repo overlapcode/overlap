@@ -1,14 +1,12 @@
+import type { APIContext } from 'astro';
 import { authenticateRequest, errorResponse, successResponse } from '@lib/auth/middleware';
 
-type Env = {
-  DB: D1Database;
-};
-
-export const onRequestGet: PagesFunction<Env> = async (context) => {
-  const { request, env } = context;
+export async function GET(context: APIContext) {
+  const { request } = context;
+  const db = context.locals.runtime.env.DB;
 
   // Authenticate
-  const authResult = await authenticateRequest(request, env.DB);
+  const authResult = await authenticateRequest(request, db);
   if (!authResult.success) {
     return errorResponse(authResult.error, authResult.status);
   }
@@ -21,7 +19,7 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
 
   try {
     // Get user's sessions with activity
-    const result = await env.DB
+    const result = await db
       .prepare(
         `SELECT
           s.*,
@@ -95,4 +93,4 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
     console.error('Timeline error:', error);
     return errorResponse('Failed to fetch timeline', 500);
   }
-};
+}
