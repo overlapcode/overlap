@@ -17,49 +17,60 @@ export function Header({ teamName, userName }: HeaderProps) {
     >
       {/* Logo */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-md)' }}>
-        <div
+        <a
+          href="/"
           style={{
-            display: 'grid',
-            gridTemplateColumns: '1fr 1fr',
-            gap: '2px',
-            width: '24px',
-            height: '24px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 'var(--space-md)',
+            textDecoration: 'none',
+            color: 'inherit',
           }}
         >
           <div
             style={{
-              backgroundColor: 'var(--accent-orange)',
-              borderRadius: '2px 0 0 0',
+              display: 'grid',
+              gridTemplateColumns: '1fr 1fr',
+              gap: '2px',
+              width: '24px',
+              height: '24px',
             }}
-          />
-          <div
+          >
+            <div
+              style={{
+                backgroundColor: 'var(--accent-orange)',
+                borderRadius: '2px 0 0 0',
+              }}
+            />
+            <div
+              style={{
+                backgroundColor: 'var(--text-muted)',
+                borderRadius: '0 2px 0 0',
+              }}
+            />
+            <div
+              style={{
+                backgroundColor: 'var(--text-muted)',
+                borderRadius: '0 0 0 2px',
+              }}
+            />
+            <div
+              style={{
+                backgroundColor: 'var(--accent-orange)',
+                borderRadius: '0 0 2px 0',
+              }}
+            />
+          </div>
+          <span
             style={{
-              backgroundColor: 'var(--text-muted)',
-              borderRadius: '0 2px 0 0',
+              fontFamily: 'var(--font-mono)',
+              fontWeight: 600,
+              letterSpacing: '-0.02em',
             }}
-          />
-          <div
-            style={{
-              backgroundColor: 'var(--text-muted)',
-              borderRadius: '0 0 0 2px',
-            }}
-          />
-          <div
-            style={{
-              backgroundColor: 'var(--accent-orange)',
-              borderRadius: '0 0 2px 0',
-            }}
-          />
-        </div>
-        <span
-          style={{
-            fontFamily: 'var(--font-mono)',
-            fontWeight: 600,
-            letterSpacing: '-0.02em',
-          }}
-        >
-          overlap
-        </span>
+          >
+            overlap
+          </span>
+        </a>
         {teamName && (
           <>
             <span className="text-muted">/</span>

@@ -1,5 +1,5 @@
 import type { D1Database } from '@cloudflare/workers-types';
-import { getUserByToken, getTeam } from '@lib/db/queries';
+import { getUserByToken, getTeam, getUserById } from '@lib/db/queries';
 import type { User, Team } from '@lib/db/types';
 
 export type AuthContext = {
@@ -10,6 +10,69 @@ export type AuthContext = {
 export type AuthResult =
   | { success: true; context: AuthContext }
   | { success: false; error: string; status: number };
+
+/**
+ * Authenticate a request using web session cookie.
+ * Used by the web dashboard for browser-based access.
+ */
+export async function authenticateWebSession(
+  request: Request,
+  db: D1Database
+): Promise<AuthResult> {
+  // Get session token from cookie
+  const cookieHeader = request.headers.get('Cookie');
+  if (!cookieHeader) {
+    return { success: false, error: 'Not authenticated', status: 401 };
+  }
+
+  // Parse cookies
+  const cookies = Object.fromEntries(
+    cookieHeader.split(';').map((c) => {
+      const [key, ...val] = c.trim().split('=');
+      return [key, val.join('=')];
+    })
+  );
+
+  const sessionToken = cookies['overlap_session'];
+  if (!sessionToken) {
+    return { success: false, error: 'Not authenticated', status: 401 };
+  }
+
+  // Hash the token to compare with stored hash
+  const encoder = new TextEncoder();
+  const data = encoder.encode(sessionToken);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+  const tokenHash = btoa(String.fromCharCode(...new Uint8Array(hashBuffer)));
+
+  // Find session
+  const session = await db
+    .prepare(
+      `SELECT ws.*, u.id as user_id
+       FROM web_sessions ws
+       JOIN users u ON ws.user_id = u.id
+       WHERE ws.token_hash = ?
+       AND ws.expires_at > datetime('now')`
+    )
+    .bind(tokenHash)
+    .first<{ user_id: string }>();
+
+  if (!session) {
+    return { success: false, error: 'Session expired', status: 401 };
+  }
+
+  // Get user and team
+  const user = await getUserById(db, session.user_id);
+  if (!user || !user.is_active) {
+    return { success: false, error: 'User not found or inactive', status: 401 };
+  }
+
+  const team = await getTeam(db);
+  if (!team) {
+    return { success: false, error: 'Team not configured', status: 500 };
+  }
+
+  return { success: true, context: { user, team } };
+}
 
 /**
  * Authenticate a request using Bearer token (user_token) and X-Team-Token header.
@@ -58,6 +121,25 @@ export async function authenticateRequest(
   }
 
   return { success: true, context: { user, team } };
+}
+
+/**
+ * Authenticate using either web session or API tokens.
+ * Tries web session first (for dashboard), then API tokens (for plugin).
+ */
+export async function authenticateAny(
+  request: Request,
+  db: D1Database
+): Promise<AuthResult> {
+  // Try web session first
+  const webResult = await authenticateWebSession(request, db);
+  if (webResult.success) {
+    return webResult;
+  }
+
+  // Try API token auth
+  const apiResult = await authenticateRequest(request, db);
+  return apiResult;
 }
 
 /**

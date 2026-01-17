@@ -1,7 +1,8 @@
 import type { APIContext } from 'astro';
 import { z } from 'zod';
-import { authenticateRequest, requireAdmin, errorResponse, successResponse } from '@lib/auth/middleware';
+import { authenticateAny, requireAdmin, errorResponse, successResponse } from '@lib/auth/middleware';
 import { hashPassword } from '@lib/utils/crypto';
+import { getTeam } from '@lib/db/queries';
 
 const UpdateTeamSchema = z.object({
   name: z.string().min(1).max(100).optional(),
@@ -10,12 +11,48 @@ const UpdateTeamSchema = z.object({
   dashboard_password: z.string().min(8).optional(),
 });
 
+// GET: Retrieve team settings
+export async function GET(context: APIContext) {
+  const { request } = context;
+  const db = context.locals.runtime.env.DB;
+
+  // Authenticate and require admin (supports both web session and API tokens)
+  const authResult = await authenticateAny(request, db);
+  if (!authResult.success) {
+    return errorResponse(authResult.error, authResult.status);
+  }
+
+  const adminCheck = requireAdmin(authResult.context);
+  if (!adminCheck.success) {
+    return errorResponse(adminCheck.error, adminCheck.status);
+  }
+
+  try {
+    const team = await getTeam(db);
+    if (!team) {
+      return errorResponse('Team not found', 404);
+    }
+
+    return successResponse({
+      name: team.name,
+      team_token: team.team_token,
+      is_public: team.is_public === 1,
+      stale_timeout_hours: team.stale_timeout_hours,
+      has_dashboard_password: !!team.dashboard_password_hash,
+    });
+  } catch (error) {
+    console.error('Get team error:', error);
+    return errorResponse('Failed to get team settings', 500);
+  }
+}
+
+// PUT: Update team settings
 export async function PUT(context: APIContext) {
   const { request } = context;
   const db = context.locals.runtime.env.DB;
 
-  // Authenticate and require admin
-  const authResult = await authenticateRequest(request, db);
+  // Authenticate and require admin (supports both web session and API tokens)
+  const authResult = await authenticateAny(request, db);
   if (!authResult.success) {
     return errorResponse(authResult.error, authResult.status);
   }

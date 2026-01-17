@@ -13,114 +13,236 @@ import { Header } from '@components/Header';
         <h1 style="font-size: 1.5rem;">Team Settings</h1>
       </div>
 
-      <form id="team-form" class="card">
-        <div style="margin-bottom: var(--space-lg);">
-          <label
-            for="team-name"
-            style="display: block; margin-bottom: var(--space-sm); font-weight: 500;"
-          >
-            Team Name
-          </label>
+      <div id="loading-state" class="card" style="text-align: center; padding: var(--space-xl);">
+        <p class="text-secondary">Loading...</p>
+      </div>
+
+      <div id="error-state" class="card" style="display: none; text-align: center; padding: var(--space-xl);">
+        <p style="color: var(--accent-orange); margin-bottom: var(--space-md);" id="load-error-message">Failed to load settings</p>
+        <a href="/settings" class="btn btn-secondary">Back to Settings</a>
+      </div>
+
+      <div id="form-container" style="display: none;">
+        <!-- Team Token Section -->
+        <div class="card" style="margin-bottom: var(--space-lg);">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-sm);">
+            <label style="font-weight: 500;">Team Token</label>
+            <button type="button" id="copy-token-btn" style="
+              background: none;
+              border: 1px solid var(--border-default);
+              color: var(--text-secondary);
+              padding: 4px 8px;
+              border-radius: var(--radius-sm);
+              font-size: 0.75rem;
+              cursor: pointer;
+            ">
+              Copy
+            </button>
+          </div>
           <input
             type="text"
-            id="team-name"
-            name="name"
-            placeholder="My Team"
+            id="team-token"
+            readonly
             style="
               width: 100%;
               padding: var(--space-sm) var(--space-md);
-              background: var(--bg-elevated);
-              border: 1px solid var(--border-default);
+              background: var(--bg-primary);
+              border: 1px solid var(--border-subtle);
               border-radius: var(--radius-sm);
               color: var(--text-primary);
-              font-size: 1rem;
-            "
-          />
-        </div>
-
-        <div style="margin-bottom: var(--space-lg);">
-          <label style="display: flex; align-items: center; gap: var(--space-sm); cursor: pointer;">
-            <input
-              type="checkbox"
-              id="is-public"
-              name="is_public"
-              style="width: 18px; height: 18px;"
-            />
-            <span style="font-weight: 500;">Public Timeline</span>
-          </label>
-          <p class="text-muted" style="font-size: 0.75rem; margin-top: var(--space-xs); margin-left: 26px;">
-            Allow anyone to view your team's activity without authentication
-          </p>
-        </div>
-
-        <div style="margin-bottom: var(--space-lg);">
-          <label
-            for="stale-timeout"
-            style="display: block; margin-bottom: var(--space-sm); font-weight: 500;"
-          >
-            Stale Session Timeout (hours)
-          </label>
-          <input
-            type="number"
-            id="stale-timeout"
-            name="stale_timeout_hours"
-            min="1"
-            max="168"
-            value="8"
-            style="
-              width: 100%;
-              padding: var(--space-sm) var(--space-md);
-              background: var(--bg-elevated);
-              border: 1px solid var(--border-default);
-              border-radius: var(--radius-sm);
-              color: var(--text-primary);
-              font-size: 1rem;
+              font-family: var(--font-mono);
+              font-size: 0.875rem;
             "
           />
           <p class="text-muted" style="font-size: 0.75rem; margin-top: var(--space-xs);">
-            Sessions without activity will be marked stale after this time
+            Share this with team members so they can join your team.
           </p>
         </div>
 
-        <div style="margin-bottom: var(--space-lg);">
-          <label
-            for="new-password"
-            style="display: block; margin-bottom: var(--space-sm); font-weight: 500;"
-          >
-            New Dashboard Password (optional)
-          </label>
-          <input
-            type="password"
-            id="new-password"
-            name="dashboard_password"
-            minlength="8"
-            placeholder="Leave blank to keep current"
-            style="
-              width: 100%;
-              padding: var(--space-sm) var(--space-md);
-              background: var(--bg-elevated);
-              border: 1px solid var(--border-default);
-              border-radius: var(--radius-sm);
-              color: var(--text-primary);
-              font-size: 1rem;
-            "
-          />
-        </div>
+        <!-- Settings Form -->
+        <form id="team-form" class="card">
+          <div style="margin-bottom: var(--space-lg);">
+            <label
+              for="team-name"
+              style="display: block; margin-bottom: var(--space-sm); font-weight: 500;"
+            >
+              Team Name
+            </label>
+            <input
+              type="text"
+              id="team-name"
+              name="name"
+              placeholder="My Team"
+              style="
+                width: 100%;
+                padding: var(--space-sm) var(--space-md);
+                background: var(--bg-elevated);
+                border: 1px solid var(--border-default);
+                border-radius: var(--radius-sm);
+                color: var(--text-primary);
+                font-size: 1rem;
+              "
+            />
+          </div>
 
-        <button type="submit" class="btn btn-primary" style="width: 100%;">
-          Save Changes
-        </button>
+          <div style="margin-bottom: var(--space-lg);">
+            <label style="display: flex; align-items: center; gap: var(--space-sm); cursor: pointer;">
+              <input
+                type="checkbox"
+                id="is-public"
+                name="is_public"
+                style="width: 18px; height: 18px;"
+              />
+              <span style="font-weight: 500;">Public Timeline</span>
+            </label>
+            <p class="text-muted" style="font-size: 0.75rem; margin-top: var(--space-xs); margin-left: 26px;">
+              Allow anyone to view your team's activity without authentication
+            </p>
+          </div>
 
-        <p id="status-message" style="margin-top: var(--space-md); text-align: center; display: none;"></p>
-      </form>
+          <div style="margin-bottom: var(--space-lg);">
+            <label
+              for="stale-timeout"
+              style="display: block; margin-bottom: var(--space-sm); font-weight: 500;"
+            >
+              Stale Session Timeout (hours)
+            </label>
+            <input
+              type="number"
+              id="stale-timeout"
+              name="stale_timeout_hours"
+              min="1"
+              max="168"
+              value="8"
+              style="
+                width: 100%;
+                padding: var(--space-sm) var(--space-md);
+                background: var(--bg-elevated);
+                border: 1px solid var(--border-default);
+                border-radius: var(--radius-sm);
+                color: var(--text-primary);
+                font-size: 1rem;
+              "
+            />
+            <p class="text-muted" style="font-size: 0.75rem; margin-top: var(--space-xs);">
+              Sessions without activity will be marked stale after this time
+            </p>
+          </div>
+
+          <div style="margin-bottom: var(--space-lg);">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-sm);">
+              <label
+                for="new-password"
+                style="font-weight: 500;"
+              >
+                Dashboard Password
+              </label>
+              <span id="password-status" class="text-muted" style="font-size: 0.75rem;"></span>
+            </div>
+            <input
+              type="password"
+              id="new-password"
+              name="dashboard_password"
+              minlength="8"
+              placeholder="Enter new password to change"
+              style="
+                width: 100%;
+                padding: var(--space-sm) var(--space-md);
+                background: var(--bg-elevated);
+                border: 1px solid var(--border-default);
+                border-radius: var(--radius-sm);
+                color: var(--text-primary);
+                font-size: 1rem;
+              "
+            />
+            <p class="text-muted" style="font-size: 0.75rem; margin-top: var(--space-xs);">
+              Leave blank to keep current password. Share this with your team for dashboard access.
+            </p>
+          </div>
+
+          <button type="submit" class="btn btn-primary" style="width: 100%;">
+            Save Changes
+          </button>
+
+          <p id="status-message" style="margin-top: var(--space-md); text-align: center; display: none;"></p>
+        </form>
+      </div>
     </div>
   </main>
 </Layout>
 
 <script>
+  type TeamSettings = {
+    name: string;
+    team_token: string;
+    is_public: boolean;
+    stale_timeout_hours: number;
+    has_dashboard_password: boolean;
+  };
+
+  const loadingState = document.getElementById('loading-state') as HTMLDivElement;
+  const errorState = document.getElementById('error-state') as HTMLDivElement;
+  const loadErrorMessage = document.getElementById('load-error-message') as HTMLParagraphElement;
+  const formContainer = document.getElementById('form-container') as HTMLDivElement;
   const form = document.getElementById('team-form') as HTMLFormElement;
   const statusMessage = document.getElementById('status-message') as HTMLParagraphElement;
+  const teamTokenInput = document.getElementById('team-token') as HTMLInputElement;
+  const teamNameInput = document.getElementById('team-name') as HTMLInputElement;
+  const isPublicCheckbox = document.getElementById('is-public') as HTMLInputElement;
+  const staleTimeoutInput = document.getElementById('stale-timeout') as HTMLInputElement;
+  const passwordStatus = document.getElementById('password-status') as HTMLSpanElement;
+  const copyTokenBtn = document.getElementById('copy-token-btn') as HTMLButtonElement;
 
+  // Load existing settings
+  async function loadSettings() {
+    try {
+      const response = await fetch('/api/v1/admin/team');
+      const result = await response.json() as { data?: TeamSettings, error?: string };
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to load settings');
+      }
+
+      const settings = result.data!;
+
+      // Populate form
+      teamTokenInput.value = settings.team_token;
+      teamNameInput.value = settings.name;
+      isPublicCheckbox.checked = settings.is_public;
+      staleTimeoutInput.value = String(settings.stale_timeout_hours);
+      passwordStatus.textContent = settings.has_dashboard_password ? '(Password set)' : '(No password set)';
+
+      // Show form
+      loadingState.style.display = 'none';
+      formContainer.style.display = 'block';
+    } catch (error) {
+      loadingState.style.display = 'none';
+      loadErrorMessage.textContent = error instanceof Error ? error.message : 'Failed to load settings';
+      errorState.style.display = 'block';
+    }
+  }
+
+  loadSettings();
+
+  // Copy token handler
+  copyTokenBtn?.addEventListener('click', async () => {
+    try {
+      await navigator.clipboard.writeText(teamTokenInput.value);
+      copyTokenBtn.textContent = 'Copied!';
+      setTimeout(() => {
+        copyTokenBtn.textContent = 'Copy';
+      }, 2000);
+    } catch (err) {
+      teamTokenInput.select();
+      document.execCommand('copy');
+      copyTokenBtn.textContent = 'Copied!';
+      setTimeout(() => {
+        copyTokenBtn.textContent = 'Copy';
+      }, 2000);
+    }
+  });
+
+  // Form submit handler
   form?.addEventListener('submit', async (e) => {
     e.preventDefault();
 
@@ -154,6 +276,11 @@ import { Header } from '@components/Header';
       statusMessage.textContent = 'Settings saved successfully!';
       statusMessage.style.color = 'var(--accent-green)';
       statusMessage.style.display = 'block';
+
+      // Update password status if changed
+      if (password) {
+        passwordStatus.textContent = '(Password set)';
+      }
 
       setTimeout(() => {
         statusMessage.style.display = 'none';
