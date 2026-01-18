@@ -9,6 +9,14 @@ Overlap server and stores the session ID for later use.
 import json
 import sys
 import os
+from pathlib import Path
+
+# IMMEDIATE debug logging - this runs before anything else
+print(f"[Overlap] === SessionStart hook STARTED ===", file=sys.stderr)
+print(f"[Overlap] Python: {sys.executable}", file=sys.stderr)
+print(f"[Overlap] Script: {__file__}", file=sys.stderr)
+print(f"[Overlap] Home dir: {Path.home()}", file=sys.stderr)
+print(f"[Overlap] CWD: {os.getcwd()}", file=sys.stderr)
 
 # Add scripts directory to path for imports
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -19,30 +27,36 @@ from api import api_request, get_hostname, get_device_name, get_git_info, is_rem
 
 def main():
     # Read hook input from stdin
+    print(f"[Overlap] Reading stdin...", file=sys.stderr)
     try:
         input_data = json.load(sys.stdin)
-    except json.JSONDecodeError:
-        # No input or invalid JSON - silently exit
+        print(f"[Overlap] Received input: {json.dumps(input_data)}", file=sys.stderr)
+    except json.JSONDecodeError as e:
+        print(f"[Overlap] JSON decode error: {e}", file=sys.stderr)
         sys.exit(0)
 
     # Check if this is a startup or resume
     source = input_data.get("source", "")
+    print(f"[Overlap] Source: {source}", file=sys.stderr)
     if source not in ("startup", "resume"):
-        # Only handle startup and resume, not clear or compact
+        print(f"[Overlap] Skipping - source is not startup/resume", file=sys.stderr)
         sys.exit(0)
 
     # Check if configured
+    print(f"[Overlap] Checking configuration...", file=sys.stderr)
     if not is_configured():
-        # Not configured - silently exit
-        # User needs to run /overlap:config first
+        print(f"[Overlap] NOT CONFIGURED - exiting. Run /overlap:config first", file=sys.stderr)
         sys.exit(0)
+    print(f"[Overlap] Configuration OK", file=sys.stderr)
 
     # If resuming, check if we already have a session
     if source == "resume":
+        print(f"[Overlap] Resume - checking for existing session...", file=sys.stderr)
         existing_session = get_current_session()
         if existing_session:
-            # Already have a session, just exit
+            print(f"[Overlap] Found existing session {existing_session}, exiting", file=sys.stderr)
             sys.exit(0)
+        print(f"[Overlap] No existing session found, will create new one", file=sys.stderr)
 
     # Get session info
     session_id = input_data.get("session_id", "")
