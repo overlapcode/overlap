@@ -155,7 +155,9 @@ export function ActivityCard({ session }: ActivityCardProps) {
   const getFileUrl = (filePath: string): string | null => {
     if (!githubBaseUrl || !branch) return null;
     const relativePath = getRelativeFilePath(filePath, worktree);
-    return `${githubBaseUrl}/blob/${branch}/${relativePath}`;
+    // Encode each path segment to handle special chars like (), [], etc.
+    const encodedPath = relativePath.split('/').map(encodeURIComponent).join('/');
+    return `${githubBaseUrl}/blob/${branch}/${encodedPath}`;
   };
 
   return (
