@@ -5,8 +5,9 @@ type Session = {
   id: string;
   user: { id: string; name: string };
   device: { id: string; name: string; is_remote: boolean };
-  repo: { id: string; name: string } | null;
+  repo: { id: string; name: string; remote_url: string | null } | null;
   branch: string | null;
+  worktree: string | null;
   status: 'active' | 'stale' | 'ended';
   started_at: string;
   last_activity_at: string;
