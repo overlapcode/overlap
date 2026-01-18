@@ -6,7 +6,7 @@ import type { APIContext } from 'astro';
 import { successResponse } from '@lib/auth/middleware';
 
 // This should match package.json version
-const VERSION = '0.1.9';
+const VERSION = '0.1.10';
 const REPO = 'overlapcode/overlap';
 
 export async function GET(_context: APIContext) {
