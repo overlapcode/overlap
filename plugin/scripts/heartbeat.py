@@ -4,6 +4,8 @@ Overlap PostToolUse heartbeat hook.
 
 Called after file edits to report activity to the Overlap server.
 Collects the files being edited and sends them for classification.
+
+Uses transcript_path to look up the Overlap session ID.
 """
 
 import json
@@ -14,7 +16,7 @@ import os
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import logger
-from config import is_configured, get_current_session
+from config import is_configured, get_session_for_transcript
 from api import api_request
 
 
@@ -48,12 +50,21 @@ def main():
         logger.debug("Not configured, skipping")
         sys.exit(0)
 
-    # Get session ID from hook input (preferred) or fall back to stored session
-    session_id = input_data.get("session_id") or get_current_session()
-    logger.set_context(hook="PostToolUse", session_id=session_id)
+    # Get transcript_path - this is our key for looking up the session
+    transcript_path = input_data.get("transcript_path", "")
+    if not transcript_path:
+        logger.debug("No transcript_path in input, skipping")
+        sys.exit(0)
 
-    if not session_id:
-        logger.debug("No active session, skipping")
+    # Expand ~ in path
+    transcript_path = os.path.expanduser(transcript_path)
+
+    # Look up Overlap session for this Claude session
+    overlap_session_id = get_session_for_transcript(transcript_path)
+    logger.set_context(hook="PostToolUse", session_id=overlap_session_id)
+
+    if not overlap_session_id:
+        logger.debug("No Overlap session for this transcript, skipping")
         sys.exit(0)
 
     # Extract file path from tool input
@@ -80,7 +91,7 @@ def main():
 
     try:
         # Send heartbeat with file info
-        response = api_request("POST", f"/api/v1/sessions/{session_id}/heartbeat", {
+        response = api_request("POST", f"/api/v1/sessions/{overlap_session_id}/heartbeat", {
             "files": [file_path],
         })
 

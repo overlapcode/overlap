@@ -5,9 +5,11 @@ This module loads configuration from:
 1. Environment variables (OVERLAP_*)
 2. Config file (~/.claude/overlap/config.json)
 
-Claude Code recommends storing persistent state in ~/.claude/ for user-level data.
+Sessions are keyed by Claude Code's transcript_path, which uniquely identifies
+each Claude session (even multiple sessions in the same repo).
 """
 
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -22,7 +24,7 @@ except ImportError:
 # Store in ~/.claude/overlap/ as recommended by Claude Code docs
 CONFIG_DIR = Path.home() / ".claude" / "overlap"
 CONFIG_FILE = CONFIG_DIR / "config.json"
-SESSION_FILE = CONFIG_DIR / "session.json"
+SESSIONS_FILE = CONFIG_DIR / "sessions.json"  # Keyed by transcript_path
 
 
 def get_config() -> dict:
@@ -74,49 +76,84 @@ def save_config(config: dict) -> None:
         raise
 
 
-def get_current_session() -> Optional[str]:
-    """Get the current session ID if one is active."""
-    if SESSION_FILE.exists():
+def _get_transcript_key(transcript_path: str) -> str:
+    """Get a safe key for a transcript path (hash to avoid filesystem issues)."""
+    # Normalize path and hash it
+    normalized = os.path.expanduser(transcript_path)
+    return hashlib.sha256(normalized.encode()).hexdigest()[:16]
+
+
+def _load_sessions() -> dict:
+    """Load all sessions from file."""
+    if SESSIONS_FILE.exists():
         try:
-            with open(SESSION_FILE) as f:
-                data = json.load(f)
-                return data.get("session_id")
-        except json.JSONDecodeError as e:
-            if _logger:
-                _logger.warn("Session file has invalid JSON", path=str(SESSION_FILE), error=str(e))
-        except IOError as e:
-            if _logger:
-                _logger.warn("Failed to read session file", path=str(SESSION_FILE), error=str(e))
+            with open(SESSIONS_FILE) as f:
+                return json.load(f)
+        except (json.JSONDecodeError, IOError):
+            pass
+    return {}
+
+
+def _save_sessions(sessions: dict) -> None:
+    """Save all sessions to file."""
+    CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+    with open(SESSIONS_FILE, "w") as f:
+        json.dump(sessions, f, indent=2)
+
+
+def get_session_for_transcript(transcript_path: str) -> Optional[str]:
+    """Get the Overlap session ID for a Claude transcript."""
+    sessions = _load_sessions()
+    key = _get_transcript_key(transcript_path)
+    session_data = sessions.get(key)
+    if session_data:
+        return session_data.get("overlap_session_id")
     return None
 
 
-def save_current_session(session_id: str) -> None:
-    """Save the current session ID."""
+def save_session_for_transcript(transcript_path: str, overlap_session_id: str, worktree: str) -> None:
+    """Save an Overlap session ID for a Claude transcript."""
     import sys
+    from datetime import datetime, timezone
     try:
-        CONFIG_DIR.mkdir(parents=True, exist_ok=True)
-        with open(SESSION_FILE, "w") as f:
-            json.dump({"session_id": session_id}, f)
+        sessions = _load_sessions()
+        key = _get_transcript_key(transcript_path)
+        sessions[key] = {
+            "overlap_session_id": overlap_session_id,
+            "transcript_path": transcript_path,  # Store original for debugging
+            "worktree": worktree,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+        }
+        _save_sessions(sessions)
         if _logger:
-            _logger.info("Session saved", session_id=session_id, path=str(SESSION_FILE))
-        print(f"[Overlap] Config: Successfully wrote session file to {SESSION_FILE}", file=sys.stderr)
+            _logger.info("Session saved", overlap_session_id=overlap_session_id, transcript_path=transcript_path)
+        print(f"[Overlap] Config: Saved session for transcript", file=sys.stderr)
     except Exception as e:
         if _logger:
-            _logger.error("Failed to save session", exc=e, session_id=session_id)
-        print(f"[Overlap] Config: FAILED to write session file: {e}", file=sys.stderr)
+            _logger.error("Failed to save session", exc=e, overlap_session_id=overlap_session_id)
+        print(f"[Overlap] Config: FAILED to save session: {e}", file=sys.stderr)
         raise
 
 
-def clear_current_session() -> None:
-    """Clear the current session."""
-    if SESSION_FILE.exists():
-        try:
-            SESSION_FILE.unlink()
+def clear_session_for_transcript(transcript_path: str) -> None:
+    """Clear the session for a Claude transcript."""
+    try:
+        sessions = _load_sessions()
+        key = _get_transcript_key(transcript_path)
+        if key in sessions:
+            del sessions[key]
+            _save_sessions(sessions)
             if _logger:
-                _logger.info("Session cleared", path=str(SESSION_FILE))
-        except OSError as e:
-            if _logger:
-                _logger.warn("Failed to clear session file", path=str(SESSION_FILE), error=str(e))
+                _logger.info("Session cleared", transcript_path=transcript_path)
+    except Exception as e:
+        if _logger:
+            _logger.warn("Failed to clear session", transcript_path=transcript_path, error=str(e))
+
+
+def get_lock_file_for_transcript(transcript_path: str) -> Path:
+    """Get the lock file path for a Claude transcript."""
+    key = _get_transcript_key(transcript_path)
+    return CONFIG_DIR / f"session-{key}.lock"
 
 
 def is_configured() -> bool:

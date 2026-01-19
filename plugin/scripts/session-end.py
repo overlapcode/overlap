@@ -4,6 +4,8 @@ Overlap SessionEnd hook.
 
 Called when a Claude Code session ends. Notifies the server that the session
 has ended so it can be marked as inactive.
+
+Uses transcript_path to look up the Overlap session ID.
 """
 
 import json
@@ -14,7 +16,7 @@ import os
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import logger
-from config import is_configured, get_current_session, clear_current_session
+from config import is_configured, get_session_for_transcript, clear_session_for_transcript
 from api import api_request
 
 
@@ -29,8 +31,9 @@ def main():
         input_data = json.load(sys.stdin)
         logger.info("Received input", input_keys=list(input_data.keys()))
     except json.JSONDecodeError as e:
-        # No input - try to end session anyway
+        # No input - can't do much without transcript_path
         logger.warn("No valid JSON input", error=str(e))
+        sys.exit(0)
 
     # Check if configured
     if not is_configured():
@@ -38,32 +41,31 @@ def main():
         print("[Overlap] SessionEnd: Not configured, skipping", file=sys.stderr)
         sys.exit(0)
 
-    # Get the session ID that's ending (from Claude Code) and the stored session ID
-    ending_session_id = input_data.get("session_id", "")
-    stored_session_id = get_current_session()
-
-    # If we have no stored session, nothing to do
-    if not stored_session_id:
-        logger.info("No active session to end")
-        print("[Overlap] SessionEnd: No active session to end", file=sys.stderr)
+    # Get transcript_path - this is our key for looking up the session
+    transcript_path = input_data.get("transcript_path", "")
+    if not transcript_path:
+        logger.info("No transcript_path in input, skipping")
+        print("[Overlap] SessionEnd: No transcript_path, skipping", file=sys.stderr)
         sys.exit(0)
 
-    # Only proceed if this is our session ending (or if no session_id provided in input)
-    if ending_session_id and ending_session_id != stored_session_id:
-        logger.info("Different session ending, keeping our session",
-                    ending_session=ending_session_id,
-                    our_session=stored_session_id)
-        print(f"[Overlap] SessionEnd: Different session ending, keeping ours", file=sys.stderr)
+    # Expand ~ in path
+    transcript_path = os.path.expanduser(transcript_path)
+
+    # Look up our Overlap session for this Claude session
+    overlap_session_id = get_session_for_transcript(transcript_path)
+
+    if not overlap_session_id:
+        logger.info("No Overlap session found for transcript", transcript_path=transcript_path)
+        print("[Overlap] SessionEnd: No tracked session for this transcript", file=sys.stderr)
         sys.exit(0)
 
-    session_id = stored_session_id
-    logger.set_context(hook="SessionEnd", session_id=session_id)
+    logger.set_context(hook="SessionEnd", session_id=overlap_session_id)
 
     try:
         # End session on server
-        logger.info("Ending session on server")
-        print(f"[Overlap] SessionEnd: Ending session {session_id}", file=sys.stderr)
-        api_request("POST", f"/api/v1/sessions/{session_id}/end", {})
+        logger.info("Ending session on server", overlap_session_id=overlap_session_id)
+        print(f"[Overlap] SessionEnd: Ending session {overlap_session_id}", file=sys.stderr)
+        api_request("POST", f"/api/v1/sessions/{overlap_session_id}/end", {})
         logger.info("Session ended successfully")
         print(f"[Overlap] SessionEnd: Successfully ended session on server", file=sys.stderr)
     except Exception as e:
@@ -72,10 +74,10 @@ def main():
         print(f"[Overlap] Failed to end session: {e}", file=sys.stderr)
         print(f"[Overlap] Traceback: {traceback.format_exc()}", file=sys.stderr)
     finally:
-        # Clear local session file (we've confirmed this is our session)
-        clear_current_session()
-        logger.info("Local session file cleared")
-        print(f"[Overlap] SessionEnd: Cleared local session file", file=sys.stderr)
+        # Clear local session mapping
+        clear_session_for_transcript(transcript_path)
+        logger.info("Local session mapping cleared", transcript_path=transcript_path)
+        print(f"[Overlap] SessionEnd: Cleared local session mapping", file=sys.stderr)
 
     sys.exit(0)
 
