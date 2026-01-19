@@ -20,6 +20,14 @@ Overlap is a **Claude Code plugin + self-hosted cloud service** that tracks what
 - **Self-Hosted & Private** - Your data stays on your infrastructure
 - **Zero Platform Cost** - Deploy to Cloudflare free tier
 
+## Prerequisites
+
+The Claude Code plugin requires **Python 3.7+** installed on your machine. Check with:
+
+```bash
+python3 --version
+```
+
 ## Quick Start
 
 ### Option A: One-Click Deploy
