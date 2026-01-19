@@ -33,7 +33,7 @@ You'll need:
 - **Team Token**: Get this from your team admin
 - **User Token**: Your personal token from the join flow
 
-Configuration is stored at `~/.overlap/config.json`.
+Configuration is stored at `~/.claude/overlap/config.json`.
 
 ## Commands
 
@@ -86,8 +86,8 @@ Environment variables override the config file.
 
 ## Files
 
-- `~/.overlap/config.json` - Plugin configuration
-- `~/.overlap/session.json` - Current session info (temporary)
+- `~/.claude/overlap/config.json` - Plugin configuration
+- `~/.claude/overlap/sessions.json` - Session tracking (keyed by transcript path)
 
 ## Requirements
 

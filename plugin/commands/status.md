@@ -7,8 +7,8 @@ allowed-tools: Bash(cat:*), Bash(curl:*)
 
 Check the current Overlap session status by:
 
-1. Reading the configuration from `~/.overlap/config.json`
-2. Reading the current session from `~/.overlap/session.json` (if exists)
+1. Reading the configuration from `~/.claude/overlap/config.json`
+2. Reading the current session from `~/.claude/overlap/sessions.json` (if exists)
 3. Testing the connection to the server
 
 ## Check Configuration
@@ -16,7 +16,7 @@ Check the current Overlap session status by:
 First, check if the plugin is configured:
 
 ```bash
-cat ~/.overlap/config.json 2>/dev/null || echo "Not configured"
+cat ~/.claude/overlap/config.json 2>/dev/null || echo "Not configured"
 ```
 
 ## Check Current Session
@@ -24,7 +24,7 @@ cat ~/.overlap/config.json 2>/dev/null || echo "Not configured"
 Check if there's an active session:
 
 ```bash
-cat ~/.overlap/session.json 2>/dev/null || echo "No active session"
+cat ~/.claude/overlap/sessions.json 2>/dev/null || echo "No active session"
 ```
 
 ## Test Connection
@@ -33,9 +33,9 @@ If configured, test the connection by fetching user info:
 
 ```bash
 # Read config
-SERVER_URL=$(cat ~/.overlap/config.json | grep -o '"server_url"[^,]*' | cut -d'"' -f4)
-USER_TOKEN=$(cat ~/.overlap/config.json | grep -o '"user_token"[^,]*' | cut -d'"' -f4)
-TEAM_TOKEN=$(cat ~/.overlap/config.json | grep -o '"team_token"[^,]*' | cut -d'"' -f4)
+SERVER_URL=$(cat ~/.claude/overlap/config.json | grep -o '"server_url"[^,]*' | cut -d'"' -f4)
+USER_TOKEN=$(cat ~/.claude/overlap/config.json | grep -o '"user_token"[^,]*' | cut -d'"' -f4)
+TEAM_TOKEN=$(cat ~/.claude/overlap/config.json | grep -o '"team_token"[^,]*' | cut -d'"' -f4)
 
 # Test connection
 curl -s -X GET "${SERVER_URL}/api/v1/users/me" \
@@ -49,7 +49,7 @@ Check the server version:
 
 ```bash
 # Get server version
-SERVER_URL=$(cat ~/.overlap/config.json 2>/dev/null | grep -o '"server_url"[^,]*' | cut -d'"' -f4)
+SERVER_URL=$(cat ~/.claude/overlap/config.json 2>/dev/null | grep -o '"server_url"[^,]*' | cut -d'"' -f4)
 if [ -n "$SERVER_URL" ]; then
   curl -s "${SERVER_URL}/api/v1/version"
 fi
