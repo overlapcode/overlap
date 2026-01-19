@@ -296,11 +296,41 @@ export async function createActivity(
   return db.prepare('SELECT * FROM activity WHERE id = ?').bind(data.id).first<Activity>() as Promise<Activity>;
 }
 
+export type PaginatedSessions = {
+  sessions: SessionWithDetails[];
+  total: number;
+  limit: number;
+  offset: number;
+  hasMore: boolean;
+};
+
 export async function getRecentActivity(
   db: D1Database,
   teamId: string,
-  limit = 50
-): Promise<SessionWithDetails[]> {
+  options: {
+    limit?: number;
+    offset?: number;
+    includeStale?: boolean;
+  } = {}
+): Promise<PaginatedSessions> {
+  const { limit = 20, offset = 0, includeStale = true } = options;
+
+  const statusFilter = includeStale ? "('active', 'stale')" : "('active')";
+
+  // Get total count
+  const countResult = await db
+    .prepare(
+      `SELECT COUNT(*) as count
+       FROM sessions s
+       JOIN users u ON s.user_id = u.id
+       WHERE u.team_id = ?
+       AND s.status IN ${statusFilter}`
+    )
+    .bind(teamId)
+    .first<{ count: number }>();
+
+  const total = countResult?.count ?? 0;
+
   // Get recent sessions with their latest activity
   const result = await db
     .prepare(
@@ -320,14 +350,14 @@ export async function getRecentActivity(
         FROM activity
       ) a ON s.id = a.session_id AND a.rn = 1
       WHERE u.team_id = ?
-      AND s.status IN ('active', 'stale')
+      AND s.status IN ${statusFilter}
       ORDER BY s.last_activity_at DESC
-      LIMIT ?`
+      LIMIT ? OFFSET ?`
     )
-    .bind(teamId, limit)
+    .bind(teamId, limit, offset)
     .all();
 
-  return result.results.map((row: Record<string, unknown>) => ({
+  const sessions = result.results.map((row: Record<string, unknown>) => ({
     id: row.id as string,
     user_id: row.user_id as string,
     device_id: row.device_id as string,
@@ -365,6 +395,157 @@ export async function getRecentActivity(
         }
       : null,
   }));
+
+  return {
+    sessions,
+    total,
+    limit,
+    offset,
+    hasMore: offset + sessions.length < total,
+  };
+}
+
+export type UserActivitySummary = {
+  userId: string;
+  userName: string;
+  sessionCount: number;
+  latestActivity: string;
+};
+
+export async function getActivityByUser(
+  db: D1Database,
+  teamId: string,
+  includeStale: boolean = true
+): Promise<UserActivitySummary[]> {
+  const statusFilter = includeStale ? "('active', 'stale')" : "('active')";
+
+  const result = await db
+    .prepare(
+      `SELECT
+        u.id as user_id,
+        u.name as user_name,
+        COUNT(s.id) as session_count,
+        MAX(s.last_activity_at) as latest_activity
+      FROM users u
+      JOIN sessions s ON s.user_id = u.id
+      WHERE u.team_id = ?
+      AND s.status IN ${statusFilter}
+      GROUP BY u.id, u.name
+      ORDER BY latest_activity DESC`
+    )
+    .bind(teamId)
+    .all();
+
+  return result.results.map((row: Record<string, unknown>) => ({
+    userId: row.user_id as string,
+    userName: row.user_name as string,
+    sessionCount: row.session_count as number,
+    latestActivity: row.latest_activity as string,
+  }));
+}
+
+export async function getUserSessions(
+  db: D1Database,
+  teamId: string,
+  userId: string,
+  options: {
+    limit?: number;
+    offset?: number;
+    includeStale?: boolean;
+  } = {}
+): Promise<PaginatedSessions> {
+  const { limit = 20, offset = 0, includeStale = true } = options;
+
+  const statusFilter = includeStale ? "('active', 'stale')" : "('active')";
+
+  // Get total count for this user
+  const countResult = await db
+    .prepare(
+      `SELECT COUNT(*) as count
+       FROM sessions s
+       JOIN users u ON s.user_id = u.id
+       WHERE u.team_id = ?
+       AND s.user_id = ?
+       AND s.status IN ${statusFilter}`
+    )
+    .bind(teamId, userId)
+    .first<{ count: number }>();
+
+  const total = countResult?.count ?? 0;
+
+  // Get user's sessions with their latest activity
+  const result = await db
+    .prepare(
+      `SELECT
+        s.*,
+        u.id as user_id, u.name as user_name,
+        d.id as device_id, d.name as device_name, d.is_remote as device_is_remote,
+        r.id as repo_id, r.name as repo_name, r.remote_url as repo_remote_url,
+        a.id as activity_id, a.files, a.semantic_scope, a.summary, a.created_at as activity_created_at
+      FROM sessions s
+      JOIN users u ON s.user_id = u.id
+      JOIN devices d ON s.device_id = d.id
+      LEFT JOIN repos r ON s.repo_id = r.id
+      LEFT JOIN (
+        SELECT session_id, id, files, semantic_scope, summary, created_at,
+               ROW_NUMBER() OVER (PARTITION BY session_id ORDER BY created_at DESC) as rn
+        FROM activity
+      ) a ON s.id = a.session_id AND a.rn = 1
+      WHERE u.team_id = ?
+      AND s.user_id = ?
+      AND s.status IN ${statusFilter}
+      ORDER BY s.last_activity_at DESC
+      LIMIT ? OFFSET ?`
+    )
+    .bind(teamId, userId, limit, offset)
+    .all();
+
+  const sessions = result.results.map((row: Record<string, unknown>) => ({
+    id: row.id as string,
+    user_id: row.user_id as string,
+    device_id: row.device_id as string,
+    repo_id: row.repo_id as string | null,
+    branch: row.branch as string | null,
+    worktree: row.worktree as string | null,
+    status: row.status as 'active' | 'stale' | 'ended',
+    started_at: row.started_at as string,
+    last_activity_at: row.last_activity_at as string,
+    ended_at: row.ended_at as string | null,
+    user: {
+      id: row.user_id as string,
+      name: row.user_name as string,
+    },
+    device: {
+      id: row.device_id as string,
+      name: row.device_name as string,
+      is_remote: row.device_is_remote as number,
+    },
+    repo: row.repo_id
+      ? {
+          id: row.repo_id as string,
+          name: row.repo_name as string,
+          remote_url: row.repo_remote_url as string | null,
+        }
+      : null,
+    latest_activity: row.activity_id
+      ? {
+          id: row.activity_id as string,
+          session_id: row.id as string,
+          files: JSON.parse(row.files as string) as string[],
+          semantic_scope: row.semantic_scope as string | null,
+          summary: row.summary as string | null,
+          created_at: row.activity_created_at as string,
+        }
+      : null,
+  }));
+
+  return {
+    sessions,
+    total,
+    limit,
+    offset,
+    hasMore: offset + sessions.length < total,
+  };
 }
 
 // ============================================================================

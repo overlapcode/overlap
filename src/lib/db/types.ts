@@ -112,6 +112,6 @@ export type ParsedActivity = Omit<Activity, 'files'> & {
 export type SessionWithDetails = Session & {
   user: Pick<User, 'id' | 'name'>;
   device: Pick<Device, 'id' | 'name' | 'is_remote'>;
-  repo: Pick<Repo, 'id' | 'name'> | null;
+  repo: Pick<Repo, 'id' | 'name' | 'remote_url'> | null;
   latest_activity: ParsedActivity | null;
 };

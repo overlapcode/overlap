@@ -1,5 +1,9 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { ActivityCard } from './ActivityCard';
+import { ViewToggle } from './ViewToggle';
+import { UserActivityList } from './UserActivityList';
+
+type ViewMode = 'timeline' | 'byUser';
 
 type Session = {
   id: string;
@@ -18,36 +22,75 @@ type Session = {
   } | null;
 };
 
+const PAGE_SIZE = 20;
+
+function getInitialViewMode(): ViewMode {
+  if (typeof window === 'undefined') return 'timeline';
+  const stored = localStorage.getItem('overlap-view-mode');
+  return stored === 'byUser' ? 'byUser' : 'timeline';
+}
+
 export function Timeline() {
   const [sessions, setSessions] = useState<Session[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [isConnected, setIsConnected] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [showStale, setShowStale] = useState(false);
+  const [viewMode, setViewMode] = useState<ViewMode>(getInitialViewMode);
+  const [hasMore, setHasMore] = useState(false);
+  const [offset, setOffset] = useState(0);
+  const prevShowStaleRef = useRef(showStale);
 
-  const fetchInitialData = useCallback(async () => {
-    try {
-      // Uses session cookie for auth (automatically included)
-      const response = await fetch('/api/v1/activity');
-
-      if (!response.ok) {
-        const data = await response.json() as { error?: string };
-        throw new Error(data.error || 'Failed to fetch activity');
+  const fetchSessions = useCallback(
+    async (currentOffset: number, append: boolean = false) => {
+      if (append) {
+        setIsLoadingMore(true);
+      } else {
+        setIsLoading(true);
       }
 
-      const data = await response.json() as { data: { sessions: Session[] } };
-      setSessions(data.data.sessions);
-      setError(null);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load activity');
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
+      try {
+        const params = new URLSearchParams({
+          limit: String(PAGE_SIZE),
+          offset: String(currentOffset),
+          includeStale: String(showStale),
+        });
 
+        const response = await fetch(`/api/v1/activity?${params}`);
+
+        if (!response.ok) {
+          const data = (await response.json()) as { error?: string };
+          throw new Error(data.error || 'Failed to fetch activity');
+        }
+
+        const data = (await response.json()) as {
+          data: { sessions: Session[]; hasMore: boolean; total: number };
+        };
+
+        if (append) {
+          setSessions((prev) => [...prev, ...data.data.sessions]);
+        } else {
+          setSessions(data.data.sessions);
+        }
+        setHasMore(data.data.hasMore);
+        setOffset(currentOffset + data.data.sessions.length);
+        setError(null);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to load activity');
+      } finally {
+        setIsLoading(false);
+        setIsLoadingMore(false);
+      }
+    },
+    [showStale]
+  );
+
+  // Initial fetch and SSE setup
   useEffect(() => {
-    // Fetch initial data
-    fetchInitialData();
+    if (viewMode === 'timeline') {
+      fetchSessions(0);
+    }
 
     // Set up SSE connection (uses session cookie automatically)
     const eventSource = new EventSource('/api/v1/stream');
@@ -88,13 +131,39 @@ export function Timeline() {
     return () => {
       eventSource.close();
     };
-  }, [fetchInitialData]);
+  }, [viewMode, fetchSessions]);
+
+  // Refetch when showStale changes
+  useEffect(() => {
+    if (prevShowStaleRef.current !== showStale && viewMode === 'timeline') {
+      setOffset(0);
+      fetchSessions(0);
+    }
+    prevShowStaleRef.current = showStale;
+  }, [showStale, viewMode, fetchSessions]);
+
+  // Save view mode to localStorage
+  useEffect(() => {
+    localStorage.setItem('overlap-view-mode', viewMode);
+  }, [viewMode]);
+
+  const handleViewModeChange = (mode: ViewMode) => {
+    setViewMode(mode);
+    if (mode === 'timeline') {
+      setOffset(0);
+      fetchSessions(0);
+    }
+  };
+
+  const handleLoadMore = () => {
+    fetchSessions(offset, true);
+  };
 
   const hasStale = sessions.some((s) => s.status === 'stale');
 
   return (
     <div>
-      {/* Connection status */}
+      {/* Header bar with connection status, view toggle, and stale toggle */}
       <div
         style={{
           display: 'flex',
@@ -105,79 +174,120 @@ export function Timeline() {
           backgroundColor: 'var(--bg-surface)',
           borderRadius: 'var(--radius-sm)',
           fontSize: '0.875rem',
+          flexWrap: 'wrap',
         }}
       >
         <span
           className={`status-dot ${isConnected ? 'active' : 'stale'}`}
           style={{ width: 6, height: 6 }}
         />
-        <span className="text-secondary">
-          {isConnected ? 'Connected' : 'Connecting...'}
-        </span>
+        <span className="text-secondary">{isConnected ? 'Connected' : 'Connecting...'}</span>
         {error && (
           <>
             <span className="text-muted">·</span>
             <span style={{ color: 'var(--accent-orange)' }}>{error}</span>
           </>
         )}
-        {hasStale && (
-          <button
-            onClick={() => setShowStale(!showStale)}
-            style={{
-              marginLeft: 'auto',
-              background: 'none',
-              border: 'none',
-              color: 'var(--text-muted)',
-              cursor: 'pointer',
-              fontSize: '0.875rem',
-              padding: 0,
-            }}
-          >
-            {showStale ? 'Hide stale' : 'Show stale'}
-          </button>
-        )}
+
+        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 'var(--space-md)' }}>
+          <ViewToggle value={viewMode} onChange={handleViewModeChange} />
+          {(hasStale || showStale) && (
+            <button
+              onClick={() => setShowStale(!showStale)}
+              style={{
+                background: 'none',
+                border: 'none',
+                color: showStale ? 'var(--text-secondary)' : 'var(--text-muted)',
+                cursor: 'pointer',
+                fontSize: '0.875rem',
+                padding: 0,
+              }}
+            >
+              {showStale ? 'Hide stale' : 'Show stale'}
+            </button>
+          )}
+        </div>
       </div>
 
-      {/* Sessions list */}
-      {(() => {
-        const activeSessions = sessions.filter((s) => s.status !== 'stale');
-        const displayedSessions = showStale ? sessions : activeSessions;
+      {/* Content based on view mode */}
+      {viewMode === 'byUser' ? (
+        <UserActivityList showStale={showStale} />
+      ) : (
+        <>
+          {(() => {
+            const activeSessions = sessions.filter((s) => s.status !== 'stale');
+            const displayedSessions = showStale ? sessions : activeSessions;
 
-        if (isLoading) {
-          return (
-            <div
-              className="card"
-              style={{
-                textAlign: 'center',
-                padding: 'var(--space-xl)',
-              }}
-            >
-              <img src="/loading.gif" alt="Loading" width={48} height={48} style={{ opacity: 0.8 }} />
-            </div>
-          );
-        }
+            if (isLoading) {
+              return (
+                <div
+                  className="card"
+                  style={{
+                    textAlign: 'center',
+                    padding: 'var(--space-xl)',
+                  }}
+                >
+                  <img
+                    src="/loading.gif"
+                    alt="Loading"
+                    width={48}
+                    height={48}
+                    style={{ opacity: 0.8 }}
+                  />
+                </div>
+              );
+            }
 
-        if (displayedSessions.length === 0) {
-          return (
-            <div
-              className="card"
-              style={{
-                textAlign: 'center',
-                padding: 'var(--space-xl)',
-              }}
-            >
-              <p className="text-secondary">No active sessions</p>
-              <p className="text-muted" style={{ fontSize: '0.875rem', marginTop: 'var(--space-sm)' }}>
-                Activity will appear here when team members start coding
-              </p>
-            </div>
-          );
-        }
+            if (displayedSessions.length === 0) {
+              return (
+                <div
+                  className="card"
+                  style={{
+                    textAlign: 'center',
+                    padding: 'var(--space-xl)',
+                  }}
+                >
+                  <p className="text-secondary">No active sessions</p>
+                  <p
+                    className="text-muted"
+                    style={{ fontSize: '0.875rem', marginTop: 'var(--space-sm)' }}
+                  >
+                    Activity will appear here when team members start coding
+                  </p>
+                </div>
+              );
+            }
 
-        return displayedSessions.map((session) => (
-          <ActivityCard key={session.id} session={session} />
-        ));
-      })()}
+            return (
+              <>
+                {displayedSessions.map((session) => (
+                  <ActivityCard key={session.id} session={session} />
+                ))}
+
+                {hasMore && (
+                  <button
+                    onClick={handleLoadMore}
+                    disabled={isLoadingMore}
+                    style={{
+                      width: '100%',
+                      padding: 'var(--space-sm)',
+                      marginTop: 'var(--space-sm)',
+                      background: 'var(--bg-elevated)',
+                      border: '1px solid var(--border-subtle)',
+                      borderRadius: 'var(--radius-sm)',
+                      color: 'var(--text-secondary)',
+                      cursor: isLoadingMore ? 'wait' : 'pointer',
+                      fontSize: '0.875rem',
+                    }}
+                  >
+                    {isLoadingMore ? 'Loading...' : 'Load more'}
+                  </button>
+                )}
+              </>
+            );
+          })()}
+        </>
+      )}
     </div>
   );
 }

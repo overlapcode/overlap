@@ -1,7 +1,7 @@
 {
   "name": "overlap",
   "type": "module",
-  "version": "0.1.14",
+  "version": "0.1.15",
   "description": "Track team activity and detect overlapping work in Claude Code sessions",
   "scripts": {
     "dev": "astro dev",

@@ -43,10 +43,10 @@ export async function GET(context: APIContext) {
       while (isActive) {
         try {
           // Check for new activity
-          const sessions = await getRecentActivity(db, team.id, 20);
+          const result = await getRecentActivity(db, team.id, { limit: 20 });
 
           // Filter to only new activity since last seen
-          const newSessions = sessions.filter((s) => {
+          const newSessions = result.sessions.filter((s) => {
             const activityTime = s.latest_activity
               ? new Date(s.latest_activity.created_at)
               : new Date(s.last_activity_at);
