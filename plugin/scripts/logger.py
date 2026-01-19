@@ -9,6 +9,8 @@ Provides structured logging with:
 - Server sync (sends logs to Overlap server for admin viewing)
 """
 
+from __future__ import annotations
+
 import atexit
 import json
 import os
