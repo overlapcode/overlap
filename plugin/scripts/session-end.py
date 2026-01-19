@@ -24,6 +24,7 @@ def main():
     logger.info("Hook started")
 
     # Read hook input from stdin
+    input_data = {}
     try:
         input_data = json.load(sys.stdin)
         logger.info("Received input", input_keys=list(input_data.keys()))
@@ -37,13 +38,25 @@ def main():
         print("[Overlap] SessionEnd: Not configured, skipping", file=sys.stderr)
         sys.exit(0)
 
-    # Get current session
-    session_id = get_current_session()
-    if not session_id:
+    # Get the session ID that's ending (from Claude Code) and the stored session ID
+    ending_session_id = input_data.get("session_id", "")
+    stored_session_id = get_current_session()
+
+    # If we have no stored session, nothing to do
+    if not stored_session_id:
         logger.info("No active session to end")
         print("[Overlap] SessionEnd: No active session to end", file=sys.stderr)
         sys.exit(0)
 
+    # Only proceed if this is our session ending (or if no session_id provided in input)
+    if ending_session_id and ending_session_id != stored_session_id:
+        logger.info("Different session ending, keeping our session",
+                    ending_session=ending_session_id,
+                    our_session=stored_session_id)
+        print(f"[Overlap] SessionEnd: Different session ending, keeping ours", file=sys.stderr)
+        sys.exit(0)
+
+    session_id = stored_session_id
     logger.set_context(hook="SessionEnd", session_id=session_id)
 
     try:
@@ -59,7 +72,7 @@ def main():
         print(f"[Overlap] Failed to end session: {e}", file=sys.stderr)
         print(f"[Overlap] Traceback: {traceback.format_exc()}", file=sys.stderr)
     finally:
-        # Always clear local session file
+        # Clear local session file (we've confirmed this is our session)
         clear_current_session()
         logger.info("Local session file cleared")
         print(f"[Overlap] SessionEnd: Cleared local session file", file=sys.stderr)
