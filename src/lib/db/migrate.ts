@@ -128,28 +128,20 @@ CREATE INDEX IF NOT EXISTS idx_plugin_logs_created ON plugin_logs(created_at DES
 `;
 
 export async function ensureMigrated(db: D1Database): Promise<void> {
-  // Check if teams table exists
-  const result = await db
-    .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='teams'")
-    .first<{ name: string }>();
-
-  if (result) {
-    // Already migrated
-    return;
-  }
-
-  // Run migration
-  console.log('Running initial database migration...');
-
-  // Split by semicolons and run each statement
+  // Always run CREATE TABLE IF NOT EXISTS statements - they're idempotent
+  // This ensures new tables are created even for existing deployments
   const statements = SCHEMA
     .split(';')
     .map(s => s.trim())
     .filter(s => s.length > 0);
 
   for (const statement of statements) {
-    await db.prepare(statement).run();
+    try {
+      await db.prepare(statement).run();
+    } catch (error) {
+      // Log but don't fail - some statements may fail on existing schemas
+      // (e.g., trying to create an index that already exists with different options)
+      console.warn('Migration statement warning:', error);
+    }
   }
-
-  console.log('Database migration complete.');
 }
