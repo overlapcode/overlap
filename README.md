@@ -58,10 +58,19 @@ In Claude Code, run:
 
 ```
 /plugin marketplace add overlapcode/overlap
-/plugin install overlap@overlapcode-overlap
+/plugin install overlap@overlap
 ```
 
 That's it - no cloning required.
+
+#### Enable for All Projects (Optional)
+
+By default, the plugin installs with project scope. To use Overlap across all projects on your machine, edit `~/.claude/plugins/installed_plugins.json`:
+
+1. Find the `"overlap@overlap"` entry
+2. Change `"scope": "local"` to `"scope": "user"`
+3. Remove the `"projectPath"` line
+4. Restart Claude Code
 
 ### 4. Configure the Plugin
 
