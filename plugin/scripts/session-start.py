@@ -48,10 +48,13 @@ def main():
         print(f"[Overlap] JSON decode error: {e}", file=sys.stderr)
         sys.exit(0)
 
-    # Check if this is a startup or resume
+    # Check if this is a startup, resume, or compact
+    # - startup: new session
+    # - resume: continuing a previous session
+    # - compact: session context was compacted (same session continues)
     source = input_data.get("source", "")
-    if source not in ("startup", "resume"):
-        logger.info("Skipping - not startup/resume", source=source)
+    if source not in ("startup", "resume", "compact"):
+        logger.info("Skipping - not startup/resume/compact", source=source)
         sys.exit(0)
 
     # Check if configured
