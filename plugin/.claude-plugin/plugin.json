@@ -1,7 +1,7 @@
 {
   "name": "overlap",
   "description": "Track team activity and detect overlapping work across Claude Code sessions",
-  "version": "0.1.20",
+  "version": "0.1.21",
   "author": {
     "name": "Overlap"
   },

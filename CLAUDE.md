@@ -226,6 +226,26 @@ Do NOT include:
 - "Co-Authored-By: Claude" lines
 ```
 
+## Pre-Commit: Version Bump Check
+
+**Before every commit**, evaluate whether the changes warrant a version bump:
+
+**Bump version (update all 3 locations) when:**
+- New features, pages, or API endpoints
+- Bug fixes that affect user-facing behavior
+- Plugin script changes (users need to update)
+- Any change that users would want to sync their fork to get
+
+**Skip version bump when:**
+- Documentation-only changes (CLAUDE.md, README, comments)
+- Dev tooling or config changes that don't affect the deployed product
+- Refactors with no user-visible behavior change
+
+When bumping, update all three locations in a single commit titled "Bump version to X.Y.Z":
+1. `package.json` → `version` field
+2. `src/lib/version.ts` → `VERSION` constant
+3. `plugin/.claude-plugin/plugin.json` → `version` field
+
 ## Common Commands
 
 ```bash
