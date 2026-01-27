@@ -108,29 +108,6 @@ def _rotate_logs() -> None:
         pass
 
 
-def _get_config() -> dict:
-    """Get config without importing config module (avoid circular import)."""
-    config_file = Path.home() / ".claude" / "overlap" / "config.json"
-    config = {
-        "server_url": os.environ.get("OVERLAP_SERVER_URL"),
-        "team_token": os.environ.get("OVERLAP_TEAM_TOKEN"),
-        "user_token": os.environ.get("OVERLAP_USER_TOKEN"),
-    }
-
-    if config_file.exists():
-        try:
-            with open(config_file) as f:
-                file_config = json.load(f)
-                # Only use file config if env var not set
-                for key in config:
-                    if not config[key] and key in file_config:
-                        config[key] = file_config[key]
-        except (json.JSONDecodeError, IOError):
-            pass
-
-    return config
-
-
 def _sync_to_server() -> None:
     """Send buffered logs to the server."""
     global LOG_BUFFER, _syncing
@@ -143,7 +120,8 @@ def _sync_to_server() -> None:
     LOG_BUFFER = []
 
     try:
-        config = _get_config()
+        from config import get_config
+        config = get_config()
         if not all([config.get("server_url"), config.get("user_token"), config.get("team_token")]):
             return
 

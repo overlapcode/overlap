@@ -5,26 +5,33 @@ This module loads configuration from:
 1. Environment variables (OVERLAP_*)
 2. Config file (~/.claude/overlap/config.json)
 
-Sessions are keyed by Claude Code's transcript_path, which uniquely identifies
-each Claude session (even multiple sessions in the same repo).
+Sessions are stored in a unified sessions.json with a status field:
+- "pending": saved at SessionStart, not yet registered with server
+- "active": registered with server, has an overlap_session_id
 """
 
+import fcntl
 import hashlib
 import json
 import os
+from contextlib import contextmanager
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
-
-# Import logger - but handle case where it fails (avoid circular issues)
-try:
-    import logger as _logger
-except ImportError:
-    _logger = None  # type: ignore
 
 # Store in ~/.claude/overlap/ as recommended by Claude Code docs
 CONFIG_DIR = Path.home() / ".claude" / "overlap"
 CONFIG_FILE = CONFIG_DIR / "config.json"
-SESSIONS_FILE = CONFIG_DIR / "sessions.json"  # Keyed by transcript_path
+SESSIONS_FILE = CONFIG_DIR / "sessions.json"  # Unified session store
+
+
+def _log(level: str, message: str, **kwargs) -> None:
+    """Lazy-import logger to avoid circular dependency."""
+    try:
+        import logger
+        getattr(logger, level)(message, **kwargs)
+    except ImportError:
+        pass
 
 
 def get_config() -> dict:
@@ -42,11 +49,9 @@ def get_config() -> dict:
                 file_config = json.load(f)
                 config.update(file_config)
         except json.JSONDecodeError as e:
-            if _logger:
-                _logger.warn("Config file has invalid JSON", path=str(CONFIG_FILE), error=str(e))
+            _log("warn", "Config file has invalid JSON", path=str(CONFIG_FILE), error=str(e))
         except IOError as e:
-            if _logger:
-                _logger.warn("Failed to read config file", path=str(CONFIG_FILE), error=str(e))
+            _log("warn", "Failed to read config file", path=str(CONFIG_FILE), error=str(e))
 
     # Override with environment variables
     if os.environ.get("OVERLAP_SERVER_URL"):
@@ -66,25 +71,25 @@ def save_config(config: dict) -> None:
         CONFIG_DIR.mkdir(parents=True, exist_ok=True)
         with open(CONFIG_FILE, "w") as f:
             json.dump(config, f, indent=2)
-        if _logger:
-            _logger.info("Config saved", path=str(CONFIG_FILE))
+        _log("info", "Config saved", path=str(CONFIG_FILE))
         print(f"[Overlap] Config: Saved config to {CONFIG_FILE}", file=sys.stderr)
     except Exception as e:
-        if _logger:
-            _logger.error("Failed to save config", exc=e, path=str(CONFIG_FILE))
+        _log("error", "Failed to save config", path=str(CONFIG_FILE))
         print(f"[Overlap] Config: FAILED to save config: {e}", file=sys.stderr)
         raise
 
 
 def _get_transcript_key(transcript_path: str) -> str:
     """Get a safe key for a transcript path (hash to avoid filesystem issues)."""
-    # Normalize path and hash it
     normalized = os.path.expanduser(transcript_path)
     return hashlib.sha256(normalized.encode()).hexdigest()[:16]
 
 
+LOCK_FILE = CONFIG_DIR / "sessions.lock"
+
+
 def _load_sessions() -> dict:
-    """Load all sessions from file."""
+    """Load all sessions from file (caller should hold lock for read-modify-write)."""
     if SESSIONS_FILE.exists():
         try:
             with open(SESSIONS_FILE) as f:
@@ -95,42 +100,88 @@ def _load_sessions() -> dict:
 
 
 def _save_sessions(sessions: dict) -> None:
-    """Save all sessions to file."""
+    """Save all sessions to file (caller should hold lock for read-modify-write)."""
     CONFIG_DIR.mkdir(parents=True, exist_ok=True)
     with open(SESSIONS_FILE, "w") as f:
         json.dump(sessions, f, indent=2)
 
 
+@contextmanager
+def _locked_sessions():
+    """Context manager for atomic read-modify-write of sessions.json.
+
+    Usage:
+        with _locked_sessions() as (sessions, save):
+            sessions["key"] = value
+            save(sessions)
+    """
+    CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+    lock_fd = open(LOCK_FILE, "w")
+    try:
+        fcntl.flock(lock_fd, fcntl.LOCK_EX)
+        sessions = _load_sessions()
+        yield sessions, _save_sessions
+    finally:
+        fcntl.flock(lock_fd, fcntl.LOCK_UN)
+        lock_fd.close()
+
+
 def get_session_for_transcript(transcript_path: str) -> Optional[str]:
-    """Get the Overlap session ID for a Claude transcript."""
-    sessions = _load_sessions()
-    key = _get_transcript_key(transcript_path)
-    session_data = sessions.get(key)
-    if session_data:
-        return session_data.get("overlap_session_id")
+    """Get the Overlap session ID for a registered Claude transcript."""
+    entry = get_session_entry(transcript_path)
+    if not entry:
+        return None
+    # Backward compat: old entries have overlap_session_id but no status field.
+    # Treat any entry with an overlap_session_id as active.
+    if entry.get("overlap_session_id"):
+        return entry["overlap_session_id"]
     return None
 
 
-def save_session_for_transcript(transcript_path: str, overlap_session_id: str, worktree: str) -> None:
-    """Save an Overlap session ID for a Claude transcript."""
+def get_session_entry(transcript_path: str) -> Optional[dict]:
+    """Get the full session entry for a transcript (pending or active)."""
+    sessions = _load_sessions()
+    key = _get_transcript_key(transcript_path)
+    return sessions.get(key)
+
+
+def save_session_for_transcript(
+    transcript_path: str,
+    overlap_session_id: Optional[str],
+    worktree: str,
+    status: str = "active",
+    session_info: Optional[dict] = None,
+) -> None:
+    """Save a session entry for a Claude transcript.
+
+    Args:
+        transcript_path: Claude's transcript file path
+        overlap_session_id: Server session ID (None for pending)
+        worktree: Working directory path
+        status: "pending" or "active"
+        session_info: Additional session data (device, git info, etc.)
+    """
     import sys
-    from datetime import datetime, timezone
     try:
-        sessions = _load_sessions()
-        key = _get_transcript_key(transcript_path)
-        sessions[key] = {
-            "overlap_session_id": overlap_session_id,
-            "transcript_path": transcript_path,  # Store original for debugging
-            "worktree": worktree,
-            "created_at": datetime.now(timezone.utc).isoformat(),
-        }
-        _save_sessions(sessions)
-        if _logger:
-            _logger.info("Session saved", overlap_session_id=overlap_session_id, transcript_path=transcript_path)
-        print(f"[Overlap] Config: Saved session for transcript", file=sys.stderr)
+        with _locked_sessions() as (sessions, save):
+            key = _get_transcript_key(transcript_path)
+            existing = sessions.get(key, {})
+            entry = {
+                **existing,
+                "overlap_session_id": overlap_session_id,
+                "transcript_path": transcript_path,
+                "worktree": worktree,
+                "status": status,
+                "created_at": existing.get("created_at", datetime.now(timezone.utc).isoformat()),
+            }
+            if session_info:
+                entry["session_info"] = session_info
+            sessions[key] = entry
+            save(sessions)
+        _log("info", "Session saved", overlap_session_id=overlap_session_id, status=status)
+        print(f"[Overlap] Config: Saved session ({status})", file=sys.stderr)
     except Exception as e:
-        if _logger:
-            _logger.error("Failed to save session", exc=e, overlap_session_id=overlap_session_id)
+        _log("error", "Failed to save session", overlap_session_id=str(overlap_session_id))
         print(f"[Overlap] Config: FAILED to save session: {e}", file=sys.stderr)
         raise
 
@@ -138,86 +189,49 @@ def save_session_for_transcript(transcript_path: str, overlap_session_id: str, w
 def clear_session_for_transcript(transcript_path: str) -> None:
     """Clear the session for a Claude transcript."""
     try:
-        sessions = _load_sessions()
+        with _locked_sessions() as (sessions, save):
+            key = _get_transcript_key(transcript_path)
+            if key in sessions:
+                del sessions[key]
+                save(sessions)
+                _log("info", "Session cleared", transcript_path=transcript_path)
+    except Exception as e:
+        _log("warn", "Failed to clear session", transcript_path=transcript_path, error=str(e))
+
+
+def update_session_heartbeat_time(transcript_path: str) -> None:
+    """Update the last heartbeat timestamp for client-side throttling."""
+    with _locked_sessions() as (sessions, save):
         key = _get_transcript_key(transcript_path)
         if key in sessions:
-            del sessions[key]
-            _save_sessions(sessions)
-            if _logger:
-                _logger.info("Session cleared", transcript_path=transcript_path)
-    except Exception as e:
-        if _logger:
-            _logger.warn("Failed to clear session", transcript_path=transcript_path, error=str(e))
+            sessions[key]["last_heartbeat_at"] = datetime.now(timezone.utc).isoformat()
+            save(sessions)
 
 
-# Pending sessions - saved at SessionStart, registered lazily on first tool use
-PENDING_SESSIONS_FILE = CONFIG_DIR / "pending_sessions.json"
+def gc_stale_sessions(max_age_hours: int = 48) -> int:
+    """Remove session entries older than max_age_hours. Returns count removed."""
+    with _locked_sessions() as (sessions, save):
+        now = datetime.now(timezone.utc)
+        to_remove = []
 
+        for key, entry in sessions.items():
+            created_at = entry.get("created_at", "")
+            if not created_at:
+                to_remove.append(key)
+                continue
+            try:
+                created = datetime.fromisoformat(created_at)
+                if (now - created).total_seconds() > max_age_hours * 3600:
+                    to_remove.append(key)
+            except (ValueError, TypeError):
+                to_remove.append(key)
 
-def _load_pending_sessions() -> dict:
-    """Load all pending sessions from file."""
-    if PENDING_SESSIONS_FILE.exists():
-        try:
-            with open(PENDING_SESSIONS_FILE) as f:
-                return json.load(f)
-        except (json.JSONDecodeError, IOError):
-            pass
-    return {}
+        if to_remove:
+            for key in to_remove:
+                del sessions[key]
+            save(sessions)
 
-
-def _save_pending_sessions(pending: dict) -> None:
-    """Save all pending sessions to file."""
-    CONFIG_DIR.mkdir(parents=True, exist_ok=True)
-    with open(PENDING_SESSIONS_FILE, "w") as f:
-        json.dump(pending, f, indent=2)
-
-
-def save_pending_session(transcript_path: str, session_info: dict) -> None:
-    """Save pending session info for lazy registration."""
-    import sys
-    try:
-        pending = _load_pending_sessions()
-        key = _get_transcript_key(transcript_path)
-        pending[key] = {
-            "transcript_path": transcript_path,
-            **session_info,
-        }
-        _save_pending_sessions(pending)
-        if _logger:
-            _logger.info("Pending session saved", transcript_path=transcript_path)
-        print(f"[Overlap] Config: Saved pending session for lazy registration", file=sys.stderr)
-    except Exception as e:
-        if _logger:
-            _logger.error("Failed to save pending session", exc=e, transcript_path=transcript_path)
-        print(f"[Overlap] Config: FAILED to save pending session: {e}", file=sys.stderr)
-
-
-def get_pending_session(transcript_path: str) -> Optional[dict]:
-    """Get pending session info for a Claude transcript."""
-    pending = _load_pending_sessions()
-    key = _get_transcript_key(transcript_path)
-    return pending.get(key)
-
-
-def clear_pending_session(transcript_path: str) -> None:
-    """Clear pending session after registration."""
-    try:
-        pending = _load_pending_sessions()
-        key = _get_transcript_key(transcript_path)
-        if key in pending:
-            del pending[key]
-            _save_pending_sessions(pending)
-            if _logger:
-                _logger.info("Pending session cleared", transcript_path=transcript_path)
-    except Exception as e:
-        if _logger:
-            _logger.warn("Failed to clear pending session", transcript_path=transcript_path, error=str(e))
-
-
-def get_lock_file_for_transcript(transcript_path: str) -> Path:
-    """Get the lock file path for a Claude transcript."""
-    key = _get_transcript_key(transcript_path)
-    return CONFIG_DIR / f"session-{key}.lock"
+        return len(to_remove)
 
 
 def is_configured() -> bool:

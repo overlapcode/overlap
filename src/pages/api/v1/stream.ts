@@ -1,8 +1,8 @@
 import type { APIContext } from 'astro';
 import { authenticateAny, errorResponse } from '@lib/auth/middleware';
-import { getRecentActivity } from '@lib/db/queries';
+import { getRecentActivity, markStaleSessions } from '@lib/db/queries';
 
-const POLL_INTERVAL_MS = 5000; // Poll database every 5 seconds
+const POLL_INTERVAL_MS = 10000; // Poll database every 10 seconds
 const KEEPALIVE_INTERVAL_MS = 30000; // Send keepalive every 30 seconds
 
 export async function GET(context: APIContext) {
@@ -42,6 +42,9 @@ export async function GET(context: APIContext) {
       // Polling loop
       while (isActive) {
         try {
+          // Mark stale sessions before fetching
+          await markStaleSessions(db);
+
           // Check for new activity
           const result = await getRecentActivity(db, team.id, { limit: 20 });
 
@@ -117,12 +120,17 @@ export async function GET(context: APIContext) {
     },
   });
 
+  const origin = request.headers.get('Origin');
+  const requestUrl = new URL(request.url);
+  const allowedOrigin = origin === requestUrl.origin ? origin : requestUrl.origin;
+
   return new Response(stream, {
     headers: {
       'Content-Type': 'text/event-stream',
       'Cache-Control': 'no-cache',
       Connection: 'keep-alive',
-      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Origin': allowedOrigin,
+      Vary: 'Origin',
     },
   });
 }

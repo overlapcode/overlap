@@ -47,10 +47,33 @@ export async function POST(context: APIContext) {
       return errorResponse('Session does not belong to user', 403);
     }
 
+    // Rate limit: skip if last activity was < 30s ago
+    const HEARTBEAT_MIN_INTERVAL_SECONDS = 30;
+    // SQLite datetime('now') produces UTC without timezone suffix -- ensure UTC parse
+    const lastActivityStr = session.last_activity_at.includes('Z')
+      ? session.last_activity_at
+      : session.last_activity_at.replace(' ', 'T') + 'Z';
+    const lastActivity = new Date(lastActivityStr);
+    const now = new Date();
+    const elapsedSeconds = (now.getTime() - lastActivity.getTime()) / 1000;
+
+    if (elapsedSeconds < HEARTBEAT_MIN_INTERVAL_SECONDS) {
+      return successResponse({
+        activity_id: null,
+        throttled: true,
+        retry_after: Math.ceil(HEARTBEAT_MIN_INTERVAL_SECONDS - elapsedSeconds),
+      });
+    }
+
+    // Sanitize file paths before LLM classification
+    const sanitizedFiles = input.files
+      .map(f => f.replace(/[\x00-\x1f\x7f]/g, '').substring(0, 500))
+      .slice(0, 50);
+
     // Classify the activity
     const classification = await classifyActivity(
       team,
-      input.files,
+      sanitizedFiles,
       encryptionKey
     );
 

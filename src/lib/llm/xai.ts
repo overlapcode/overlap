@@ -27,8 +27,7 @@ export const xaiProvider: LLMProvider = {
     });
 
     if (!response.ok) {
-      const error = await response.text();
-      console.error('xAI API error:', error);
+      console.error('xAI API error: status', response.status);
       throw new Error(`xAI API error: ${response.status}`);
     }
 

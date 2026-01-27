@@ -114,22 +114,15 @@ export async function updateUserRole(db: D1Database, userId: string, role: 'admi
 }
 
 export async function deleteUser(db: D1Database, userId: string): Promise<void> {
-  // Delete related data first (due to foreign key constraints)
-  // Delete user's web sessions
-  await db.prepare('DELETE FROM web_sessions WHERE user_id = ?').bind(userId).run();
-  // Delete user's magic links
-  await db.prepare('DELETE FROM magic_links WHERE user_id = ?').bind(userId).run();
-  // Delete user's activity (via sessions)
-  await db
-    .prepare('DELETE FROM activity WHERE session_id IN (SELECT id FROM sessions WHERE user_id = ?)')
-    .bind(userId)
-    .run();
-  // Delete user's sessions
-  await db.prepare('DELETE FROM sessions WHERE user_id = ?').bind(userId).run();
-  // Delete user's devices
-  await db.prepare('DELETE FROM devices WHERE user_id = ?').bind(userId).run();
-  // Finally delete the user
-  await db.prepare('DELETE FROM users WHERE id = ?').bind(userId).run();
+  // Delete related data first (due to foreign key constraints), batched for atomicity
+  await db.batch([
+    db.prepare('DELETE FROM web_sessions WHERE user_id = ?').bind(userId),
+    db.prepare('DELETE FROM magic_links WHERE user_id = ?').bind(userId),
+    db.prepare('DELETE FROM activity WHERE session_id IN (SELECT id FROM sessions WHERE user_id = ?)').bind(userId),
+    db.prepare('DELETE FROM sessions WHERE user_id = ?').bind(userId),
+    db.prepare('DELETE FROM devices WHERE user_id = ?').bind(userId),
+    db.prepare('DELETE FROM users WHERE id = ?').bind(userId),
+  ]);
 }
 
 // ============================================================================
@@ -282,16 +275,20 @@ export async function createActivity(
   db: D1Database,
   data: Pick<Activity, 'id' | 'session_id' | 'files' | 'semantic_scope' | 'summary'>
 ): Promise<Activity> {
-  await db
+  const insertStmt = db
     .prepare(
       `INSERT INTO activity (id, session_id, files, semantic_scope, summary)
        VALUES (?, ?, ?, ?, ?)`
     )
-    .bind(data.id, data.session_id, data.files, data.semantic_scope, data.summary)
-    .run();
+    .bind(data.id, data.session_id, data.files, data.semantic_scope, data.summary);
 
-  // Also update session last_activity_at
-  await updateSessionActivity(db, data.session_id);
+  const updateStmt = db
+    .prepare(
+      "UPDATE sessions SET last_activity_at = datetime('now'), status = 'active' WHERE id = ?"
+    )
+    .bind(data.session_id);
+
+  await db.batch([insertStmt, updateStmt]);
 
   return db.prepare('SELECT * FROM activity WHERE id = ?').bind(data.id).first<Activity>() as Promise<Activity>;
 }
@@ -315,7 +312,8 @@ export async function getRecentActivity(
 ): Promise<PaginatedSessions> {
   const { limit = 20, offset = 0, includeStale = true } = options;
 
-  const statusFilter = includeStale ? "('active', 'stale')" : "('active')";
+  const statusA = 'active';
+  const statusB = includeStale ? 'stale' : 'active';
 
   // Get total count
   const countResult = await db
@@ -324,9 +322,9 @@ export async function getRecentActivity(
        FROM sessions s
        JOIN users u ON s.user_id = u.id
        WHERE u.team_id = ?
-       AND s.status IN ${statusFilter}`
+       AND s.status IN (?, ?)`
     )
-    .bind(teamId)
+    .bind(teamId, statusA, statusB)
     .first<{ count: number }>();
 
   const total = countResult?.count ?? 0;
@@ -350,11 +348,11 @@ export async function getRecentActivity(
         FROM activity
       ) a ON s.id = a.session_id AND a.rn = 1
       WHERE u.team_id = ?
-      AND s.status IN ${statusFilter}
+      AND s.status IN (?, ?)
       ORDER BY s.last_activity_at DESC
       LIMIT ? OFFSET ?`
     )
-    .bind(teamId, limit, offset)
+    .bind(teamId, statusA, statusB, limit, offset)
     .all();
 
   const sessions = result.results.map((row: Record<string, unknown>) => ({
@@ -417,7 +415,8 @@ export async function getActivityByUser(
   teamId: string,
   includeStale: boolean = true
 ): Promise<UserActivitySummary[]> {
-  const statusFilter = includeStale ? "('active', 'stale')" : "('active')";
+  const statusA = 'active';
+  const statusB = includeStale ? 'stale' : 'active';
 
   const result = await db
     .prepare(
@@ -429,11 +428,11 @@ export async function getActivityByUser(
       FROM users u
       JOIN sessions s ON s.user_id = u.id
       WHERE u.team_id = ?
-      AND s.status IN ${statusFilter}
+      AND s.status IN (?, ?)
       GROUP BY u.id, u.name
       ORDER BY latest_activity DESC`
     )
-    .bind(teamId)
+    .bind(teamId, statusA, statusB)
     .all();
 
   return result.results.map((row: Record<string, unknown>) => ({
@@ -456,7 +455,8 @@ export async function getUserSessions(
 ): Promise<PaginatedSessions> {
   const { limit = 20, offset = 0, includeStale = true } = options;
 
-  const statusFilter = includeStale ? "('active', 'stale')" : "('active')";
+  const statusA = 'active';
+  const statusB = includeStale ? 'stale' : 'active';
 
   // Get total count for this user
   const countResult = await db
@@ -466,9 +466,9 @@ export async function getUserSessions(
        JOIN users u ON s.user_id = u.id
        WHERE u.team_id = ?
        AND s.user_id = ?
-       AND s.status IN ${statusFilter}`
+       AND s.status IN (?, ?)`
     )
-    .bind(teamId, userId)
+    .bind(teamId, userId, statusA, statusB)
     .first<{ count: number }>();
 
   const total = countResult?.count ?? 0;
@@ -493,11 +493,11 @@ export async function getUserSessions(
       ) a ON s.id = a.session_id AND a.rn = 1
       WHERE u.team_id = ?
       AND s.user_id = ?
-      AND s.status IN ${statusFilter}
+      AND s.status IN (?, ?)
       ORDER BY s.last_activity_at DESC
       LIMIT ? OFFSET ?`
     )
-    .bind(teamId, userId, limit, offset)
+    .bind(teamId, userId, statusA, statusB, limit, offset)
     .all();
 
   const sessions = result.results.map((row: Record<string, unknown>) => ({
@@ -560,9 +560,9 @@ export async function checkForOverlaps(
   semanticScope: string | null
 ): Promise<SessionWithDetails[]> {
   // Find active sessions from OTHER users that overlap
-  // Overlap = same files OR same semantic scope
+  // Overlap = exact file match via json_each OR same semantic scope
 
-  const filePatterns = files.map((f) => `%${f}%`);
+  const placeholders = files.map(() => '?').join(', ');
 
   let query = `
     SELECT DISTINCT
@@ -575,19 +575,17 @@ export async function checkForOverlaps(
     JOIN users u ON s.user_id = u.id
     JOIN devices d ON s.device_id = d.id
     LEFT JOIN repos r ON s.repo_id = r.id
-    LEFT JOIN activity a ON s.id = a.session_id
+    JOIN activity a ON s.id = a.session_id
     WHERE u.team_id = ?
     AND s.user_id != ?
     AND s.status = 'active'
     AND (
-  `;
+      EXISTS (
+        SELECT 1 FROM json_each(a.files) je
+        WHERE je.value IN (${placeholders})
+      )`;
 
-  const bindParams: unknown[] = [teamId, userId];
-
-  // Add file overlap conditions
-  const fileConditions = filePatterns.map(() => 'a.files LIKE ?');
-  query += fileConditions.join(' OR ');
-  bindParams.push(...filePatterns);
+  const bindParams: unknown[] = [teamId, userId, ...files];
 
   // Add semantic scope overlap if provided
   if (semanticScope) {
@@ -652,28 +650,30 @@ export async function checkForOverlaps(
  * Returns the number of sessions marked as stale.
  */
 export async function markStaleSessions(db: D1Database): Promise<number> {
-  // Get the default stale timeout from team settings
   const team = await db
     .prepare('SELECT stale_timeout_hours FROM teams LIMIT 1')
     .first<{ stale_timeout_hours: number }>();
 
-  const defaultTimeout = team?.stale_timeout_hours ?? 8;
+  const timeout = team?.stale_timeout_hours ?? 8;
 
-  // Mark sessions as stale based on user-specific or team default timeout
-  // Uses COALESCE to prefer user's timeout, falling back to team default
   const result = await db
     .prepare(
       `UPDATE sessions
        SET status = 'stale'
        WHERE status = 'active'
-       AND datetime(last_activity_at, '+' ||
-         COALESCE(
-           (SELECT stale_timeout_hours FROM users WHERE users.id = sessions.user_id),
-           ?
-         ) || ' hours'
-       ) < datetime('now')`
+       AND last_activity_at < datetime('now', '-' || ? || ' hours')`
     )
-    .bind(defaultTimeout)
+    .bind(timeout)
+    .run();
+
+  // Also end sessions that have been stale for 24+ hours
+  await db
+    .prepare(
+      `UPDATE sessions
+       SET status = 'ended', ended_at = datetime('now')
+       WHERE status = 'stale'
+       AND last_activity_at < datetime('now', '-24 hours')`
+    )
     .run();
 
   return result.meta.changes ?? 0;

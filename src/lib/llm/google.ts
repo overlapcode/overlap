@@ -33,8 +33,7 @@ export const googleProvider: LLMProvider = {
     });
 
     if (!response.ok) {
-      const error = await response.text();
-      console.error('Google API error:', error);
+      console.error('Google API error: status', response.status);
       throw new Error(`Google API error: ${response.status}`);
     }
 

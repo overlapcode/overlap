@@ -2,6 +2,8 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { ActivityCard } from './ActivityCard';
 import { ViewToggle } from './ViewToggle';
 import { UserActivityList } from './UserActivityList';
+import { useSSE } from '@lib/hooks/useSSE';
+import { fetchWithTimeout } from '@lib/utils/fetch';
 
 type ViewMode = 'timeline' | 'byUser';
 
@@ -32,18 +34,50 @@ function getInitialViewMode(): ViewMode {
 
 export function Timeline() {
   const [sessions, setSessions] = useState<Session[]>([]);
-  const [error, setError] = useState<string | null>(null);
-  const [isConnected, setIsConnected] = useState(false);
+  const [fetchError, setFetchError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [showStale, setShowStale] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>(getInitialViewMode);
   const [hasMore, setHasMore] = useState(false);
-  const [offset, setOffset] = useState(0);
-  const prevShowStaleRef = useRef(showStale);
+  const abortRef = useRef<AbortController | null>(null);
+
+  // SSE hook for real-time updates
+  const handleSSEEvent = useCallback((event: MessageEvent) => {
+    try {
+      const newSession = JSON.parse(event.data) as Session;
+      setSessions((prev) => {
+        const existing = prev.findIndex((s) => s.id === newSession.id);
+        if (existing >= 0) {
+          const updated = [...prev];
+          updated[existing] = newSession;
+          updated.sort(
+            (a, b) =>
+              new Date(b.last_activity_at).getTime() - new Date(a.last_activity_at).getTime()
+          );
+          return updated;
+        }
+        return [newSession, ...prev];
+      });
+    } catch (err) {
+      console.error('Failed to parse SSE event:', err);
+    }
+  }, []);
+
+  const { connectionState, error: sseError, reconnect } = useSSE({
+    url: '/api/v1/stream',
+    onEvent: handleSSEEvent,
+    eventName: 'activity',
+    enabled: true,
+  });
 
   const fetchSessions = useCallback(
     async (currentOffset: number, append: boolean = false) => {
+      // Abort previous request
+      abortRef.current?.abort();
+      const controller = new AbortController();
+      abortRef.current = controller;
+
       if (append) {
         setIsLoadingMore(true);
       } else {
@@ -57,7 +91,9 @@ export function Timeline() {
           includeStale: String(showStale),
         });
 
-        const response = await fetch(`/api/v1/activity?${params}`);
+        const response = await fetchWithTimeout(`/api/v1/activity?${params}`, {
+          signal: controller.signal,
+        });
 
         if (!response.ok) {
           const data = (await response.json()) as { error?: string };
@@ -74,10 +110,10 @@ export function Timeline() {
           setSessions(data.data.sessions);
         }
         setHasMore(data.data.hasMore);
-        setOffset(currentOffset + data.data.sessions.length);
-        setError(null);
+        setFetchError(null);
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to load activity');
+        if (err instanceof DOMException && err.name === 'AbortError') return;
+        setFetchError(err instanceof Error ? err.message : 'Failed to load activity');
       } finally {
         setIsLoading(false);
         setIsLoadingMore(false);
@@ -86,61 +122,13 @@ export function Timeline() {
     [showStale]
   );
 
-  // Initial fetch and SSE setup
+  // Fetch when viewMode, showStale, or fetchSessions identity changes
   useEffect(() => {
     if (viewMode === 'timeline') {
       fetchSessions(0);
     }
-
-    // Set up SSE connection (uses session cookie automatically)
-    const eventSource = new EventSource('/api/v1/stream');
-
-    eventSource.addEventListener('connected', () => {
-      setIsConnected(true);
-      setError(null);
-    });
-
-    eventSource.addEventListener('activity', (event) => {
-      try {
-        const newSession = JSON.parse(event.data) as Session;
-        setSessions((prev) => {
-          // Update existing session or add new one
-          const existing = prev.findIndex((s) => s.id === newSession.id);
-          if (existing >= 0) {
-            const updated = [...prev];
-            updated[existing] = newSession;
-            // Re-sort by last activity
-            updated.sort(
-              (a, b) =>
-                new Date(b.last_activity_at).getTime() - new Date(a.last_activity_at).getTime()
-            );
-            return updated;
-          }
-          return [newSession, ...prev];
-        });
-      } catch (err) {
-        console.error('Failed to parse SSE event:', err);
-      }
-    });
-
-    eventSource.addEventListener('error', () => {
-      setIsConnected(false);
-      setError('Connection lost. Reconnecting...');
-    });
-
-    return () => {
-      eventSource.close();
-    };
+    return () => abortRef.current?.abort();
   }, [viewMode, fetchSessions]);
-
-  // Refetch when showStale changes
-  useEffect(() => {
-    if (prevShowStaleRef.current !== showStale && viewMode === 'timeline') {
-      setOffset(0);
-      fetchSessions(0);
-    }
-    prevShowStaleRef.current = showStale;
-  }, [showStale, viewMode, fetchSessions]);
 
   // Save view mode to localStorage
   useEffect(() => {
@@ -149,20 +137,21 @@ export function Timeline() {
 
   const handleViewModeChange = (mode: ViewMode) => {
     setViewMode(mode);
-    if (mode === 'timeline') {
-      setOffset(0);
-      fetchSessions(0);
-    }
   };
 
   const handleLoadMore = () => {
-    fetchSessions(offset, true);
+    fetchSessions(sessions.length, true);
   };
+
+  const isConnected = connectionState === 'connected';
+  const displayError = fetchError || sseError;
 
   return (
     <div>
       {/* Header bar with connection status, view toggle, and stale toggle */}
       <div
+        role="status"
+        aria-live="polite"
         style={{
           display: 'flex',
           alignItems: 'center',
@@ -178,12 +167,18 @@ export function Timeline() {
         <span
           className={`status-dot ${isConnected ? 'active' : 'stale'}`}
           style={{ width: 6, height: 6 }}
+          aria-label={isConnected ? 'Connected' : 'Disconnected'}
         />
         <span className="text-secondary">{isConnected ? 'Connected' : 'Connecting...'}</span>
-        {error && (
+        {displayError && (
           <>
             <span className="text-muted">·</span>
-            <span style={{ color: 'var(--accent-orange)' }}>{error}</span>
+            <span
+              style={{ color: 'var(--accent-orange)', cursor: sseError ? 'pointer' : 'default' }}
+              onClick={sseError ? reconnect : undefined}
+            >
+              {displayError}
+            </span>
           </>
         )}
 
@@ -191,6 +186,7 @@ export function Timeline() {
           <ViewToggle value={viewMode} onChange={handleViewModeChange} />
           <button
             onClick={() => setShowStale(!showStale)}
+            aria-pressed={showStale}
             style={{
               background: 'none',
               border: 'none',

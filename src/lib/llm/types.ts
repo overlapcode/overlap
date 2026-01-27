@@ -25,7 +25,10 @@ Respond with a JSON object containing:
 Respond ONLY with valid JSON, no markdown or explanation.`;
 
 export function buildPrompt(files: string[]): string {
-  return CLASSIFICATION_PROMPT.replace('{files}', files.map((f) => `- ${f}`).join('\n'));
+  const sanitized = files
+    .slice(0, 50)
+    .map(f => f.replace(/[\x00-\x1f\x7f]/g, '').substring(0, 500));
+  return CLASSIFICATION_PROMPT.replace('{files}', sanitized.map((f) => `- ${f}`).join('\n'));
 }
 
 export function parseClassificationResponse(response: string): ClassificationResult {

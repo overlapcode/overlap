@@ -139,9 +139,10 @@ export async function ensureMigrated(db: D1Database): Promise<void> {
     try {
       await db.prepare(statement).run();
     } catch (error) {
-      // Log but don't fail - some statements may fail on existing schemas
-      // (e.g., trying to create an index that already exists with different options)
-      console.warn('Migration statement warning:', error);
+      const msg = error instanceof Error ? error.message : String(error);
+      if (!msg.includes('already exists')) {
+        console.error('Migration error:', msg, 'Statement:', statement.substring(0, 80));
+      }
     }
   }
 }

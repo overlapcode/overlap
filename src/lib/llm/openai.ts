@@ -27,8 +27,7 @@ export const openaiProvider: LLMProvider = {
     });
 
     if (!response.ok) {
-      const error = await response.text();
-      console.error('OpenAI API error:', error);
+      console.error('OpenAI API error: status', response.status);
       throw new Error(`OpenAI API error: ${response.status}`);
     }
 

@@ -28,8 +28,7 @@ export const anthropicProvider: LLMProvider = {
     });
 
     if (!response.ok) {
-      const error = await response.text();
-      console.error('Anthropic API error:', error);
+      console.error('Anthropic API error: status', response.status);
       throw new Error(`Anthropic API error: ${response.status}`);
     }
 

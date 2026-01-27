@@ -3,7 +3,7 @@
 Overlap PreToolUse conflict check hook.
 
 Called before file edits to check if anyone else is working on the same files.
-Displays a warning if overlap is detected, but does NOT block the edit.
+Displays a warning if overlap is detected and asks the user whether to proceed.
 
 If this is the first tool use, lazily registers the session with the server.
 """
@@ -18,19 +18,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import logger
 from config import is_configured
 from api import api_request, ensure_session_registered
-
-
-def extract_file_path(tool_input: dict, tool_name: str) -> str | None:
-    """Extract the file path from tool input based on tool type."""
-    if tool_name in ("Write", "Edit"):
-        return tool_input.get("file_path")
-    elif tool_name == "MultiEdit":
-        edits = tool_input.get("edits", [])
-        if edits:
-            return edits[0].get("file_path")
-    elif tool_name == "NotebookEdit":
-        return tool_input.get("notebook_path")
-    return None
+from utils import extract_file_paths, make_relative
 
 
 def format_overlap_warning(overlaps: list) -> str:
@@ -100,38 +88,37 @@ def main():
     overlap_session_id = ensure_session_registered(transcript_path, session_id, cwd)
     logger.set_context(hook="PreToolUse", session_id=overlap_session_id)
 
-    # Extract file path from tool input
+    # Conflict check requires a registered session
+    if not overlap_session_id:
+        logger.debug("No Overlap session for this transcript, skipping")
+        sys.exit(0)
+
+    # Extract ALL file paths from tool input
     tool_name = input_data.get("tool_name", "")
     tool_input = input_data.get("tool_input", {})
 
-    file_path = extract_file_path(tool_input, tool_name)
-    if not file_path:
+    file_paths = extract_file_paths(tool_input, tool_name)
+    if not file_paths:
         logger.debug("No file path in tool input", tool_name=tool_name)
         sys.exit(0)
 
-    # Make path relative to cwd for privacy
+    # Make paths relative to cwd for privacy
     cwd = input_data.get("cwd", os.getcwd())
-    original_path = file_path
-    try:
-        if os.path.isabs(file_path):
-            file_path = os.path.relpath(file_path, cwd)
-    except ValueError as e:
-        # Can't make relative (different drive on Windows, etc.)
-        logger.debug("Could not make path relative", path=file_path, error=str(e))
+    relative_paths = [make_relative(p, cwd) for p in file_paths]
 
     logger.info("Checking for conflicts",
                 tool_name=tool_name,
-                file_path=file_path)
+                file_paths=relative_paths)
 
     try:
-        # Check for overlaps
+        # Check with NO retry (budget: 5s hook timeout, informational only)
         response = api_request("POST", "/api/v1/check", {
-            "files": [file_path],
-        })
+            "files": relative_paths,
+        }, timeout=3, retries=0)
 
         overlaps = response.get("data", {}).get("overlaps", [])
         logger.info("Conflict check complete",
-                    file_path=file_path,
+                    file_paths=relative_paths,
                     overlap_count=len(overlaps))
 
         if overlaps:
@@ -152,17 +139,15 @@ def main():
                 "hookSpecificOutput": {
                     "hookEventName": "PreToolUse",
                     "additionalContext": warning,
-                    # We don't block - just inform
+                    # Ask user whether to proceed despite conflict
                     "permissionDecision": "ask",
                 }
             }
             print(json.dumps(output))
 
     except Exception as e:
-        logger.error("Conflict check failed", exc=e, file_path=file_path)
-        import traceback
+        logger.error("Conflict check failed", exc=e, file_paths=relative_paths)
         print(f"[Overlap] Check failed: {e}", file=sys.stderr)
-        print(f"[Overlap] Traceback: {traceback.format_exc()}", file=sys.stderr)
 
     sys.exit(0)
 

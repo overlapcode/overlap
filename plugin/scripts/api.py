@@ -5,9 +5,11 @@ Simple HTTP client for communicating with the Overlap server.
 """
 
 import json
+import os
 import socket
 import subprocess
 import sys
+import time
 from typing import Optional
 from urllib.request import Request, urlopen
 from urllib.error import URLError, HTTPError
@@ -20,7 +22,9 @@ def api_request(
     method: str,
     endpoint: str,
     data: Optional[dict] = None,
-    timeout: int = 5
+    timeout: int = 5,
+    retries: int = 0,
+    backoff_base: float = 0.5,
 ) -> dict:
     """
     Make an API request to the Overlap server.
@@ -30,12 +34,14 @@ def api_request(
         endpoint: API endpoint (e.g., /api/v1/sessions/start)
         data: JSON data to send (for POST/PUT)
         timeout: Request timeout in seconds
+        retries: Number of retry attempts (0 = single attempt)
+        backoff_base: Base delay for exponential backoff
 
     Returns:
         Response data as dict
 
     Raises:
-        Exception: If request fails
+        Exception: If request fails after all attempts
     """
     config = get_config()
 
@@ -52,34 +58,37 @@ def api_request(
     }
 
     body = json.dumps(data).encode() if data else None
-
     request = Request(url, data=body, headers=headers, method=method)
 
-    # Start request logging
-    req_ctx = logger.log_request(method, url, len(body) if body else 0)
-    req_ctx.log_start()
+    last_error = None
+    for attempt in range(retries + 1):
+        if attempt > 0:
+            time.sleep(backoff_base * (2 ** (attempt - 1)))
 
-    try:
-        with urlopen(request, timeout=timeout) as response:
-            response_data = json.loads(response.read().decode())
-            req_ctx.log_success(response.status)
-            return response_data
-    except HTTPError as e:
-        error_body = e.read().decode()
+        req_ctx = logger.log_request(method, url, len(body) if body else 0)
+        req_ctx.log_start()
+
         try:
-            error_data = json.loads(error_body)
-            error_msg = error_data.get("error", f"HTTP {e.code}")
-            req_ctx.log_error(e.code, error_msg=error_msg)
-            raise Exception(error_msg)
-        except json.JSONDecodeError:
-            req_ctx.log_error(e.code, error_msg=error_body[:200])
-            raise Exception(f"HTTP {e.code}: {error_body}")
-    except URLError as e:
-        req_ctx.log_error(0, exc=e)
-        raise Exception(f"Connection error: {e.reason}")
-    except socket.timeout as e:
-        req_ctx.log_error(0, exc=e)
-        raise Exception("Request timed out")
+            with urlopen(request, timeout=timeout) as response:
+                response_data = json.loads(response.read().decode())
+                req_ctx.log_success(response.status)
+                return response_data
+        except HTTPError as e:
+            error_body = e.read().decode()
+            req_ctx.log_error(e.code)
+            # Don't retry on client errors (4xx)
+            if 400 <= e.code < 500:
+                try:
+                    error_data = json.loads(error_body)
+                    raise Exception(error_data.get("error", f"HTTP {e.code}"))
+                except json.JSONDecodeError:
+                    raise Exception(f"HTTP {e.code}: {error_body}")
+            last_error = Exception(f"HTTP {e.code}: {error_body}")
+        except (URLError, socket.timeout) as e:
+            req_ctx.log_error(0, exc=e)
+            last_error = Exception(f"Connection error: {e}")
+
+    raise last_error
 
 
 def get_hostname() -> str:
@@ -169,16 +178,9 @@ def register_pending_session(transcript_path: str) -> str | None:
 
     This is called lazily on first tool use (PreToolUse or PostToolUse)
     to filter out ghost sessions that never do actual work.
-
-    Args:
-        transcript_path: The Claude session transcript path
-
-    Returns:
-        The Overlap session ID if successful, None otherwise
     """
     from config import (
-        get_pending_session,
-        clear_pending_session,
+        get_session_entry,
         save_session_for_transcript,
         get_session_for_transcript,
     )
@@ -189,42 +191,40 @@ def register_pending_session(transcript_path: str) -> str | None:
         logger.info("Session already registered", overlap_session_id=existing)
         return existing
 
-    # Get pending session info
-    pending = get_pending_session(transcript_path)
-    if not pending:
+    # Get session entry (unified store)
+    entry = get_session_entry(transcript_path)
+    if not entry or entry.get("status") != "pending":
         logger.debug("No pending session found", transcript_path=transcript_path)
         return None
 
+    session_info = entry.get("session_info", {})
     logger.info("Registering pending session", transcript_path=transcript_path)
     print(f"[Overlap] Registering session...", file=sys.stderr)
 
     try:
-        # Build request data from pending info
+        # Build request data from session info
         request_data = {
-            "session_id": pending.get("session_id", ""),
-            "device_name": pending.get("device_name", ""),
-            "hostname": pending.get("hostname", ""),
-            "is_remote": pending.get("is_remote", False),
-            "worktree": pending.get("worktree", ""),
+            "session_id": session_info.get("session_id", ""),
+            "device_name": session_info.get("device_name", ""),
+            "hostname": session_info.get("hostname", ""),
+            "is_remote": session_info.get("is_remote", False),
+            "worktree": session_info.get("worktree", entry.get("worktree", "")),
         }
-        # Add optional git fields only if they have values
-        if pending.get("repo_name"):
-            request_data["repo_name"] = pending["repo_name"]
-        if pending.get("remote_url"):
-            request_data["remote_url"] = pending["remote_url"]
-        if pending.get("branch"):
-            request_data["branch"] = pending["branch"]
+        for field in ("repo_name", "remote_url", "branch"):
+            if session_info.get(field):
+                request_data[field] = session_info[field]
 
         response = api_request("POST", "/api/v1/sessions/start", request_data)
 
         overlap_session_id = response.get("data", {}).get("session_id")
         if overlap_session_id:
-            # Save the registered session and clear pending
-            save_session_for_transcript(transcript_path, overlap_session_id, pending.get("worktree", ""))
-            clear_pending_session(transcript_path)
+            # Upgrade from pending to active
+            save_session_for_transcript(
+                transcript_path, overlap_session_id,
+                entry.get("worktree", ""), status="active"
+            )
             logger.info("Session registered successfully",
-                        overlap_session_id=overlap_session_id,
-                        transcript_path=transcript_path)
+                        overlap_session_id=overlap_session_id)
             print(f"[Overlap] Session started: {overlap_session_id}", file=sys.stderr)
             return overlap_session_id
         else:
@@ -242,22 +242,14 @@ def ensure_session_registered(transcript_path: str, session_id: str, cwd: str) -
     Ensure a session is registered, using lazy registration.
 
     Checks in order:
-    1. Already registered session
+    1. Already registered (active) session
     2. Pending session (register it)
     3. Fresh registration (if transcript file exists)
-
-    Args:
-        transcript_path: The Claude session transcript path
-        session_id: Claude's session ID from hook input
-        cwd: Current working directory from hook input
-
-    Returns:
-        The Overlap session ID if successful, None otherwise
     """
     from config import (
         get_session_for_transcript,
-        get_pending_session,
-        save_pending_session,
+        get_session_entry,
+        save_session_for_transcript,
     )
 
     # 1. Check if already registered
@@ -265,8 +257,9 @@ def ensure_session_registered(transcript_path: str, session_id: str, cwd: str) -
     if existing:
         return existing
 
-    # 2. Check for pending session
-    if get_pending_session(transcript_path):
+    # 2. Check for pending session in unified store
+    entry = get_session_entry(transcript_path)
+    if entry and entry.get("status") == "pending":
         return register_pending_session(transcript_path)
 
     # 3. Check if transcript file exists now (lazy check)
@@ -274,7 +267,7 @@ def ensure_session_registered(transcript_path: str, session_id: str, cwd: str) -
         logger.debug("Transcript file still does not exist", transcript_path=transcript_path)
         return None
 
-    # Transcript exists but no pending - gather fresh info and register
+    # Transcript exists but no entry - gather fresh info and register
     logger.info("Transcript exists, gathering session info for registration",
                 transcript_path=transcript_path)
 
@@ -290,17 +283,14 @@ def ensure_session_registered(transcript_path: str, session_id: str, cwd: str) -
         "is_remote": is_remote,
         "worktree": cwd,
     }
-    if git_info.get("repo_name"):
-        session_info["repo_name"] = git_info["repo_name"]
-    if git_info.get("remote_url"):
-        session_info["remote_url"] = git_info["remote_url"]
-    if git_info.get("branch"):
-        session_info["branch"] = git_info["branch"]
+    for field in ("repo_name", "remote_url", "branch"):
+        if git_info.get(field):
+            session_info[field] = git_info[field]
 
-    # Save pending and register
-    save_pending_session(transcript_path, session_info)
+    # Save as pending then immediately register
+    save_session_for_transcript(
+        transcript_path, overlap_session_id=None,
+        worktree=cwd, status="pending", session_info=session_info,
+    )
     return register_pending_session(transcript_path)
 
-
-# Import os for is_remote_session
-import os

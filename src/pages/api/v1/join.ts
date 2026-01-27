@@ -40,6 +40,25 @@ export async function POST(context: APIContext) {
       return errorResponse('Invalid team token', 401);
     }
 
+    // Idempotency: check if user with same name+email already exists
+    const existingUsers = await db
+      .prepare('SELECT * FROM users WHERE team_id = ? AND name = ? AND is_active = 1')
+      .bind(team.id, input.name)
+      .all();
+
+    const existingUser = existingUsers.results.find(
+      (u: Record<string, unknown>) => u.email === (input.email ?? null)
+    );
+
+    if (existingUser) {
+      return successResponse({
+        user_id: existingUser.id as string,
+        user_token: existingUser.user_token as string,
+        team_name: team.name,
+        message: 'Already a member',
+      });
+    }
+
     // Generate user token
     const userId = generateId();
     const userToken = generateToken();

@@ -15,10 +15,6 @@ binding = "ASSETS"
 binding = "DB"
 database_name = "overlap-db"
 
-# KV namespace for sessions - auto-provisioned when no id is set
-[[kv_namespaces]]
-binding = "SESSION"
-
 # Environment variables
 [vars]
 ENVIRONMENT = "production"

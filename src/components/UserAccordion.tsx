@@ -1,5 +1,7 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { ActivityCard } from './ActivityCard';
+import { formatRelativeTime } from '@lib/utils/time';
+import { fetchWithTimeout } from '@lib/utils/fetch';
 
 type Session = {
   id: string;
@@ -30,28 +32,6 @@ type UserAccordionProps = {
   showStale: boolean;
 };
 
-function formatRelativeTime(dateString: string): string {
-  const utcDateString =
-    dateString.includes('Z') || dateString.includes('+')
-      ? dateString
-      : dateString.replace(' ', 'T') + 'Z';
-
-  const date = new Date(utcDateString);
-  const now = new Date();
-  const diffMs = now.getTime() - date.getTime();
-  const diffSeconds = Math.floor(diffMs / 1000);
-  const diffMinutes = Math.floor(diffSeconds / 60);
-  const diffHours = Math.floor(diffMinutes / 60);
-  const diffDays = Math.floor(diffHours / 24);
-
-  if (diffSeconds < 0) return 'just now';
-  if (diffSeconds < 60) return 'just now';
-  if (diffMinutes < 60) return `${diffMinutes}m ago`;
-  if (diffHours < 24) return `${diffHours}h ago`;
-  if (diffDays < 7) return `${diffDays}d ago`;
-  return date.toLocaleDateString();
-}
-
 const PAGE_SIZE = 20;
 
 export function UserAccordion({ user, showStale }: UserAccordionProps) {
@@ -62,7 +42,6 @@ export function UserAccordion({ user, showStale }: UserAccordionProps) {
   const [hasMore, setHasMore] = useState(false);
   const [offset, setOffset] = useState(0);
   const [error, setError] = useState<string | null>(null);
-  const prevShowStaleRef = useRef(showStale);
 
   const fetchSessions = useCallback(
     async (currentOffset: number, append: boolean = false) => {
@@ -81,7 +60,7 @@ export function UserAccordion({ user, showStale }: UserAccordionProps) {
           includeStale: String(showStale),
         });
 
-        const response = await fetch(`/api/v1/activity?${params}`);
+        const response = await fetchWithTimeout(`/api/v1/activity?${params}`);
         if (!response.ok) {
           const data = (await response.json()) as { error?: string };
           throw new Error(data.error || 'Failed to fetch sessions');
@@ -120,14 +99,13 @@ export function UserAccordion({ user, showStale }: UserAccordionProps) {
     fetchSessions(offset, true);
   };
 
-  // Refetch when showStale changes and accordion is expanded
+  // Refetch when showStale changes (fetchSessions identity changes) and accordion is expanded
   useEffect(() => {
-    if (prevShowStaleRef.current !== showStale && isExpanded) {
+    if (isExpanded) {
       setOffset(0);
       fetchSessions(0);
     }
-    prevShowStaleRef.current = showStale;
-  }, [showStale, isExpanded, fetchSessions]);
+  }, [fetchSessions]);
 
   return (
     <div

@@ -56,7 +56,13 @@ export async function classifyActivity(
     // Try LLM classification
     return await provider.classify(files, apiKey, team.llm_model ?? undefined);
   } catch (error) {
-    console.error('LLM classification failed, falling back to heuristic:', error);
+    const sanitizedError = error instanceof Error
+      ? error.message
+          // Redact common API key patterns: sk-xxx, xai-xxx, key-xxx, Bearer tokens
+          .replace(/\b(sk-|xai-|key-|AIza)[A-Za-z0-9_\-]{10,}\b/g, '[REDACTED_KEY]')
+          .replace(/\bBearer\s+[A-Za-z0-9_\-.]{10,}\b/g, 'Bearer [REDACTED_KEY]')
+      : 'Classification failed';
+    console.error('LLM classification failed, falling back to heuristic:', sanitizedError);
     return heuristicProvider.classify(files, '');
   }
 }

@@ -8,6 +8,8 @@ type ViewToggleProps = {
 export function ViewToggle({ value, onChange }: ViewToggleProps) {
   return (
     <div
+      role="tablist"
+      aria-label="View mode"
       style={{
         display: 'inline-flex',
         backgroundColor: 'var(--bg-elevated)',
@@ -16,6 +18,8 @@ export function ViewToggle({ value, onChange }: ViewToggleProps) {
       }}
     >
       <button
+        role="tab"
+        aria-selected={value === 'timeline'}
         onClick={() => onChange('timeline')}
         style={{
           padding: 'var(--space-xs) var(--space-sm)',
@@ -32,6 +36,8 @@ export function ViewToggle({ value, onChange }: ViewToggleProps) {
         Timeline
       </button>
       <button
+        role="tab"
+        aria-selected={value === 'byUser'}
         onClick={() => onChange('byUser')}
         style={{
           padding: 'var(--space-xs) var(--space-sm)',

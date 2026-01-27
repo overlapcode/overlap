@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react';
+import { memo } from 'react';
+import { useRelativeTime } from '@lib/utils/time';
 
 const WAITING_MESSAGES = [
   "Warming up the keyboard...",
@@ -91,49 +92,6 @@ function getRelativeFilePath(absolutePath: string, worktree: string | null): str
   return absolutePath;
 }
 
-function formatRelativeTime(dateString: string): string {
-  // SQLite timestamps don't include timezone - they're UTC
-  // Append 'Z' if not already present to parse as UTC
-  const utcDateString = dateString.includes('Z') || dateString.includes('+')
-    ? dateString
-    : dateString.replace(' ', 'T') + 'Z';
-
-  const date = new Date(utcDateString);
-  const now = new Date();
-  const diffMs = now.getTime() - date.getTime();
-  const diffSeconds = Math.floor(diffMs / 1000);
-  const diffMinutes = Math.floor(diffSeconds / 60);
-  const diffHours = Math.floor(diffMinutes / 60);
-  const diffDays = Math.floor(diffHours / 24);
-
-  // Handle future dates (shouldn't happen, but just in case)
-  if (diffSeconds < 0) return 'just now';
-
-  if (diffSeconds < 60) return 'just now';
-  if (diffMinutes < 60) return `${diffMinutes}m ago`;
-  if (diffHours < 24) return `${diffHours}h ago`;
-  if (diffDays < 7) return `${diffDays}d ago`;
-  return date.toLocaleDateString();
-}
-
-function useRelativeTime(dateString: string): string {
-  const [relativeTime, setRelativeTime] = useState(() => formatRelativeTime(dateString));
-
-  useEffect(() => {
-    // Update immediately when dateString changes
-    setRelativeTime(formatRelativeTime(dateString));
-
-    // Update every 30 seconds for live timestamps
-    const interval = setInterval(() => {
-      setRelativeTime(formatRelativeTime(dateString));
-    }, 30000);
-
-    return () => clearInterval(interval);
-  }, [dateString]);
-
-  return relativeTime;
-}
-
 function getStatusLabel(status: string): string {
   switch (status) {
     case 'active': return 'ACTIVE';
@@ -143,7 +101,7 @@ function getStatusLabel(status: string): string {
   }
 }
 
-export function ActivityCard({ session }: ActivityCardProps) {
+export const ActivityCard = memo(function ActivityCard({ session }: ActivityCardProps) {
   const { user, device, repo, branch, worktree, status, last_activity_at, activity } = session;
   const relativeTime = useRelativeTime(last_activity_at);
 
@@ -178,7 +136,7 @@ export function ActivityCard({ session }: ActivityCardProps) {
           )}
           <span className="text-muted">·</span>
           <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-            <span className={`status-dot ${status}`} />
+            <span className={`status-dot ${status}`} aria-label={`Status: ${status}`} />
             <span className="text-secondary" style={{ fontSize: '0.75rem' }}>
               {getStatusLabel(status)}
             </span>
@@ -274,4 +232,4 @@ export function ActivityCard({ session }: ActivityCardProps) {
       )}
     </div>
   );
-}
+});

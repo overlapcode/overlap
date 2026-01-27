@@ -24,8 +24,9 @@ import logger
 from config import (
     is_configured,
     get_session_for_transcript,
-    get_pending_session,
-    save_pending_session,
+    get_session_entry,
+    save_session_for_transcript,
+    gc_stale_sessions,
 )
 from api import get_hostname, get_device_name, get_git_info, is_remote_session
 
@@ -64,6 +65,11 @@ def main():
         sys.exit(0)
     logger.info("Configuration OK")
 
+    # GC stale local sessions (older than 48h)
+    removed = gc_stale_sessions(max_age_hours=48)
+    if removed:
+        logger.info("GC'd stale sessions", count=removed)
+
     # Get transcript_path - this is our primary key for session tracking
     transcript_path = input_data.get("transcript_path", "")
     if not transcript_path:
@@ -96,9 +102,9 @@ def main():
         print(json.dumps(output))
         sys.exit(0)
 
-    # Check if we already have pending session info
-    existing_pending = get_pending_session(transcript_path)
-    if existing_pending:
+    # Check if we already have a pending session entry
+    existing_entry = get_session_entry(transcript_path)
+    if existing_entry and existing_entry.get("status") == "pending":
         logger.info("Pending session already exists for transcript", transcript_path=transcript_path)
         sys.exit(0)
 
@@ -137,7 +143,13 @@ def main():
     if git_info.get("branch"):
         session_info["branch"] = git_info["branch"]
 
-    save_pending_session(transcript_path, session_info)
+    save_session_for_transcript(
+        transcript_path,
+        overlap_session_id=None,
+        worktree=cwd,
+        status="pending",
+        session_info=session_info,
+    )
     logger.info("Pending session saved for lazy registration", transcript_path=transcript_path)
 
     # Output context for Claude (shown in SessionStart)

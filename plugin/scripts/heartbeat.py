@@ -16,22 +16,9 @@ import os
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import logger
-from config import is_configured
+from config import is_configured, get_session_entry, update_session_heartbeat_time
 from api import api_request, ensure_session_registered
-
-
-def extract_file_path(tool_input: dict, tool_name: str) -> str | None:
-    """Extract the file path from tool input based on tool type."""
-    if tool_name in ("Write", "Edit"):
-        return tool_input.get("file_path")
-    elif tool_name == "MultiEdit":
-        # MultiEdit has an array of edits
-        edits = tool_input.get("edits", [])
-        if edits:
-            return edits[0].get("file_path")
-    elif tool_name == "NotebookEdit":
-        return tool_input.get("notebook_path")
-    return None
+from utils import extract_file_paths, make_relative
 
 
 def main():
@@ -72,44 +59,56 @@ def main():
         logger.debug("No Overlap session for this transcript, skipping")
         sys.exit(0)
 
-    # Extract file path from tool input
+    # Client-side throttle: skip if last heartbeat was < 30s ago
+    entry = get_session_entry(transcript_path)
+    if entry:
+        last_hb = entry.get("last_heartbeat_at")
+        if last_hb:
+            from datetime import datetime, timezone
+            try:
+                last_dt = datetime.fromisoformat(last_hb)
+                elapsed = (datetime.now(timezone.utc) - last_dt).total_seconds()
+                if elapsed < 30:
+                    logger.debug("Heartbeat throttled (client-side)", elapsed=elapsed)
+                    sys.exit(0)
+            except (ValueError, TypeError):
+                pass  # Bad timestamp, proceed with heartbeat
+
+    # Extract ALL file paths from tool input (fixes MultiEdit bug)
     tool_name = input_data.get("tool_name", "")
     tool_input = input_data.get("tool_input", {})
 
-    file_path = extract_file_path(tool_input, tool_name)
-    if not file_path:
+    file_paths = extract_file_paths(tool_input, tool_name)
+    if not file_paths:
         logger.debug("No file path in tool input", tool_name=tool_name)
         sys.exit(0)
 
-    # Make path relative to cwd for privacy
+    # Make paths relative to cwd for privacy
     cwd = input_data.get("cwd", os.getcwd())
-    try:
-        if os.path.isabs(file_path):
-            file_path = os.path.relpath(file_path, cwd)
-    except ValueError as e:
-        # Can't make relative (different drive on Windows, etc.)
-        logger.debug("Could not make path relative", path=file_path, error=str(e))
+    relative_paths = [make_relative(p, cwd) for p in file_paths]
 
     logger.info("Sending heartbeat",
                 tool_name=tool_name,
-                file_path=file_path)
+                file_paths=relative_paths)
 
     try:
-        # Send heartbeat with file info
+        # Send heartbeat with retry (budget: 10s hook timeout)
         response = api_request("POST", f"/api/v1/sessions/{overlap_session_id}/heartbeat", {
-            "files": [file_path],
-        })
+            "files": relative_paths,
+        }, timeout=4, retries=1)
 
         result = response.get("data", {})
-        logger.info("Heartbeat sent successfully",
-                    file_path=file_path,
-                    scope=result.get("semantic_scope"))
+        if result.get("throttled"):
+            logger.debug("Heartbeat throttled (server-side)", retry_after=result.get("retry_after"))
+        else:
+            update_session_heartbeat_time(transcript_path)
+            logger.info("Heartbeat sent",
+                        file_paths=relative_paths,
+                        scope=result.get("semantic_scope"))
 
     except Exception as e:
-        logger.error("Heartbeat failed", exc=e, file_path=file_path)
-        import traceback
+        logger.error("Heartbeat failed", exc=e, file_paths=relative_paths)
         print(f"[Overlap] Heartbeat failed: {e}", file=sys.stderr)
-        print(f"[Overlap] Traceback: {traceback.format_exc()}", file=sys.stderr)
 
     sys.exit(0)
 
