@@ -7,7 +7,7 @@ const DEFAULT_MODEL = 'grok-2-latest';
 export const xaiProvider: LLMProvider = {
   name: 'xai',
 
-  async classify(files: string[], apiKey: string, model?: string): Promise<ClassificationResult> {
+  async classify(files: string[], apiKey: string, model?: string, toolName?: string): Promise<ClassificationResult> {
     const response = await fetch(API_URL, {
       method: 'POST',
       headers: {
@@ -20,7 +20,7 @@ export const xaiProvider: LLMProvider = {
         messages: [
           {
             role: 'user',
-            content: buildPrompt(files),
+            content: buildPrompt(files, toolName),
           },
         ],
       }),

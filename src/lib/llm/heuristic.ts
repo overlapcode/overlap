@@ -22,7 +22,31 @@ const SCOPE_PATTERNS: [RegExp, string, string][] = [
   [/websocket|socket|realtime|sse|stream/i, 'realtime', 'Working on real-time features'],
 ];
 
-function classifyByPath(files: string[]): ClassificationResult {
+/**
+ * Map tool name to a verb for heuristic summaries.
+ */
+function getVerb(toolName?: string): string {
+  if (!toolName) return 'Editing';
+  switch (toolName) {
+    case 'Edit':
+    case 'Write':
+    case 'MultiEdit':
+    case 'NotebookEdit':
+      return 'Editing';
+    case 'Read':
+      return 'Reading';
+    case 'Grep':
+      return 'Searching';
+    case 'Glob':
+      return 'Finding files in';
+    case 'Bash':
+      return 'Running command in';
+    default:
+      return 'Working on';
+  }
+}
+
+function classifyByPath(files: string[], toolName?: string): ClassificationResult {
   const scopeCounts = new Map<string, number>();
   let matchedScope = 'general';
   let matchedSummary = 'Working on code';
@@ -41,13 +65,18 @@ function classifyByPath(files: string[]): ClassificationResult {
     }
   }
 
-  // Generate more specific summary based on files
-  if (files.length === 1) {
+  const verb = getVerb(toolName);
+
+  // Generate more specific summary based on files and operation
+  if (toolName === 'Bash') {
+    // For bash commands, the "file" is actually the command text
+    matchedSummary = 'Running a command';
+  } else if (files.length === 1) {
     const fileName = files[0].split('/').pop() || files[0];
-    matchedSummary = `Editing ${fileName}`;
+    matchedSummary = `${verb} ${fileName}`;
   } else if (files.length <= 3) {
     const fileNames = files.map((f) => f.split('/').pop()).join(', ');
-    matchedSummary = `Editing ${fileNames}`;
+    matchedSummary = `${verb} ${fileNames}`;
   } else {
     matchedSummary = `${matchedSummary} (${files.length} files)`;
   }
@@ -61,8 +90,7 @@ function classifyByPath(files: string[]): ClassificationResult {
 export const heuristicProvider: LLMProvider = {
   name: 'heuristic',
 
-  async classify(files: string[]): Promise<ClassificationResult> {
-    // Heuristic is synchronous but we return a promise for interface consistency
-    return classifyByPath(files);
+  async classify(files: string[], _apiKey: string, _model?: string, toolName?: string): Promise<ClassificationResult> {
+    return classifyByPath(files, toolName);
   },
 };

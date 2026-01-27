@@ -2,10 +2,16 @@
 """
 Overlap PostToolUse heartbeat hook.
 
-Called after file edits to report activity to the Overlap server.
-Collects the files being edited and sends them for classification.
+Called after ANY tool use to report activity to the Overlap server.
+Collects the files being worked on and sends them for classification.
 
 If this is the first tool use, lazily registers the session with the server.
+
+Throttle strategy (Option C):
+- Write tools (Edit, Write, MultiEdit, NotebookEdit) and read tools (Read, Grep, Glob, Bash, etc.)
+  have SEPARATE throttle timers: last_write_heartbeat_at and last_read_heartbeat_at.
+- A write never gets suppressed by a recent read (and vice versa).
+- Within each category, 15s throttle applies.
 """
 
 import json
@@ -18,7 +24,9 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import logger
 from config import is_configured, get_session_entry, update_session_heartbeat_time
 from api import api_request, ensure_session_registered
-from utils import extract_file_paths, make_relative
+from utils import extract_file_paths, make_relative, is_write_tool
+
+THROTTLE_SECONDS = 15
 
 
 def main():
@@ -59,25 +67,30 @@ def main():
         logger.debug("No Overlap session for this transcript, skipping")
         sys.exit(0)
 
-    # Client-side throttle: skip if last heartbeat was < 30s ago
+    # Determine tool type for dual throttle
+    tool_name = input_data.get("tool_name", "")
+    is_write = is_write_tool(tool_name)
+
+    # Client-side throttle (Option C): separate timers for reads vs writes
     entry = get_session_entry(transcript_path)
     if entry:
-        last_hb = entry.get("last_heartbeat_at")
+        from datetime import datetime, timezone
+        # Pick the right timestamp field based on tool type
+        ts_field = "last_write_heartbeat_at" if is_write else "last_read_heartbeat_at"
+        last_hb = entry.get(ts_field)
         if last_hb:
-            from datetime import datetime, timezone
             try:
                 last_dt = datetime.fromisoformat(last_hb)
                 elapsed = (datetime.now(timezone.utc) - last_dt).total_seconds()
-                if elapsed < 30:
-                    logger.debug("Heartbeat throttled (client-side)", elapsed=elapsed)
+                if elapsed < THROTTLE_SECONDS:
+                    logger.debug("Heartbeat throttled (client-side)",
+                                 elapsed=elapsed, tool=tool_name, is_write=is_write)
                     sys.exit(0)
             except (ValueError, TypeError):
                 pass  # Bad timestamp, proceed with heartbeat
 
-    # Extract ALL file paths from tool input (fixes MultiEdit bug)
-    tool_name = input_data.get("tool_name", "")
+    # Extract file paths from tool input
     tool_input = input_data.get("tool_input", {})
-
     file_paths = extract_file_paths(tool_input, tool_name)
     if not file_paths:
         logger.debug("No file path in tool input", tool_name=tool_name)
@@ -89,19 +102,21 @@ def main():
 
     logger.info("Sending heartbeat",
                 tool_name=tool_name,
-                file_paths=relative_paths)
+                file_paths=relative_paths,
+                is_write=is_write)
 
     try:
         # Send heartbeat with retry (budget: 10s hook timeout)
         response = api_request("POST", f"/api/v1/sessions/{overlap_session_id}/heartbeat", {
             "files": relative_paths,
+            "tool_name": tool_name,
         }, timeout=4, retries=1)
 
         result = response.get("data", {})
         if result.get("throttled"):
             logger.debug("Heartbeat throttled (server-side)", retry_after=result.get("retry_after"))
         else:
-            update_session_heartbeat_time(transcript_path)
+            update_session_heartbeat_time(transcript_path, is_write=is_write)
             logger.info("Heartbeat sent",
                         file_paths=relative_paths,
                         scope=result.get("semantic_scope"))

@@ -7,7 +7,7 @@ const DEFAULT_MODEL = 'gemini-2.0-flash';
 export const googleProvider: LLMProvider = {
   name: 'google',
 
-  async classify(files: string[], apiKey: string, model?: string): Promise<ClassificationResult> {
+  async classify(files: string[], apiKey: string, model?: string, toolName?: string): Promise<ClassificationResult> {
     const modelName = model || DEFAULT_MODEL;
     const url = `${API_URL}/${modelName}:generateContent?key=${apiKey}`;
 
@@ -21,7 +21,7 @@ export const googleProvider: LLMProvider = {
           {
             parts: [
               {
-                text: buildPrompt(files),
+                text: buildPrompt(files, toolName),
               },
             ],
           },

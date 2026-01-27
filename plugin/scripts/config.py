@@ -199,12 +199,22 @@ def clear_session_for_transcript(transcript_path: str) -> None:
         _log("warn", "Failed to clear session", transcript_path=transcript_path, error=str(e))
 
 
-def update_session_heartbeat_time(transcript_path: str) -> None:
-    """Update the last heartbeat timestamp for client-side throttling."""
+def update_session_heartbeat_time(transcript_path: str, is_write: bool = True) -> None:
+    """Update the last heartbeat timestamp for client-side throttling.
+
+    Option C dual throttle: tracks read and write timestamps separately.
+    Write tools update last_write_heartbeat_at, read tools update last_read_heartbeat_at.
+    """
     with _locked_sessions() as (sessions, save):
         key = _get_transcript_key(transcript_path)
         if key in sessions:
-            sessions[key]["last_heartbeat_at"] = datetime.now(timezone.utc).isoformat()
+            now = datetime.now(timezone.utc).isoformat()
+            if is_write:
+                sessions[key]["last_write_heartbeat_at"] = now
+            else:
+                sessions[key]["last_read_heartbeat_at"] = now
+            # Keep legacy field for backward compat
+            sessions[key]["last_heartbeat_at"] = now
             save(sessions)
 
 

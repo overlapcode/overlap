@@ -7,7 +7,7 @@ const DEFAULT_MODEL = 'claude-3-5-haiku-latest';
 export const anthropicProvider: LLMProvider = {
   name: 'anthropic',
 
-  async classify(files: string[], apiKey: string, model?: string): Promise<ClassificationResult> {
+  async classify(files: string[], apiKey: string, model?: string, toolName?: string): Promise<ClassificationResult> {
     const response = await fetch(API_URL, {
       method: 'POST',
       headers: {
@@ -21,7 +21,7 @@ export const anthropicProvider: LLMProvider = {
         messages: [
           {
             role: 'user',
-            content: buildPrompt(files),
+            content: buildPrompt(files, toolName),
           },
         ],
       }),

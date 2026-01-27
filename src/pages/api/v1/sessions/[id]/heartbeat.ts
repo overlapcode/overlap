@@ -7,6 +7,7 @@ import { classifyActivity } from '@lib/llm';
 
 const HeartbeatSchema = z.object({
   files: z.array(z.string()),
+  tool_name: z.string().optional(),
 });
 
 export async function POST(context: APIContext) {
@@ -47,8 +48,8 @@ export async function POST(context: APIContext) {
       return errorResponse('Session does not belong to user', 403);
     }
 
-    // Rate limit: skip if last activity was < 30s ago
-    const HEARTBEAT_MIN_INTERVAL_SECONDS = 30;
+    // Rate limit: skip if last activity was < 15s ago
+    const HEARTBEAT_MIN_INTERVAL_SECONDS = 15;
     // SQLite datetime('now') produces UTC without timezone suffix -- ensure UTC parse
     const lastActivityStr = session.last_activity_at.includes('Z')
       ? session.last_activity_at
@@ -70,11 +71,12 @@ export async function POST(context: APIContext) {
       .map(f => f.replace(/[\x00-\x1f\x7f]/g, '').substring(0, 500))
       .slice(0, 50);
 
-    // Classify the activity
+    // Classify the activity (pass tool_name for context)
     const classification = await classifyActivity(
       team,
       sanitizedFiles,
-      encryptionKey
+      encryptionKey,
+      input.tool_name
     );
 
     // Create activity record

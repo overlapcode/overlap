@@ -7,8 +7,9 @@ def extract_file_paths(tool_input: dict, tool_name: str) -> list[str]:
     """Extract ALL file paths from tool input based on tool type.
 
     Returns a list of file paths (may be empty).
-    For MultiEdit, returns all edited files, not just the first.
+    Supports edit tools, read tools, search tools, and bash commands.
     """
+    # Edit tools
     if tool_name in ("Write", "Edit"):
         path = tool_input.get("file_path")
         return [path] if path else []
@@ -25,7 +26,32 @@ def extract_file_paths(tool_input: dict, tool_name: str) -> list[str]:
     elif tool_name == "NotebookEdit":
         path = tool_input.get("notebook_path")
         return [path] if path else []
+
+    # Read tools
+    elif tool_name == "Read":
+        path = tool_input.get("file_path")
+        return [path] if path else []
+
+    # Search tools — extract the search path/directory
+    elif tool_name in ("Grep", "Glob"):
+        path = tool_input.get("path")
+        return [path] if path else []
+
+    # Bash — try to extract meaningful context from the command
+    elif tool_name == "Bash":
+        command = tool_input.get("command", "")
+        return [command[:200]] if command else []
+
     return []
+
+
+# Tools that represent edits/writes (bypass read throttle in Option C)
+WRITE_TOOLS = frozenset({"Write", "Edit", "MultiEdit", "NotebookEdit"})
+
+
+def is_write_tool(tool_name: str) -> bool:
+    """Check if a tool is a write/edit tool (vs read/search)."""
+    return tool_name in WRITE_TOOLS
 
 
 def make_relative(file_path: str, cwd: str) -> str:

@@ -33,19 +33,20 @@ export function getProvider(name: LLMProviderName): LLMProvider {
 export async function classifyActivity(
   team: Team,
   files: string[],
-  encryptionKey?: string
+  encryptionKey?: string,
+  toolName?: string
 ): Promise<ClassificationResult> {
   const providerName = team.llm_provider as LLMProviderName;
 
   // Use heuristic if no provider configured or no API key
   if (providerName === 'heuristic' || !team.llm_api_key_encrypted) {
-    return heuristicProvider.classify(files, '');
+    return heuristicProvider.classify(files, '', undefined, toolName);
   }
 
   // Need encryption key to decrypt API key
   if (!encryptionKey) {
     console.warn('No encryption key available, falling back to heuristic');
-    return heuristicProvider.classify(files, '');
+    return heuristicProvider.classify(files, '', undefined, toolName);
   }
 
   try {
@@ -54,7 +55,7 @@ export async function classifyActivity(
     const provider = getProvider(providerName);
 
     // Try LLM classification
-    return await provider.classify(files, apiKey, team.llm_model ?? undefined);
+    return await provider.classify(files, apiKey, team.llm_model ?? undefined, toolName);
   } catch (error) {
     const sanitizedError = error instanceof Error
       ? error.message
@@ -63,6 +64,6 @@ export async function classifyActivity(
           .replace(/\bBearer\s+[A-Za-z0-9_\-.]{10,}\b/g, 'Bearer [REDACTED_KEY]')
       : 'Classification failed';
     console.error('LLM classification failed, falling back to heuristic:', sanitizedError);
-    return heuristicProvider.classify(files, '');
+    return heuristicProvider.classify(files, '', undefined, toolName);
   }
 }
