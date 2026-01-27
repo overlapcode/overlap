@@ -14,7 +14,7 @@ type ActivityItem = {
 type HistorySession = {
   id: string;
   device: { name: string; is_remote: boolean };
-  repo: { name: string } | null;
+  repo: { id: string; name: string } | null;
   branch: string | null;
   status: 'active' | 'stale' | 'ended';
   started_at: string;
@@ -94,7 +94,11 @@ function HistoryCard({ session }: { session: HistorySession }) {
         >
           {session.branch && <span>{session.branch}</span>}
           {session.branch && session.repo && <span> · </span>}
-          {session.repo && <span>{session.repo.name}</span>}
+          {session.repo && (
+            <a href={`/repo/${session.repo.id}`} className="footer-link" onClick={(e) => e.stopPropagation()}>
+              {session.repo.name}
+            </a>
+          )}
         </div>
       )}
 

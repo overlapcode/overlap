@@ -1,9 +1,50 @@
 import type { APIContext } from 'astro';
+import type { SessionWithDetails } from '@lib/db/types';
 import { authenticateAny, errorResponse } from '@lib/auth/middleware';
 import { getRecentActivity, markStaleSessions } from '@lib/db/queries';
 
-const POLL_INTERVAL_MS = 10000; // Poll database every 10 seconds
-const KEEPALIVE_INTERVAL_MS = 30000; // Send keepalive every 30 seconds
+const POLL_INTERVAL_MS = 3000; // Poll database every 3 seconds
+const KEEPALIVE_INTERVAL_MS = 15000; // Send keepalive every 15 seconds
+const STALE_CHECK_INTERVAL_MS = 30000; // Check for stale sessions every 30 seconds
+
+function formatSession(session: SessionWithDetails) {
+  return {
+    id: session.id,
+    user: session.user,
+    device: {
+      id: session.device.id,
+      name: session.device.name,
+      is_remote: session.device.is_remote === 1,
+    },
+    repo: session.repo,
+    branch: session.branch,
+    worktree: session.worktree,
+    status: session.status,
+    started_at: session.started_at,
+    last_activity_at: session.last_activity_at,
+    activity: session.latest_activity
+      ? {
+          semantic_scope: session.latest_activity.semantic_scope,
+          summary: session.latest_activity.summary,
+          files: session.latest_activity.files,
+          created_at: session.latest_activity.created_at,
+        }
+      : null,
+  };
+}
+
+/**
+ * Build a fingerprint string for a session that changes whenever something
+ * the client cares about has changed (new activity, status change, etc.).
+ */
+function sessionFingerprint(session: SessionWithDetails): string {
+  return [
+    session.status,
+    session.last_activity_at,
+    session.latest_activity?.id ?? '',
+    session.latest_activity?.created_at ?? '',
+  ].join('|');
+}
 
 export async function GET(context: APIContext) {
   const { request } = context;
@@ -16,10 +57,6 @@ export async function GET(context: APIContext) {
   }
   const { team } = authResult.context;
 
-  // Get Last-Event-ID header for resuming
-  const lastEventId = request.headers.get('Last-Event-ID');
-  let lastSeenTimestamp = lastEventId ? new Date(lastEventId) : new Date(0);
-
   const encoder = new TextEncoder();
 
   const stream = new ReadableStream({
@@ -29,7 +66,7 @@ export async function GET(context: APIContext) {
       // Handle abort
       request.signal.addEventListener('abort', () => {
         isActive = false;
-        controller.close();
+        try { controller.close(); } catch { /* already closed */ }
       });
 
       // Send initial connected event
@@ -37,84 +74,76 @@ export async function GET(context: APIContext) {
         encoder.encode(`event: connected\ndata: ${JSON.stringify({ team_id: team.id })}\n\n`)
       );
 
+      // Snapshot-diff approach: track fingerprint of each session
+      // so we detect ANY change (new activity, status change, new session, removed session)
+      let knownSessions = new Map<string, string>(); // sessionId -> fingerprint
       let lastKeepalive = Date.now();
+      let lastStaleCheck = Date.now();
+      let eventCounter = 0;
 
       // Polling loop
       while (isActive) {
         try {
-          // Mark stale sessions before fetching
-          await markStaleSessions(db);
+          // Periodically mark stale sessions (not every poll — it's a write operation)
+          const now = Date.now();
+          if (now - lastStaleCheck > STALE_CHECK_INTERVAL_MS) {
+            await markStaleSessions(db);
+            lastStaleCheck = now;
+          }
 
-          // Check for new activity
-          const result = await getRecentActivity(db, team.id, { limit: 20 });
+          // Fetch current sessions
+          const result = await getRecentActivity(db, team.id, { limit: 50 });
 
-          // Filter to only new activity since last seen
-          const newSessions = result.sessions.filter((s) => {
-            const activityTime = s.latest_activity
-              ? new Date(s.latest_activity.created_at)
-              : new Date(s.last_activity_at);
-            return activityTime > lastSeenTimestamp;
-          });
+          // Build new snapshot
+          const currentSessions = new Map<string, SessionWithDetails>();
+          for (const session of result.sessions) {
+            currentSessions.set(session.id, session);
+          }
 
-          // Send new events
-          for (const session of newSessions) {
-            const eventData = {
-              id: session.id,
-              user: session.user,
-              device: {
-                id: session.device.id,
-                name: session.device.name,
-                is_remote: session.device.is_remote === 1,
-              },
-              repo: session.repo,
-              branch: session.branch,
-              worktree: session.worktree,
-              status: session.status,
-              started_at: session.started_at,
-              last_activity_at: session.last_activity_at,
-              activity: session.latest_activity
-                ? {
-                    semantic_scope: session.latest_activity.semantic_scope,
-                    summary: session.latest_activity.summary,
-                    files: session.latest_activity.files,
-                    created_at: session.latest_activity.created_at,
-                  }
-                : null,
-            };
+          // Detect changes: new sessions, updated sessions
+          for (const [id, session] of currentSessions) {
+            const fp = sessionFingerprint(session);
+            const prevFp = knownSessions.get(id);
 
-            const timestamp = session.latest_activity?.created_at || session.last_activity_at;
-            controller.enqueue(
-              encoder.encode(
-                `id: ${timestamp}\nevent: activity\ndata: ${JSON.stringify(eventData)}\n\n`
-              )
-            );
-
-            // Update last seen
-            const eventTime = new Date(timestamp);
-            if (eventTime > lastSeenTimestamp) {
-              lastSeenTimestamp = eventTime;
+            if (prevFp !== fp) {
+              // New or changed session — send event
+              eventCounter++;
+              controller.enqueue(
+                encoder.encode(
+                  `id: ${eventCounter}\nevent: activity\ndata: ${JSON.stringify(formatSession(session))}\n\n`
+                )
+              );
             }
           }
 
+          // Update known state
+          knownSessions = new Map();
+          for (const [id, session] of currentSessions) {
+            knownSessions.set(id, sessionFingerprint(session));
+          }
+
           // Send keepalive if needed
-          const now = Date.now();
-          if (now - lastKeepalive > KEEPALIVE_INTERVAL_MS) {
+          const nowAfterPoll = Date.now();
+          if (nowAfterPoll - lastKeepalive > KEEPALIVE_INTERVAL_MS) {
             controller.enqueue(encoder.encode(': keepalive\n\n'));
-            lastKeepalive = now;
+            lastKeepalive = nowAfterPoll;
           }
 
           // Wait before next poll
           await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
         } catch (error) {
+          if (!isActive) break;
           console.error('SSE stream error:', error);
 
           // Send error event
-          controller.enqueue(
-            encoder.encode(`event: error\ndata: ${JSON.stringify({ message: 'Stream error' })}\n\n`)
-          );
+          try {
+            controller.enqueue(
+              encoder.encode(`event: error\ndata: ${JSON.stringify({ message: 'Stream error' })}\n\n`)
+            );
+          } catch { /* stream may be closed */ }
 
-          // Wait a bit before retrying
-          await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS * 2));
+          // Wait before retrying
+          await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS * 3));
         }
       }
     },

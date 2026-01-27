@@ -45,6 +45,16 @@ import { Header } from '@components/Header';
     margin-bottom: 32px;
   }
 
+  .repo-card-link {
+    text-decoration: none;
+    color: inherit;
+    display: block;
+  }
+
+  .repo-card-link:hover .repo-card {
+    border-color: var(--border-active);
+  }
+
   .repo-card {
     background: var(--bg-surface);
     border: 1px solid var(--border-default);
@@ -282,17 +292,19 @@ import { Header } from '@components/Header';
     const formattedUrl = escapeHtml(formatRemoteUrl(repo.remote_url));
     const isGitHub = isGitHubUrl(repo.remote_url);
 
-    return `<div class="repo-card">
-      <div class="repo-card-inner">
-        <div class="repo-details">
-          <div class="repo-name">${safeName}</div>
-          <div class="repo-url">${formattedUrl}</div>
-        </div>
-        <div class="repo-visibility">
-          <span class="badge badge-${isGitHub ? 'github' : 'local'}">${isGitHub ? 'GitHub' : 'Local'}</span>
+    return `<a href="/repo/${repo.id}" class="repo-card-link">
+      <div class="repo-card">
+        <div class="repo-card-inner">
+          <div class="repo-details">
+            <div class="repo-name">${safeName}</div>
+            <div class="repo-url">${formattedUrl}</div>
+          </div>
+          <div class="repo-visibility">
+            <span class="badge badge-${isGitHub ? 'github' : 'local'}">${isGitHub ? 'GitHub' : 'Local'}</span>
+          </div>
         </div>
       </div>
-    </div>`;
+    </a>`;
   }
 
   loadRepos();

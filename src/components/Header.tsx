@@ -59,6 +59,13 @@ export function Header({ teamName, userName }: HeaderProps) {
             {userName}
           </span>
           <a
+            href="/repos"
+            className="btn btn-secondary"
+            style={{ fontSize: '0.75rem', padding: 'var(--space-xs) var(--space-sm)' }}
+          >
+            Repos
+          </a>
+          <a
             href="/history"
             className="btn btn-secondary"
             style={{ fontSize: '0.75rem', padding: 'var(--space-xs) var(--space-sm)' }}

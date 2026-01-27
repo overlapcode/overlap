@@ -79,7 +79,7 @@ export async function GET(context: APIContext) {
           name: row.device_name,
           is_remote: row.device_is_remote === 1,
         },
-        repo: row.repo_name ? { name: row.repo_name } : null,
+        repo: row.repo_name ? { id: row.repo_id, name: row.repo_name } : null,
         branch: row.branch,
         status: row.status,
         started_at: row.started_at,

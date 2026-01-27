@@ -560,6 +560,174 @@ export async function getUserSessions(
 }
 
 // ============================================================================
+// REPO ACTIVITY QUERIES
+// ============================================================================
+
+/**
+ * Get distinct branches for a repo (for filter dropdown).
+ */
+export async function getRepoBranches(db: D1Database, repoId: string): Promise<string[]> {
+  const result = await db
+    .prepare(
+      `SELECT DISTINCT branch FROM sessions
+       WHERE repo_id = ? AND branch IS NOT NULL
+       ORDER BY branch`
+    )
+    .bind(repoId)
+    .all<{ branch: string }>();
+  return result.results.map((r) => r.branch);
+}
+
+/**
+ * Get distinct users who have sessions in a repo (for filter dropdown).
+ */
+export async function getRepoUsers(
+  db: D1Database,
+  repoId: string
+): Promise<{ id: string; name: string }[]> {
+  const result = await db
+    .prepare(
+      `SELECT DISTINCT u.id, u.name
+       FROM users u
+       JOIN sessions s ON s.user_id = u.id
+       WHERE s.repo_id = ?
+       ORDER BY u.name`
+    )
+    .bind(repoId)
+    .all<{ id: string; name: string }>();
+  return result.results;
+}
+
+/**
+ * Get paginated sessions for a specific repo, with optional filters.
+ */
+export async function getRepoActivity(
+  db: D1Database,
+  teamId: string,
+  repoId: string,
+  options: {
+    limit?: number;
+    offset?: number;
+    includeStale?: boolean;
+    userId?: string;
+    branch?: string;
+    startDate?: string;
+    endDate?: string;
+  } = {}
+): Promise<PaginatedSessions> {
+  const { limit = 20, offset = 0, includeStale = true, userId, branch, startDate, endDate } = options;
+
+  const statusA = 'active';
+  const statusB = includeStale ? 'stale' : 'active';
+
+  // Build dynamic WHERE clause
+  let whereClause = `WHERE u.team_id = ? AND s.repo_id = ? AND s.status IN (?, ?)`;
+  const params: unknown[] = [teamId, repoId, statusA, statusB];
+
+  if (userId) {
+    whereClause += ' AND s.user_id = ?';
+    params.push(userId);
+  }
+  if (branch) {
+    whereClause += ' AND s.branch = ?';
+    params.push(branch);
+  }
+  if (startDate) {
+    whereClause += ' AND s.started_at >= ?';
+    params.push(startDate);
+  }
+  if (endDate) {
+    whereClause += ' AND s.started_at <= ?';
+    params.push(endDate + 'T23:59:59');
+  }
+
+  // Get total count
+  const countResult = await db
+    .prepare(
+      `SELECT COUNT(*) as count
+       FROM sessions s
+       JOIN users u ON s.user_id = u.id
+       ${whereClause}`
+    )
+    .bind(...params)
+    .first<{ count: number }>();
+
+  const total = countResult?.count ?? 0;
+
+  // Get sessions with latest activity
+  const result = await db
+    .prepare(
+      `SELECT
+        s.*,
+        u.id as user_id, u.name as user_name,
+        d.id as device_id, d.name as device_name, d.is_remote as device_is_remote,
+        r.id as repo_id, r.name as repo_name, r.remote_url as repo_remote_url,
+        a.id as activity_id, a.files, a.semantic_scope, a.summary, a.created_at as activity_created_at
+      FROM sessions s
+      JOIN users u ON s.user_id = u.id
+      JOIN devices d ON s.device_id = d.id
+      LEFT JOIN repos r ON s.repo_id = r.id
+      LEFT JOIN (
+        SELECT session_id, id, files, semantic_scope, summary, created_at,
+               ROW_NUMBER() OVER (PARTITION BY session_id ORDER BY created_at DESC) as rn
+        FROM activity
+      ) a ON s.id = a.session_id AND a.rn = 1
+      ${whereClause}
+      ORDER BY s.last_activity_at DESC
+      LIMIT ? OFFSET ?`
+    )
+    .bind(...params, limit, offset)
+    .all();
+
+  const sessions = result.results.map((row: Record<string, unknown>) => ({
+    id: row.id as string,
+    user_id: row.user_id as string,
+    device_id: row.device_id as string,
+    repo_id: row.repo_id as string | null,
+    branch: row.branch as string | null,
+    worktree: row.worktree as string | null,
+    status: row.status as 'active' | 'stale' | 'ended',
+    started_at: row.started_at as string,
+    last_activity_at: row.last_activity_at as string,
+    ended_at: row.ended_at as string | null,
+    user: {
+      id: row.user_id as string,
+      name: row.user_name as string,
+    },
+    device: {
+      id: row.device_id as string,
+      name: row.device_name as string,
+      is_remote: row.device_is_remote as number,
+    },
+    repo: row.repo_id
+      ? {
+          id: row.repo_id as string,
+          name: row.repo_name as string,
+          remote_url: row.repo_remote_url as string | null,
+        }
+      : null,
+    latest_activity: row.activity_id
+      ? {
+          id: row.activity_id as string,
+          session_id: row.id as string,
+          files: safeParseFiles(row.files as string),
+          semantic_scope: row.semantic_scope as string | null,
+          summary: row.summary as string | null,
+          created_at: row.activity_created_at as string,
+        }
+      : null,
+  }));
+
+  return {
+    sessions,
+    total,
+    limit,
+    offset,
+    hasMore: offset + sessions.length < total,
+  };
+}
+
+// ============================================================================
 // OVERLAP DETECTION
 // ============================================================================
 

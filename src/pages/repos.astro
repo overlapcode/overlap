@@ -1,0 +1,38 @@
+---
+import Layout from '@layouts/Layout.astro';
+import { Header } from '@components/Header';
+import { RepoList } from '@components/RepoList';
+import { getSessionUser } from '@lib/auth/session';
+import { ensureMigrated } from '@lib/db/migrate';
+
+let sessionData = null;
+
+if (Astro.locals.runtime?.env?.DB) {
+  const db = Astro.locals.runtime.env.DB;
+  await ensureMigrated(db);
+  sessionData = await getSessionUser(Astro.cookies, db);
+}
+
+if (!sessionData) {
+  return Astro.redirect('/');
+}
+
+const teamName = sessionData.team.name;
+const userName = sessionData.user.name;
+---
+
+<Layout title="Repositories">
+  <Header teamName={teamName} userName={userName} client:load />
+
+  <main class="container" style="padding-top: var(--space-xl); padding-bottom: var(--space-xl);">
+    <div style="width: 100%; max-width: 800px; margin: 0 auto;">
+      <div style="display: flex; align-items: center; gap: var(--space-md); margin-bottom: var(--space-lg);">
+        <a href="/" class="footer-link" style="font-size: 0.875rem;">← Back to Timeline</a>
+      </div>
+      <h1 style="font-size: 1.25rem; margin: 0 0 var(--space-lg) 0; color: var(--text-primary);">
+        Repositories
+      </h1>
+      <RepoList client:load />
+    </div>
+  </main>
+</Layout>

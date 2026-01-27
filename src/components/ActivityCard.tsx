@@ -73,7 +73,6 @@ export const ActivityCard = memo(function ActivityCard({ session }: ActivityCard
 
   // GitHub URL helpers
   const githubBaseUrl = parseGitHubUrl(repo?.remote_url ?? null);
-  const repoUrl = githubBaseUrl;
   const branchUrl = getBranchUrl(githubBaseUrl, branch);
 
   const handleToggleExpand = async () => {
@@ -219,13 +218,9 @@ export const ActivityCard = memo(function ActivityCard({ session }: ActivityCard
           )}
           {branch && repo && <span> · </span>}
           {repo && (
-            repoUrl ? (
-              <a href={repoUrl} target="_blank" rel="noopener noreferrer" className="footer-link" onClick={(e) => e.stopPropagation()}>
-                {repo.name}
-              </a>
-            ) : (
-              <span>{repo.name}</span>
-            )
+            <a href={`/repo/${repo.id}`} className="footer-link" onClick={(e) => e.stopPropagation()}>
+              {repo.name}
+            </a>
           )}
         </div>
       )}
