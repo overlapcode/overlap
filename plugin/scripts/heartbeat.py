@@ -26,7 +26,7 @@ from config import is_configured, get_session_entry, update_session_heartbeat_ti
 from api import api_request, ensure_session_registered
 from utils import extract_file_paths, make_relative, is_write_tool
 
-THROTTLE_SECONDS = 15
+THROTTLE_SECONDS = 5
 
 
 def main():

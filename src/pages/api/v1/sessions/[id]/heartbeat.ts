@@ -53,8 +53,8 @@ export async function POST(context: APIContext) {
       console.log(`Reactivating ${session.status} session ${sessionId} via heartbeat`);
     }
 
-    // Rate limit: skip if last activity was < 15s ago
-    const HEARTBEAT_MIN_INTERVAL_SECONDS = 15;
+    // Rate limit: skip if last activity was < 5s ago
+    const HEARTBEAT_MIN_INTERVAL_SECONDS = 5;
     // SQLite datetime('now') produces UTC without timezone suffix -- ensure UTC parse
     const lastActivityStr = session.last_activity_at.includes('Z')
       ? session.last_activity_at
