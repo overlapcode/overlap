@@ -37,11 +37,6 @@ def extract_file_paths(tool_input: dict, tool_name: str) -> list[str]:
         path = tool_input.get("path")
         return [path] if path else []
 
-    # Bash — try to extract meaningful context from the command
-    elif tool_name == "Bash":
-        command = tool_input.get("command", "")
-        return [command[:200]] if command else []
-
     return []
 
 

@@ -2,13 +2,13 @@
 """
 Overlap PostToolUse heartbeat hook.
 
-Called after ANY tool use to report activity to the Overlap server.
-Collects the files being worked on and sends them for classification.
+Called after write tool use (Edit, Write, MultiEdit, NotebookEdit) to report
+activity to the Overlap server. Collects files being worked on for classification.
 
-If this is the first tool use, lazily registers the session with the server.
+Lazily registers the session on first invocation.
 
-Minimal 2-second throttle per tool category (read vs write) to prevent process exhaustion,
-while keeping updates near-real-time. The SSE stream checks for changes every 1 second.
+2-second client-side throttle per tool category. Throttle check runs BEFORE any
+expensive work (session registration, API calls) so throttled invocations exit fast.
 """
 
 import json
@@ -48,25 +48,19 @@ def main():
     # Expand ~ in path
     transcript_path = os.path.expanduser(transcript_path)
 
-    # Get session info for lazy registration
-    session_id = input_data.get("session_id", "")
-    cwd = input_data.get("cwd", os.getcwd())
-
-    # Ensure session is registered (lazy registration on first tool use)
-    overlap_session_id = ensure_session_registered(transcript_path, session_id, cwd)
-    logger.set_context(hook="PostToolUse", session_id=overlap_session_id)
-
-    # Heartbeat requires a registered session
-    if not overlap_session_id:
-        logger.debug("No Overlap session for this transcript, skipping")
-        sys.exit(0)
-
     # Determine tool type for categorization
     tool_name = input_data.get("tool_name", "")
     is_write = is_write_tool(tool_name)
 
-    # Minimal client-side throttle (2s per category) to prevent process exhaustion.
-    # Reads and writes have separate timers so a write is never blocked by a recent read.
+    # Extract file paths from tool input early — exit fast if nothing to report
+    tool_input = input_data.get("tool_input", {})
+    file_paths = extract_file_paths(tool_input, tool_name)
+    if not file_paths:
+        logger.debug("No file path in tool input", tool_name=tool_name)
+        sys.exit(0)
+
+    # Throttle check BEFORE any expensive work (session registration, API calls).
+    # This ensures rapid tool use exits in <10ms with just a cheap file read.
     THROTTLE_SECONDS = 2
     entry = get_session_entry(transcript_path)
     if entry:
@@ -83,11 +77,15 @@ def main():
             except (ValueError, TypeError):
                 pass
 
-    # Extract file paths from tool input
-    tool_input = input_data.get("tool_input", {})
-    file_paths = extract_file_paths(tool_input, tool_name)
-    if not file_paths:
-        logger.debug("No file path in tool input", tool_name=tool_name)
+    # Session registration (lazy — first tool use triggers it).
+    # Only runs after throttle check passes.
+    session_id = input_data.get("session_id", "")
+    cwd = input_data.get("cwd", os.getcwd())
+    overlap_session_id = ensure_session_registered(transcript_path, session_id, cwd)
+    logger.set_context(hook="PostToolUse", session_id=overlap_session_id)
+
+    if not overlap_session_id:
+        logger.debug("No Overlap session for this transcript, skipping")
         sys.exit(0)
 
     # Make paths relative to cwd for privacy
