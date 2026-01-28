@@ -53,23 +53,23 @@ export async function POST(context: APIContext) {
       console.log(`Reactivating ${session.status} session ${sessionId} via heartbeat`);
     }
 
-    // Rate limit: skip if last activity was < 5s ago
-    const HEARTBEAT_MIN_INTERVAL_SECONDS = 5;
-    // SQLite datetime('now') produces UTC without timezone suffix -- ensure UTC parse
-    const lastActivityStr = session.last_activity_at.includes('Z')
-      ? session.last_activity_at
-      : session.last_activity_at.replace(' ', 'T') + 'Z';
-    const lastActivity = new Date(lastActivityStr);
-    const now = new Date();
-    const elapsedSeconds = (now.getTime() - lastActivity.getTime()) / 1000;
-
-    if (elapsedSeconds < HEARTBEAT_MIN_INTERVAL_SECONDS) {
-      return successResponse({
-        activity_id: null,
-        throttled: true,
-        retry_after: Math.ceil(HEARTBEAT_MIN_INTERVAL_SECONDS - elapsedSeconds),
-      });
-    }
+    // Server-side rate limit disabled — client-side throttle in heartbeat.py
+    // handles rate limiting (Option C dual throttle: 5s per read/write category).
+    // const HEARTBEAT_MIN_INTERVAL_SECONDS = 5;
+    // const lastActivityStr = session.last_activity_at.includes('Z')
+    //   ? session.last_activity_at
+    //   : session.last_activity_at.replace(' ', 'T') + 'Z';
+    // const lastActivity = new Date(lastActivityStr);
+    // const now = new Date();
+    // const elapsedSeconds = (now.getTime() - lastActivity.getTime()) / 1000;
+    //
+    // if (elapsedSeconds < HEARTBEAT_MIN_INTERVAL_SECONDS) {
+    //   return successResponse({
+    //     activity_id: null,
+    //     throttled: true,
+    //     retry_after: Math.ceil(HEARTBEAT_MIN_INTERVAL_SECONDS - elapsedSeconds),
+    //   });
+    // }
 
     // Sanitize file paths before LLM classification
     const sanitizedFiles = input.files
