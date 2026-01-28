@@ -7,11 +7,7 @@ Collects the files being worked on and sends them for classification.
 
 If this is the first tool use, lazily registers the session with the server.
 
-Throttle strategy (Option C):
-- Write tools (Edit, Write, MultiEdit, NotebookEdit) and read tools (Read, Grep, Glob, Bash, etc.)
-  have SEPARATE throttle timers: last_write_heartbeat_at and last_read_heartbeat_at.
-- A write never gets suppressed by a recent read (and vice versa).
-- Within each category, 15s throttle applies.
+No throttling — every tool use sends a heartbeat immediately for real-time updates.
 """
 
 import json
@@ -22,12 +18,9 @@ import os
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import logger
-from config import is_configured, get_session_entry, update_session_heartbeat_time, clear_session_for_transcript, save_session_for_transcript
+from config import is_configured, update_session_heartbeat_time, clear_session_for_transcript
 from api import api_request, ensure_session_registered
 from utils import extract_file_paths, make_relative, is_write_tool
-
-THROTTLE_SECONDS = 5
-
 
 def main():
     # Set up logging context
@@ -67,27 +60,12 @@ def main():
         logger.debug("No Overlap session for this transcript, skipping")
         sys.exit(0)
 
-    # Determine tool type for dual throttle
+    # Determine tool type for categorization
     tool_name = input_data.get("tool_name", "")
     is_write = is_write_tool(tool_name)
 
-    # Client-side throttle (Option C): separate timers for reads vs writes
-    entry = get_session_entry(transcript_path)
-    if entry:
-        from datetime import datetime, timezone
-        # Pick the right timestamp field based on tool type
-        ts_field = "last_write_heartbeat_at" if is_write else "last_read_heartbeat_at"
-        last_hb = entry.get(ts_field)
-        if last_hb:
-            try:
-                last_dt = datetime.fromisoformat(last_hb)
-                elapsed = (datetime.now(timezone.utc) - last_dt).total_seconds()
-                if elapsed < THROTTLE_SECONDS:
-                    logger.debug("Heartbeat throttled (client-side)",
-                                 elapsed=elapsed, tool=tool_name, is_write=is_write)
-                    sys.exit(0)
-            except (ValueError, TypeError):
-                pass  # Bad timestamp, proceed with heartbeat
+    # No throttle — every tool use sends a heartbeat immediately.
+    # The SSE stream picks up changes within ~1 second.
 
     # Extract file paths from tool input
     tool_input = input_data.get("tool_input", {})

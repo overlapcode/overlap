@@ -3,7 +3,7 @@ import type { SessionWithDetails } from '@lib/db/types';
 import { authenticateAny, errorResponse } from '@lib/auth/middleware';
 import { getRecentActivity, markStaleSessions } from '@lib/db/queries';
 
-const POLL_INTERVAL_MS = 3000; // Poll database every 3 seconds
+const POLL_INTERVAL_MS = 1000; // Check for changes every 1 second
 const KEEPALIVE_INTERVAL_MS = 15000; // Send keepalive every 15 seconds
 const STALE_CHECK_INTERVAL_MS = 30000; // Check for stale sessions every 30 seconds
 
@@ -80,6 +80,7 @@ export async function GET(context: APIContext) {
       let lastKeepalive = Date.now();
       let lastStaleCheck = Date.now();
       let eventCounter = 0;
+      let lastChangeSignature = ''; // lightweight change detection
 
       // Polling loop
       while (isActive) {
@@ -91,7 +92,33 @@ export async function GET(context: APIContext) {
             lastStaleCheck = now;
           }
 
-          // Fetch current sessions
+          // Lightweight change check: single-row query to detect if anything changed
+          const changeCheck = await db
+            .prepare(
+              `SELECT COUNT(*) as cnt, MAX(s.last_activity_at) as latest
+               FROM sessions s
+               JOIN users u ON s.user_id = u.id
+               WHERE u.team_id = ? AND s.status IN ('active', 'stale')`
+            )
+            .bind(team.id)
+            .first<{ cnt: number; latest: string | null }>();
+
+          const sig = `${changeCheck?.cnt ?? 0}|${changeCheck?.latest ?? ''}`;
+
+          // Skip full query if nothing changed (after initial load)
+          if (sig === lastChangeSignature && knownSessions.size > 0) {
+            // No change — just send keepalive if needed
+            const nowAfterCheck = Date.now();
+            if (nowAfterCheck - lastKeepalive > KEEPALIVE_INTERVAL_MS) {
+              controller.enqueue(encoder.encode(': keepalive\n\n'));
+              lastKeepalive = nowAfterCheck;
+            }
+            await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
+            continue;
+          }
+          lastChangeSignature = sig;
+
+          // Something changed — fetch full session data
           const result = await getRecentActivity(db, team.id, { limit: 50 });
 
           // Build new snapshot
@@ -129,7 +156,7 @@ export async function GET(context: APIContext) {
             lastKeepalive = nowAfterPoll;
           }
 
-          // Wait before next poll
+          // Wait before next check
           await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
         } catch (error) {
           if (!isActive) break;
