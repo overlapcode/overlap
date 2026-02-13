@@ -22,7 +22,8 @@
     ],
     "kv_namespaces": [
       {
-        "binding": "SESSION"
+        "binding": "SESSION",
+        "name": "overlap-session"
       }
     ]
   },
