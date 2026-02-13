@@ -21,12 +21,17 @@ export async function GET(context: APIContext) {
     return errorResponse(authResult.error, authResult.status);
   }
 
-  // Parse query params
-  const url = new URL(context.request.url);
-  const startDate = url.searchParams.get('startDate') ?? undefined;
-  const endDate = url.searchParams.get('endDate') ?? undefined;
+  try {
+    // Parse query params
+    const url = new URL(context.request.url);
+    const startDate = url.searchParams.get('startDate') ?? undefined;
+    const endDate = url.searchParams.get('endDate') ?? undefined;
 
-  const stats = await getTeamStats(db, { startDate, endDate });
+    const stats = await getTeamStats(db, { startDate, endDate });
 
-  return successResponse(stats);
+    return successResponse(stats);
+  } catch (error) {
+    console.error('Stats error:', error);
+    return errorResponse('Failed to fetch stats', 500);
+  }
 }

@@ -330,7 +330,7 @@ export type SessionListOptions = {
   offset?: number;
   userId?: string;
   repoName?: string;
-  status?: 'active' | 'stale' | 'ended' | 'active_or_stale';
+  status?: 'active' | 'stale' | 'ended' | 'active_or_stale' | 'all';
   startDate?: string;
   endDate?: string;
 };
@@ -355,7 +355,9 @@ export async function getSessions(db: D1Database, options: SessionListOptions = 
     whereClause += ' AND s.repo_name = ?';
     params.push(repoName);
   }
-  if (status === 'active_or_stale') {
+  if (status === 'all') {
+    // No status filter — include all sessions
+  } else if (status === 'active_or_stale') {
     whereClause += " AND s.status IN ('active', 'stale')";
   } else {
     whereClause += ' AND s.status = ?';

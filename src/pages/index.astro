@@ -2,6 +2,7 @@
 import Layout from '@layouts/Layout.astro';
 import { Header } from '@components/Header';
 import { UpdateBanner } from '@components/UpdateBanner';
+import { LLMBanner } from '@components/LLMBanner';
 import { Timeline } from '@components/Timeline';
 import { getSessionData } from '@lib/auth/session';
 import { getTeamConfig } from '@lib/db/queries';
@@ -34,6 +35,7 @@ const isAuthenticated = !!sessionData;
 <Layout title="Timeline">
   <Header teamName={teamName} userName={isAuthenticated ? "Dashboard" : undefined} client:load />
   <UpdateBanner client:load />
+  {isAuthenticated && <LLMBanner client:load />}
 
   <main class="container" style="padding-top: var(--space-xl); padding-bottom: var(--space-xl);">
     <div style="width: 100%; max-width: 800px; margin: 0 auto;">
