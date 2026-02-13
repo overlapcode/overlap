@@ -335,20 +335,18 @@ import { Header } from '@components/Header';
       teamTokenInput.value = result.data.team_join_code;
       userTokenInput.value = result.data.user_token;
 
-      // Create a web session for the dashboard
+      // Create a web session so the admin is logged into the dashboard
       try {
         await fetch('/api/v1/auth/create-session', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            user_id: result.data.user_id,
-            user_token: result.data.user_token,
-            team_token: result.data.team_join_code,
+            password: data.dashboard_password,
           }),
         });
       } catch (sessionError) {
         console.error('Failed to create session:', sessionError);
-        // Continue anyway - user can still use the tokens
+        // Continue anyway - user can still log in manually
       }
 
       // Hide form, show success
