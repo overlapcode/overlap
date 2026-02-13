@@ -49,7 +49,7 @@ The **tracer binary** runs on your machine and parses Claude Code's local JSONL 
 
 ### 1. Deploy the Dashboard
 
-[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/overlapdev/overlap)
+[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/overlapcode/overlap)
 
 Click to deploy Overlap to your Cloudflare account. The D1 database will be created automatically.
 
@@ -105,7 +105,7 @@ Share your Overlap URL with team members. They can:
 
 ```bash
 # Clone and install
-git clone https://github.com/overlapdev/overlap
+git clone https://github.com/overlapcode/overlap
 cd overlap
 npm install
 
@@ -196,6 +196,6 @@ MIT
 
 ## Links
 
-- [GitHub](https://github.com/overlapdev/overlap)
+- [GitHub](https://github.com/overlapcode/overlap)
 - [Documentation](https://overlap.dev/docs)
 - [Overlap](https://overlap.dev)
