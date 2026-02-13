@@ -224,7 +224,7 @@ export async function generateSessionSummary(
       .all<{ file_path: string; tool_name: string }>();
 
     const files = fileOpsResult.results.map((fo) => `${fo.file_path} (${fo.tool_name})`);
-    const promptTexts = prompts.map((p) => p.prompt_text);
+    const promptTexts = prompts.map((p) => p.prompt_text).filter((t): t is string => t != null);
 
     // If no LLM configured, use first prompt as summary
     if (!teamConfig.llm_provider || !teamConfig.llm_api_key_encrypted) {
