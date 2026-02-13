@@ -516,8 +516,8 @@ export async function createFileOperation(db: D1Database, event: IngestEvent): P
 
   await db
     .prepare(
-      `INSERT INTO file_operations (session_id, user_id, repo_id, repo_name, agent_type, timestamp, tool_name, file_path, operation, bash_command)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      `INSERT INTO file_operations (session_id, user_id, repo_id, repo_name, agent_type, timestamp, tool_name, file_path, operation, start_line, end_line, function_name, bash_command)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
     .bind(
       event.session_id,
@@ -529,6 +529,9 @@ export async function createFileOperation(db: D1Database, event: IngestEvent): P
       event.tool_name ?? null,
       event.file_path ?? null,
       event.operation ?? null,
+      event.start_line ?? null,
+      event.end_line ?? null,
+      event.function_name ?? null,
       event.bash_command ?? null
     )
     .run();
@@ -617,14 +620,18 @@ export async function getSessionPrompts(db: D1Database, sessionId: string): Prom
 export async function createOverlap(db: D1Database, overlap: Omit<Overlap, 'id' | 'detected_at'>): Promise<void> {
   await db
     .prepare(
-      `INSERT INTO overlaps (type, severity, file_path, directory_path, repo_name, user_id_a, user_id_b, session_id_a, session_id_b, description)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      `INSERT INTO overlaps (type, severity, overlap_scope, file_path, directory_path, start_line, end_line, function_name, repo_name, user_id_a, user_id_b, session_id_a, session_id_b, description)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
     .bind(
       overlap.type,
       overlap.severity,
+      overlap.overlap_scope ?? 'file',
       overlap.file_path ?? null,
       overlap.directory_path ?? null,
+      overlap.start_line ?? null,
+      overlap.end_line ?? null,
+      overlap.function_name ?? null,
       overlap.repo_name,
       overlap.user_id_a,
       overlap.user_id_b,
@@ -663,16 +670,20 @@ export async function getOverlaps(
 }
 
 /**
- * Detect file overlaps: same file, same repo, different user, within 2 hours.
+ * Detect file overlaps with line/function granularity.
+ * Tiers: line overlap (high) > function overlap (high) > file overlap (warning).
  * Called after processing file_op events.
  */
 export async function detectFileOverlaps(db: D1Database, repoName: string): Promise<void> {
-  // Find file overlaps within last 24 hours
+  // Find file overlaps within last 24 hours, including line data
   const overlapsResult = await db
     .prepare(
       `SELECT fo1.user_id AS user_a, fo2.user_id AS user_b,
               fo1.file_path, fo1.repo_name,
-              fo1.session_id AS session_a, fo2.session_id AS session_b
+              fo1.session_id AS session_a, fo2.session_id AS session_b,
+              fo1.start_line AS start_a, fo1.end_line AS end_a,
+              fo2.start_line AS start_b, fo2.end_line AS end_b,
+              fo1.function_name AS fn_a, fo2.function_name AS fn_b
        FROM file_operations fo1
        JOIN file_operations fo2 ON fo1.file_path = fo2.file_path
          AND fo1.repo_name = fo2.repo_name
@@ -689,33 +700,96 @@ export async function detectFileOverlaps(db: D1Database, repoName: string): Prom
 
   for (const row of overlapsResult.results) {
     const r = row as Record<string, unknown>;
+    const startA = r.start_a as number | null;
+    const endA = r.end_a as number | null;
+    const startB = r.start_b as number | null;
+    const endB = r.end_b as number | null;
+    const fnA = r.fn_a as string | null;
+    const fnB = r.fn_b as string | null;
 
-    // Check if this overlap already exists
+    // Determine overlap scope and severity
+    let overlapScope: 'line' | 'function' | 'file' = 'file';
+    let severity: 'high' | 'warning' = 'warning';
+    let description = `Both users modified ${r.file_path} within 2 hours`;
+
+    // Check for line-level overlap (ranges intersect)
+    if (startA != null && endA != null && startB != null && endB != null) {
+      if (startA <= endB && endA >= startB) {
+        overlapScope = 'line';
+        severity = 'high';
+        description = `Both users modified overlapping lines (${startA}-${endA} vs ${startB}-${endB}) in ${r.file_path}`;
+      }
+    }
+
+    // Check for function-level overlap (same function name)
+    if (overlapScope === 'file' && fnA && fnB && fnA === fnB) {
+      overlapScope = 'function';
+      severity = 'high';
+      description = `Both users modified ${fnA}() in ${r.file_path}`;
+    }
+
+    // Check if this overlap already exists (scope-aware dedup)
     const existing = await db
       .prepare(
         `SELECT id FROM overlaps
-         WHERE type = 'file' AND file_path = ? AND repo_name = ?
+         WHERE type = 'file' AND file_path = ? AND repo_name = ? AND overlap_scope = ?
          AND ((user_id_a = ? AND user_id_b = ?) OR (user_id_a = ? AND user_id_b = ?))
          AND detected_at > datetime('now', '-24 hours')`
       )
-      .bind(r.file_path, r.repo_name, r.user_a, r.user_b, r.user_b, r.user_a)
+      .bind(r.file_path, r.repo_name, overlapScope, r.user_a, r.user_b, r.user_b, r.user_a)
       .first();
 
     if (!existing) {
       await createOverlap(db, {
         type: 'file',
-        severity: 'warning',
+        severity,
+        overlap_scope: overlapScope,
         file_path: r.file_path as string,
         directory_path: null,
+        start_line: startA,
+        end_line: endA,
+        function_name: fnA || fnB || null,
         repo_name: r.repo_name as string,
         user_id_a: r.user_a as string,
         user_id_b: r.user_b as string,
         session_id_a: r.session_a as string,
         session_id_b: r.session_b as string,
-        description: `Both users modified ${r.file_path} within 2 hours`,
+        description,
       });
     }
   }
+}
+
+/**
+ * Get active sessions with file regions for team-state endpoint.
+ */
+export async function getActiveSessionsWithRegions(db: D1Database): Promise<Record<string, unknown>[]> {
+  const result = await db
+    .prepare(
+      `SELECT
+          s.id AS session_id,
+          s.user_id,
+          m.display_name,
+          s.repo_name,
+          s.started_at,
+          s.generated_summary AS summary,
+          s.status,
+          fo.file_path,
+          fo.start_line,
+          fo.end_line,
+          fo.function_name,
+          MAX(fo.timestamp) AS last_touched_at
+       FROM sessions s
+       JOIN members m ON s.user_id = m.user_id
+       LEFT JOIN file_operations fo ON fo.session_id = s.id
+         AND fo.operation IN ('create', 'modify')
+       WHERE s.status = 'active'
+       GROUP BY s.id, fo.file_path, fo.function_name
+       ORDER BY fo.timestamp DESC`
+    )
+    .all();
+
+  return result.results;
 }
 
 // ============================================================================

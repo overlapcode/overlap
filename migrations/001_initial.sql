@@ -111,6 +111,9 @@ CREATE TABLE IF NOT EXISTS file_operations (
     tool_name TEXT,
     file_path TEXT,
     operation TEXT,
+    start_line INTEGER,
+    end_line INTEGER,
+    function_name TEXT,
     bash_command TEXT,
     created_at TEXT DEFAULT (datetime('now'))
 );
@@ -140,8 +143,12 @@ CREATE TABLE IF NOT EXISTS overlaps (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     type TEXT NOT NULL,
     severity TEXT DEFAULT 'info',
+    overlap_scope TEXT DEFAULT 'file',
     file_path TEXT,
     directory_path TEXT,
+    start_line INTEGER,
+    end_line INTEGER,
+    function_name TEXT,
     repo_name TEXT NOT NULL,
     user_id_a TEXT NOT NULL,
     user_id_b TEXT NOT NULL,
@@ -178,5 +185,6 @@ CREATE INDEX IF NOT EXISTS idx_overlaps_time ON overlaps(detected_at DESC);
 CREATE INDEX IF NOT EXISTS idx_overlaps_repo ON overlaps(repo_name, detected_at DESC);
 CREATE INDEX IF NOT EXISTS idx_members_token ON members(token_hash);
 CREATE INDEX IF NOT EXISTS idx_members_last_active ON members(last_active_at DESC);
+CREATE INDEX IF NOT EXISTS idx_file_ops_active ON file_operations(session_id, file_path, timestamp DESC);
 CREATE INDEX IF NOT EXISTS idx_web_sessions_token ON web_sessions(token_hash);
 CREATE INDEX IF NOT EXISTS idx_web_sessions_expires ON web_sessions(expires_at);

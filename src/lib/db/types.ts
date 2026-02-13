@@ -93,6 +93,9 @@ export type FileOperation = {
   tool_name: string | null;
   file_path: string | null;
   operation: 'create' | 'modify' | 'read' | 'delete' | 'execute' | 'search' | null;
+  start_line: number | null;
+  end_line: number | null;
+  function_name: string | null;
   bash_command: string | null;
   created_at: string;
 };
@@ -121,9 +124,13 @@ export type Prompt = {
 export type Overlap = {
   id: number;
   type: 'file' | 'prompt' | 'directory';
-  severity: 'info' | 'warning';
+  severity: 'info' | 'warning' | 'high';
+  overlap_scope: 'line' | 'function' | 'file' | 'directory';
   file_path: string | null;
   directory_path: string | null;
+  start_line: number | null;
+  end_line: number | null;
+  function_name: string | null;
   repo_name: string;
   user_id_a: string;
   user_id_b: string;
@@ -171,6 +178,9 @@ export type IngestEvent = {
   tool_name?: string;
   file_path?: string;
   operation?: string;
+  start_line?: number;
+  end_line?: number;
+  function_name?: string;
   bash_command?: string;
 
   // prompt only

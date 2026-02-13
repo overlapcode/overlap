@@ -46,6 +46,9 @@ const IngestEventSchema = z.object({
   tool_name: z.string().optional(),
   file_path: z.string().optional(),
   operation: z.string().optional(),
+  start_line: z.number().int().optional(),
+  end_line: z.number().int().optional(),
+  function_name: z.string().optional(),
   bash_command: z.string().optional(),
 
   // prompt only

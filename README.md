@@ -14,7 +14,8 @@ Overlap is a **JSONL tracer + self-hosted dashboard** that tracks what you and y
 ## Features
 
 - **Real-time Activity Feed** - See what everyone's working on as it happens
-- **Smart Overlap Detection** - File-level matching catches conflicts early
+- **Real-Time Coordination** - Your agent warns you before editing the same function a teammate is working on
+- **Smart Overlap Detection** - Line-level and function-level matching catches conflicts early
 - **Full History Backfill** - Sync all your historical sessions on first join
 - **LLM-Powered Summaries** - AI summarizes what you're doing (BYOK)
 - **Personal History** - Searchable timeline of all your sessions
