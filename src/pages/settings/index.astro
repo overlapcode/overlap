@@ -20,7 +20,7 @@ import { Header } from '@components/Header';
             <div>
               <h2 style="font-size: 1.125rem; margin-bottom: var(--space-xs);">My Account</h2>
               <p class="text-secondary" style="font-size: 0.875rem;">
-                View your user token and account details
+                Tracer setup instructions and instance URL
               </p>
             </div>
             <span class="text-muted" style="font-size: 1.5rem;">→</span>
@@ -33,106 +33,52 @@ import { Header } from '@components/Header';
             <div>
               <h2 style="font-size: 1.125rem; margin-bottom: var(--space-xs);">Team Settings</h2>
               <p class="text-secondary" style="font-size: 0.875rem;">
-                Manage team name, visibility, and stale session timeout
+                Team name, join code, dashboard password, and stale timeout
               </p>
             </div>
             <span class="text-muted" style="font-size: 1.5rem;">→</span>
           </div>
         </a>
 
-        <!-- LLM Settings -->
-        <a href="/settings/llm" class="card" style="text-decoration: none; color: inherit;">
-          <div style="display: flex; justify-content: space-between; align-items: center;">
-            <div>
-              <h2 style="font-size: 1.125rem; margin-bottom: var(--space-xs);">LLM Classification</h2>
-              <p class="text-secondary" style="font-size: 0.875rem;">
-                Configure AI provider for activity classification
-              </p>
-            </div>
-            <span class="text-muted" style="font-size: 1.5rem;">→</span>
-          </div>
-        </a>
-
-        <!-- Users -->
+        <!-- Team Members -->
         <a href="/settings/users" class="card" style="text-decoration: none; color: inherit;">
           <div style="display: flex; justify-content: space-between; align-items: center;">
             <div>
               <h2 style="font-size: 1.125rem; margin-bottom: var(--space-xs);">Team Members</h2>
               <p class="text-secondary" style="font-size: 0.875rem;">
-                Manage users, roles, and access
+                Add members, manage roles and access
               </p>
             </div>
             <span class="text-muted" style="font-size: 1.5rem;">→</span>
           </div>
         </a>
 
-        <!-- Repos -->
+        <!-- Repositories -->
         <a href="/settings/repos" class="card" style="text-decoration: none; color: inherit;">
           <div style="display: flex; justify-content: space-between; align-items: center;">
             <div>
               <h2 style="font-size: 1.125rem; margin-bottom: var(--space-xs);">Repositories</h2>
               <p class="text-secondary" style="font-size: 0.875rem;">
-                View and manage tracked repositories
+                Add and manage tracked repositories
               </p>
             </div>
             <span class="text-muted" style="font-size: 1.5rem;">→</span>
           </div>
         </a>
 
-        <!-- Plugin Logs (Admin only) -->
-        <a id="logs-link" href="/settings/logs" class="card" style="text-decoration: none; color: inherit; display: none;">
+        <!-- LLM Classification -->
+        <a href="/settings/llm" class="card" style="text-decoration: none; color: inherit;">
           <div style="display: flex; justify-content: space-between; align-items: center;">
-            <div style="display: flex; align-items: center; gap: var(--space-sm);">
-              <div>
-                <h2 style="font-size: 1.125rem; margin-bottom: var(--space-xs);">Tracer Logs</h2>
-                <p class="text-secondary" style="font-size: 0.875rem;">
-                  View tracer sync logs and errors for debugging
-                </p>
-              </div>
+            <div>
+              <h2 style="font-size: 1.125rem; margin-bottom: var(--space-xs);">LLM Classification</h2>
+              <p class="text-secondary" style="font-size: 0.875rem;">
+                Configure AI provider for activity summaries
+              </p>
             </div>
-            <div style="display: flex; align-items: center; gap: var(--space-sm);">
-              <span class="admin-badge">Admin</span>
-              <span class="text-muted" style="font-size: 1.5rem;">→</span>
-            </div>
+            <span class="text-muted" style="font-size: 1.5rem;">→</span>
           </div>
         </a>
       </div>
     </div>
   </main>
 </Layout>
-
-<style>
-  .admin-badge {
-    font-size: 0.65rem;
-    font-weight: 600;
-    padding: 3px 8px;
-    border-radius: 4px;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    background: rgba(255, 152, 0, 0.15);
-    color: var(--accent-orange);
-    border: 1px solid rgba(255, 152, 0, 0.3);
-  }
-</style>
-
-<script>
-  // Check if user is admin and show logs link
-  async function checkAdminAndShowLogs() {
-    try {
-      const response = await fetch('/api/v1/admin/users');
-      if (response.ok) {
-        const result = await response.json() as { data?: { is_admin: boolean } };
-        if (result.data?.is_admin) {
-          const logsLink = document.getElementById('logs-link');
-          if (logsLink) {
-            logsLink.style.display = 'block';
-          }
-        }
-      }
-    } catch {
-      // Not admin or error - keep logs link hidden
-    }
-  }
-
-  checkAdminAndShowLogs();
-</script>
