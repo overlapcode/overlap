@@ -223,9 +223,21 @@ import { Header } from '@components/Header';
 
         <div style="background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: var(--space-lg); margin-bottom: var(--space-lg);">
           <h3 style="font-size: 1rem; margin-bottom: var(--space-md);">Next Steps</h3>
-          <ol style="padding-left: var(--space-lg); color: var(--text-secondary); font-size: 0.875rem; line-height: 1.8;">
-            <li>Install the tracer: <code style="background: var(--bg-elevated); padding: 2px 6px; border-radius: 3px;">brew install overlapdev/tap/overlap</code></li>
-            <li>Join this team: <code style="background: var(--bg-elevated); padding: 2px 6px; border-radius: 3px;">overlap join <span id="origin-url"></span></code></li>
+          <ol style="padding-left: var(--space-lg); color: var(--text-secondary); font-size: 0.875rem; line-height: 2.4;">
+            <li style="margin-bottom: var(--space-sm);">
+              Install the tracer:
+              <span class="cmd-block" data-cmd="curl -fsSL https://overlap.dev/install.sh | sh" style="display: flex; align-items: center; gap: var(--space-sm); background: var(--bg-elevated); padding: 4px 8px; border-radius: 3px; margin-top: 4px; cursor: pointer;" title="Click to copy">
+                <code style="flex: 1; font-size: 0.8rem;">curl -fsSL https://overlap.dev/install.sh | sh</code>
+                <span class="cmd-copy-icon" style="color: var(--text-muted); font-size: 0.7rem; white-space: nowrap;">Copy</span>
+              </span>
+            </li>
+            <li style="margin-bottom: var(--space-sm);">
+              Join this team:
+              <span class="cmd-block" id="join-cmd-block" style="display: flex; align-items: center; gap: var(--space-sm); background: var(--bg-elevated); padding: 4px 8px; border-radius: 3px; margin-top: 4px; cursor: pointer;" title="Click to copy">
+                <code style="flex: 1; font-size: 0.8rem;">overlap join <span id="origin-url"></span></code>
+                <span class="cmd-copy-icon" style="color: var(--text-muted); font-size: 0.7rem; white-space: nowrap;">Copy</span>
+              </span>
+            </li>
             <li>Share the join code and dashboard password with your team</li>
           </ol>
         </div>
@@ -350,6 +362,24 @@ import { Header } from '@components/Header';
       submitBtn.textContent = 'Create Team';
     }
   });
+
+  // Command block click-to-copy handlers
+  document.querySelectorAll('.cmd-block').forEach((block) => {
+    block.addEventListener('click', async () => {
+      const cmd = (block as HTMLElement).dataset.cmd || (block.querySelector('code') as HTMLElement)?.textContent || '';
+      const icon = block.querySelector('.cmd-copy-icon') as HTMLElement;
+      try {
+        await navigator.clipboard.writeText(cmd);
+        if (icon) { icon.textContent = 'Copied!'; setTimeout(() => { icon.textContent = 'Copy'; }, 2000); }
+      } catch {
+        if (icon) { icon.textContent = 'Copied!'; setTimeout(() => { icon.textContent = 'Copy'; }, 2000); }
+      }
+    });
+  });
+
+  // Set the join command data-cmd attribute dynamically
+  const joinBlock = document.getElementById('join-cmd-block');
+  if (joinBlock) joinBlock.dataset.cmd = `overlap join ${window.location.origin}`;
 
   // Copy button handlers
   document.querySelectorAll('.copy-btn').forEach((btn) => {
