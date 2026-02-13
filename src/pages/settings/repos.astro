@@ -4,7 +4,7 @@ import { Header } from '@components/Header';
 ---
 
 <Layout title="Repositories">
-  <Header client:load />
+  <Header userName="Dashboard" client:load />
 
   <main class="container" style="padding-top: var(--space-xl); padding-bottom: var(--space-xl);">
     <div style="width: 100%; max-width: 700px; margin: 0 auto;">
@@ -13,10 +13,42 @@ import { Header } from '@components/Header';
         <h1 style="font-size: 1.5rem; margin: 0;">Repositories</h1>
       </div>
 
+      <!-- Add Repo Form -->
+      <div class="card" style="margin-bottom: var(--space-lg);">
+        <h3 style="font-size: 0.875rem; font-weight: 500; margin-bottom: var(--space-md);">Add Repository</h3>
+        <form id="add-repo-form" style="display: flex; gap: var(--space-sm); align-items: flex-end;">
+          <div style="flex: 1;">
+            <label for="repo-name" style="display: block; font-size: 0.75rem; color: var(--text-secondary); margin-bottom: var(--space-xs);">
+              Repository name (must match git remote basename)
+            </label>
+            <input
+              type="text"
+              id="repo-name"
+              name="name"
+              required
+              placeholder="e.g. my-project"
+              style="
+                width: 100%;
+                padding: var(--space-sm) var(--space-md);
+                background: var(--bg-elevated);
+                border: 1px solid var(--border-default);
+                border-radius: var(--radius-sm);
+                color: var(--text-primary);
+                font-family: var(--font-mono);
+                font-size: 0.875rem;
+              "
+            />
+          </div>
+          <button type="submit" class="btn btn-primary" id="add-btn" style="white-space: nowrap;">
+            Add
+          </button>
+        </form>
+        <p id="add-error" style="margin-top: var(--space-sm); font-size: 0.8rem; color: var(--accent-orange); display: none;"></p>
+        <p id="add-success" style="margin-top: var(--space-sm); font-size: 0.8rem; color: var(--accent-green); display: none;"></p>
+      </div>
+
       <div id="repos-list">
-        <div class="loading-state">
-          <img src="/loading.gif" alt="Loading" width="48" height="48" style="opacity: 0.8;" />
-        </div>
+        <div class="loading-state">Loading...</div>
       </div>
 
     </div>
@@ -42,16 +74,6 @@ import { Header } from '@components/Header';
 
   .repos-section {
     margin-bottom: 32px;
-  }
-
-  .repo-card-link {
-    text-decoration: none;
-    color: inherit;
-    display: block;
-  }
-
-  .repo-card-link:hover .repo-card {
-    border-color: var(--border-active);
   }
 
   .repo-card {
@@ -99,6 +121,29 @@ import { Header } from '@components/Header';
     white-space: nowrap;
   }
 
+  .repo-delete-btn {
+    background: none;
+    border: 1px solid var(--border-default);
+    color: var(--text-muted);
+    padding: 4px 10px;
+    border-radius: var(--radius-sm);
+    font-size: 0.75rem;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 0.15s ease;
+  }
+
+  .repo-delete-btn:hover {
+    border-color: var(--accent-orange);
+    color: var(--accent-orange);
+  }
+
+  .empty-state {
+    text-align: center;
+    padding: var(--space-xl);
+    color: var(--text-secondary);
+  }
+
   .info-box {
     margin-top: 24px;
     padding: 16px;
@@ -113,18 +158,6 @@ import { Header } from '@components/Header';
     color: var(--text-secondary);
     margin: 0;
     line-height: 1.5;
-  }
-
-  .empty-state {
-    text-align: center;
-    padding: var(--space-xl);
-    color: var(--text-secondary);
-  }
-
-  .empty-state-icon {
-    font-size: 2rem;
-    margin-bottom: var(--space-md);
-    opacity: 0.5;
   }
 
   @media (max-width: 500px) {
@@ -154,6 +187,71 @@ import { Header } from '@components/Header';
     return div.innerHTML;
   }
 
+  // Add repo form
+  const addForm = document.getElementById('add-repo-form') as HTMLFormElement;
+  const addBtn = document.getElementById('add-btn') as HTMLButtonElement;
+  const addError = document.getElementById('add-error') as HTMLParagraphElement;
+  const addSuccess = document.getElementById('add-success') as HTMLParagraphElement;
+
+  addForm?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    addError.style.display = 'none';
+    addSuccess.style.display = 'none';
+    addBtn.disabled = true;
+    addBtn.textContent = 'Adding...';
+
+    const formData = new FormData(addForm);
+    const name = (formData.get('name') as string).trim();
+
+    try {
+      const response = await fetch('/api/v1/repos', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name }),
+      });
+
+      const result = await response.json() as { data?: Repo; error?: string };
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to add repository');
+      }
+
+      addSuccess.textContent = `Added "${name}"`;
+      addSuccess.style.display = 'block';
+      addForm.reset();
+      setTimeout(() => { addSuccess.style.display = 'none'; }, 3000);
+      loadRepos();
+    } catch (error) {
+      addError.textContent = error instanceof Error ? error.message : 'Failed to add repository';
+      addError.style.display = 'block';
+    } finally {
+      addBtn.disabled = false;
+      addBtn.textContent = 'Add';
+    }
+  });
+
+  async function deleteRepo(id: string, name: string) {
+    if (!confirm(`Remove "${name}" from tracked repositories?`)) return;
+
+    try {
+      const response = await fetch(`/api/v1/admin/repos/${id}`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        const result = await response.json() as { error?: string };
+        throw new Error(result.error || 'Failed to delete repository');
+      }
+
+      loadRepos();
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'Failed to delete repository');
+    }
+  }
+
+  // Expose to onclick handlers
+  (window as any).deleteRepo = deleteRepo;
+
   async function loadRepos() {
     const container = document.getElementById('repos-list') as HTMLDivElement;
 
@@ -166,22 +264,21 @@ import { Header } from '@components/Header';
       }
 
       const repos = result.data?.repos || [];
+      const isAdmin = result.data?.is_admin ?? false;
 
       if (repos.length === 0) {
         container.innerHTML = `
           <div class="empty-state">
-            <div class="empty-state-icon">📂</div>
-            <p style="margin-bottom: var(--space-sm);">No repositories tracked yet</p>
+            <p style="margin-bottom: var(--space-sm); font-size: 1rem;">No repositories tracked yet</p>
             <p class="text-muted" style="font-size: 0.8rem;">
-              Repositories appear here automatically when team members<br>
-              start working with the tracer running.
+              Add repositories above so the tracer knows which repos to sync.<br>
+              The name must match the git remote basename (e.g. "my-project" for github.com/org/my-project).
             </p>
           </div>
         `;
         return;
       }
 
-      // Sort repos alphabetically by display name or name
       const sortedRepos = repos.sort((a, b) => {
         const aName = a.display_name || a.name;
         const bName = b.display_name || b.name;
@@ -189,12 +286,12 @@ import { Header } from '@components/Header';
       });
 
       let html = `<div class="repos-section">
-        <div class="section-header">Repositories (${sortedRepos.length})</div>
-        ${sortedRepos.map(repo => renderRepoCard(repo)).join('')}
+        <div class="section-header">Tracked Repositories (${sortedRepos.length})</div>
+        ${sortedRepos.map(repo => renderRepoCard(repo, isAdmin)).join('')}
       </div>`;
 
       html += `<div class="info-box">
-        <p>Repositories are automatically registered when team members<br>work in them with the tracer running.</p>
+        <p>The tracer matches repos by basename. Make sure the name here matches<br>the last segment of your git remote URL.</p>
       </div>`;
 
       container.innerHTML = html;
@@ -203,21 +300,25 @@ import { Header } from '@components/Header';
     }
   }
 
-  function renderRepoCard(repo: Repo): string {
+  function renderRepoCard(repo: Repo, isAdmin: boolean): string {
     const displayName = repo.display_name || repo.name;
     const safeName = escapeHtml(displayName);
+    const safeRepoName = escapeHtml(repo.name);
     const safeDescription = repo.description ? escapeHtml(repo.description) : null;
 
-    return `<a href="/repo/${repo.id}" class="repo-card-link">
-      <div class="repo-card">
-        <div class="repo-card-inner">
-          <div class="repo-details">
-            <div class="repo-name">${safeName}</div>
-            ${safeDescription ? `<div class="repo-description">${safeDescription}</div>` : `<div class="repo-url">${escapeHtml(repo.name)}</div>`}
-          </div>
+    const deleteBtn = isAdmin
+      ? `<button class="repo-delete-btn" onclick="deleteRepo('${repo.id}', '${safeRepoName}')">Remove</button>`
+      : '';
+
+    return `<div class="repo-card">
+      <div class="repo-card-inner">
+        <div class="repo-details">
+          <div class="repo-name">${safeName}</div>
+          ${safeDescription ? `<div class="repo-description">${safeDescription}</div>` : `<div class="repo-url">${safeRepoName}</div>`}
         </div>
+        ${deleteBtn}
       </div>
-    </a>`;
+    </div>`;
   }
 
   loadRepos();

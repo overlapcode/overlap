@@ -32,7 +32,7 @@ const isAuthenticated = !!sessionData;
 ---
 
 <Layout title="Timeline">
-  <Header teamName={teamName} client:load />
+  <Header teamName={teamName} userName={isAuthenticated ? "Dashboard" : undefined} client:load />
   <UpdateBanner client:load />
 
   <main class="container" style="padding-top: var(--space-xl); padding-bottom: var(--space-xl);">
