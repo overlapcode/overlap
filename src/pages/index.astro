@@ -3,13 +3,14 @@ import Layout from '@layouts/Layout.astro';
 import { Header } from '@components/Header';
 import { UpdateBanner } from '@components/UpdateBanner';
 import { Timeline } from '@components/Timeline';
-import { getSessionUser } from '@lib/auth/session';
-import { getTeam } from '@lib/db/queries';
+import { getSessionData } from '@lib/auth/session';
+import { getTeamConfig } from '@lib/db/queries';
 import { ensureMigrated } from '@lib/db/migrate';
 
 // Get session data from cookie
 let sessionData = null;
 let teamExists = false;
+let teamName = '';
 
 if (Astro.locals.runtime?.env?.DB) {
   const db = Astro.locals.runtime.env.DB;
@@ -17,22 +18,21 @@ if (Astro.locals.runtime?.env?.DB) {
   // Ensure database is migrated before querying
   await ensureMigrated(db);
 
-  sessionData = await getSessionUser(Astro.cookies, db);
+  sessionData = await getSessionData(Astro.cookies, db);
 
   // Check if a team exists (for non-authenticated visitors)
-  if (!sessionData) {
-    const team = await getTeam(db);
-    teamExists = !!team;
+  const config = await getTeamConfig(db);
+  if (config) {
+    teamExists = true;
+    teamName = config.team_name;
   }
 }
 
-const teamName = sessionData?.team.name;
-const userName = sessionData?.user.name;
 const isAuthenticated = !!sessionData;
 ---
 
 <Layout title="Timeline">
-  <Header teamName={teamName} userName={userName} client:load />
+  <Header teamName={teamName} client:load />
   <UpdateBanner client:load />
 
   <main class="container" style="padding-top: var(--space-xl); padding-bottom: var(--space-xl);">
@@ -45,7 +45,7 @@ const isAuthenticated = !!sessionData;
         <div class="card" style="text-align: center; padding: var(--space-xl);">
           <h2 style="font-size: 1.25rem; margin-bottom: var(--space-md);">Welcome to Overlap</h2>
           <p class="text-secondary" style="margin-bottom: var(--space-lg);">
-            Track what your team is working on across Claude Code sessions.
+            Track what your team is working on across coding agent sessions.
           </p>
           <div style="display: flex; gap: var(--space-md); justify-content: center;">
             <a href="/join" class="btn btn-primary">Join Team</a>
@@ -55,7 +55,7 @@ const isAuthenticated = !!sessionData;
         <div class="card" style="text-align: center; padding: var(--space-xl);">
           <h2 style="font-size: 1.25rem; margin-bottom: var(--space-md);">Welcome to Overlap</h2>
           <p class="text-secondary" style="margin-bottom: var(--space-lg);">
-            Track what your team is working on across Claude Code sessions.
+            Track what your team is working on across coding agent sessions.
           </p>
           <div style="display: flex; gap: var(--space-md); justify-content: center;">
             <a href="/setup" class="btn btn-primary">Set Up Team</a>

@@ -1,7 +1,7 @@
 {
   "name": "Overlap",
   "short_name": "Overlap",
-  "description": "See where your team's heads are at",
+  "description": "Track team activity and detect overlapping work in Claude Code sessions",
   "icons": [
     {
       "src": "/android-chrome-192x192.png",

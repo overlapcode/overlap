@@ -59,6 +59,20 @@ export function Header({ teamName, userName }: HeaderProps) {
             {userName}
           </span>
           <a
+            href="/stats"
+            className="btn btn-secondary"
+            style={{ fontSize: '0.75rem', padding: 'var(--space-xs) var(--space-sm)' }}
+          >
+            Stats
+          </a>
+          <a
+            href="/overlaps"
+            className="btn btn-secondary"
+            style={{ fontSize: '0.75rem', padding: 'var(--space-xs) var(--space-sm)' }}
+          >
+            Overlaps
+          </a>
+          <a
             href="/repos"
             className="btn btn-secondary"
             style={{ fontSize: '0.75rem', padding: 'var(--space-xs) var(--space-sm)' }}
@@ -70,7 +84,7 @@ export function Header({ teamName, userName }: HeaderProps) {
             className="btn btn-secondary"
             style={{ fontSize: '0.75rem', padding: 'var(--space-xs) var(--space-sm)' }}
           >
-            My History
+            History
           </a>
           <a
             href="/settings"

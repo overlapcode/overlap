@@ -2,13 +2,15 @@
 
 ## Project Overview
 
-Overlap is a Claude Code plugin + self-hosted Cloudflare service that:
+Overlap is a **JSONL tracer + self-hosted Cloudflare service** that:
 - Tracks what you and your team are working on across Claude Code sessions
 - Detects when multiple people are working on overlapping code areas
 - Displays a real-time timeline of team activity
 - Preserves personal work history across sessions and repos
 
 **Spec Document**: [overlap_spec.md](overlap_spec.md) - Update when implementation differs from design.
+**API Documentation**: [docs/API.md](docs/API.md) - Full API reference for tracer development.
+**Tracer Spec**: [docs/TRACER_SPEC.md](docs/TRACER_SPEC.md) - Specification for the tracer binary.
 
 ## Architecture
 
@@ -18,8 +20,15 @@ Overlap is a Claude Code plugin + self-hosted Cloudflare service that:
 | Backend | Cloudflare Pages Functions |
 | Database | Cloudflare D1 (SQLite) |
 | Real-time | Server-Sent Events (SSE) |
-| Plugin Scripts | Python 3 |
+| Tracer | Standalone binary (Go/Rust) |
 | LLM Providers | Anthropic, OpenAI, xAI, Google + heuristic fallback |
+
+### How It Works
+
+1. **Claude Code** writes JSONL logs to `~/.claude/projects/{hash}/{session}.jsonl`
+2. **Tracer binary** (`overlapdev`) parses JSONL and syncs events to server
+3. **Server** stores sessions, file operations, prompts in D1
+4. **Dashboard** displays real-time team activity timeline
 
 ## Directory Structure
 
@@ -27,21 +36,20 @@ Overlap is a Claude Code plugin + self-hosted Cloudflare service that:
 overlap/
 ├── src/
 │   ├── pages/              # Astro pages (file-based routing)
+│   │   ├── api/v1/         # Versioned API endpoints
+│   │   └── settings/       # Settings pages
 │   ├── components/         # React components (islands)
 │   ├── layouts/            # Astro layouts
 │   └── lib/
 │       ├── db/             # D1 database queries & helpers
+│       │   ├── queries.ts  # All database queries
+│       │   ├── types.ts    # TypeScript types for DB entities
+│       │   └── migrate.ts  # Auto-migration on startup
 │       ├── llm/            # LLM provider implementations
 │       ├── auth/           # Authentication utilities
 │       └── utils/          # Shared utilities
-├── functions/
-│   └── api/v1/             # Cloudflare Functions (API endpoints)
-├── plugin/
-│   ├── .claude-plugin/     # Plugin manifest ONLY (plugin.json)
-│   ├── hooks/              # hooks.json
-│   ├── scripts/            # Python hook scripts
-│   └── commands/           # Slash command .md files
-├── migrations/             # D1 SQL migrations
+├── migrations/
+│   └── 001_initial.sql     # Database schema
 ├── public/                 # Static assets
 └── wrangler.toml           # Cloudflare configuration
 ```
@@ -71,19 +79,21 @@ interface User { ... }
 ### Database (D1)
 
 - Always use prepared statements with `.bind()` - never interpolate values
-- Access in API functions: `context.env.DB`
+- Access in API functions: `context.locals.runtime.env.DB`
 - Access in Astro pages: `Astro.locals.runtime.env.DB`
 - Batch related queries with `db.batch()` for performance
 
 ```typescript
 // Good
-const user = await db.prepare('SELECT * FROM users WHERE id = ?').bind(userId).first();
+const user = await db.prepare('SELECT * FROM members WHERE user_id = ?').bind(userId).first();
 
 // Bad - SQL injection risk
-const user = await db.prepare(`SELECT * FROM users WHERE id = '${userId}'`).first();
+const user = await db.prepare(`SELECT * FROM members WHERE user_id = '${userId}'`).first();
 ```
 
 ### API Responses
+
+All API endpoints are versioned under `/api/v1/`.
 
 Consistent JSON shape for all endpoints:
 
@@ -134,7 +144,7 @@ Provider files in `src/lib/llm/`:
 
 ```typescript
 // API endpoints - wrap in try/catch, return structured errors
-export async function onRequestPost(context) {
+export async function POST(context: APIContext) {
   try {
     // ... logic
     return Response.json({ data: result });
@@ -148,14 +158,6 @@ export async function onRequestPost(context) {
     return Response.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
-
-// Use custom error classes for known error types
-class ValidationError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = 'ValidationError';
-  }
-}
 ```
 
 ### React Components
@@ -167,13 +169,11 @@ class ValidationError extends Error {
 
 type ActivityCardProps = {
   session: Session;
-  user: User;
+  member: Member;
   onSelect?: (sessionId: string) => void;
 };
 
-export function ActivityCard({ session, user, onSelect }: ActivityCardProps) {
-  // Destructure props at top
-  // Event handlers prefixed with "handle"
+export function ActivityCard({ session, member, onSelect }: ActivityCardProps) {
   const handleClick = () => onSelect?.(session.id);
 
   return (
@@ -215,25 +215,24 @@ export function createSSEStream(controller: ReadableStreamDefaultController) {
 
 ## Git Commit Messages
 
-When creating commits, use concise commit messages without the Claude attribution footer. Just write the commit message itself:
+When creating commits, use concise commit messages without the Claude attribution footer:
 
 ```bash
 git commit -m "Fix mobile responsive layout for dashboard"
 ```
 
 Do NOT include:
-- "🤖 Generated with Claude Code" footer
+- "Generated with Claude Code" footer
 - "Co-Authored-By: Claude" lines
-```
 
 ## Pre-Commit: Version Bump Check
 
 **Before every commit**, evaluate whether the changes warrant a version bump:
 
-**Bump version (update all 3 locations) when:**
+**Bump version (update all 2 locations) when:**
 - New features, pages, or API endpoints
 - Bug fixes that affect user-facing behavior
-- Plugin script changes (users need to update)
+- Database schema changes
 - Any change that users would want to sync their fork to get
 
 **Skip version bump when:**
@@ -241,10 +240,9 @@ Do NOT include:
 - Dev tooling or config changes that don't affect the deployed product
 - Refactors with no user-visible behavior change
 
-When bumping, update all three locations in a single commit titled "Bump version to X.Y.Z":
+When bumping, update both locations in a single commit titled "Bump version to X.Y.Z":
 1. `package.json` → `version` field
 2. `src/lib/version.ts` → `VERSION` constant
-3. `plugin/.claude-plugin/plugin.json` → `version` field
 
 ## Common Commands
 
@@ -270,10 +268,6 @@ npm run build
 # Deploy to Cloudflare
 wrangler pages deploy dist
 
-# Test a hook script manually
-echo '{"hook_event_name":"SessionStart","source":"startup","session_id":"test"}' | \
-  python3 plugin/scripts/session-start.py
-
 # Clean up Cloudflare (delete all resources for fresh deploy)
 npx wrangler delete --name overlap          # Delete worker
 npx wrangler d1 delete overlap-db -y        # Delete D1 database
@@ -288,8 +282,6 @@ When user says "clean up Cloudflare", delete ALL these resources so they can do 
 1. **Worker**: `npx wrangler delete --name overlap`
 2. **D1 Database**: `npx wrangler d1 delete overlap-db -y`
 3. **KV Namespaces**: List with `npx wrangler kv namespace list`, then delete each with `npx wrangler kv namespace delete --namespace-id <id>`
-
-The KV namespaces are typically named `overlap` and `overlap-session`.
 
 ## Environment Variables
 
@@ -310,35 +302,18 @@ database_name = "overlap-db"
 database_id = "your-database-id"
 ```
 
-## Testing Hooks Locally
-
-```bash
-# SessionStart
-echo '{"hook_event_name":"SessionStart","source":"startup","session_id":"abc123","cwd":"/path/to/project"}' | \
-  python3 plugin/scripts/session-start.py
-
-# PreToolUse (conflict check)
-echo '{"hook_event_name":"PreToolUse","tool_name":"Edit","tool_input":{"file_path":"src/auth/oauth.ts"}}' | \
-  python3 plugin/scripts/conflict-check.py
-
-# PostToolUse (heartbeat)
-echo '{"hook_event_name":"PostToolUse","tool_name":"Write","tool_input":{"file_path":"src/api/users.ts"}}' | \
-  python3 plugin/scripts/heartbeat.py
-```
-
 ## Versioning & Updates
 
 ### Critical: User Deployments Depend On This Repo
 
 Users deploy Overlap by:
 1. Clicking Deploy to Cloudflare button → forks this repo
-2. Installing plugin via `/plugin marketplace add overlapcode/overlap`
+2. Installing tracer binary (`brew install overlapdev/tap/overlap`)
 
 **When you push to main, users can sync their fork to get updates.** This means:
 - Breaking changes can break ALL user deployments
 - Database schema changes need migration support
-- API changes must be backward compatible (or versioned)
-- Plugin changes must work with older server versions
+- API changes must be backward compatible (or versioned under `/api/v2/`)
 
 ### Version Locations (Keep In Sync)
 
@@ -346,9 +321,8 @@ Users deploy Overlap by:
 |------|----------|---------|
 | `package.json` | `version` field | NPM version |
 | `src/lib/version.ts` | `VERSION` constant | Used by API and footer |
-| `plugin/.claude-plugin/plugin.json` | `version` field | Plugin version |
 
-**Always update all three when releasing.**
+**Always update both when releasing.**
 
 ### Database Migrations
 
@@ -384,49 +358,38 @@ The database auto-migrates via `src/lib/db/migrate.ts` using `CREATE TABLE IF NO
 
 If you must make breaking changes, create a new API version (`/api/v2/`).
 
-### Plugin Compatibility
-
-The plugin calls the server API. Ensure:
-- Plugin works with servers running older versions
-- Server works with older plugin versions
-- Gracefully handle missing endpoints (check response, don't crash)
-
 ### Release Checklist
 
 Before pushing significant changes:
-1. [ ] Update version in all 3 locations
+1. [ ] Update version in both locations
 2. [ ] Test with fresh deployment (new D1 database)
 3. [ ] Test upgrade path (existing D1 database)
-4. [ ] Ensure plugin works with old server
+4. [ ] Update docs/API.md if API changed
 5. [ ] Update CHANGELOG.md if exists
 
 ### How Users Update
-
-**Plugin:**
-```
-/plugin update overlap@overlapcode-overlap
-```
 
 **Cloudflare Service (Dashboard + API):**
 1. Go to their fork on GitHub
 2. Click "Sync fork" → "Update branch"
 3. Cloudflare auto-deploys from the synced fork
 
-The dashboard and API are the SAME deployment - they update together.
+**Tracer Binary:**
+```bash
+brew upgrade overlapdev/tap/overlap
+```
 
 ## Don't Do
 
 - Don't use `any` type - use `unknown` and narrow
 - Don't store raw API keys in D1 - always use `llm_api_key_encrypted`
 - Don't use `fetch` for D1 - use the binding API
-- Don't put commands/hooks/skills inside `.claude-plugin/` - only `plugin.json` goes there
-- Don't use jq in hook scripts - we use Python for JSON
 - Don't add Co-Authored-By or Claude attribution to commits
 - Don't create feature branches - commit to main
 - Don't interpolate user input into SQL - use prepared statements
 - Don't make breaking API changes without versioning (see Versioning section)
 - Don't drop or rename database columns/tables
-- Don't change version in one place without updating all three locations
+- Don't change version in one place without updating both locations
 
 ## External Documentation
 
@@ -439,9 +402,9 @@ The dashboard and API are the SAME deployment - they update together.
 - [Astro Docs](https://docs.astro.build/)
 - [Cloudflare Adapter](https://docs.astro.build/en/guides/integrations-guide/cloudflare/)
 
-### Claude Code
+### Claude Code JSONL Format
 - [Hooks Reference](https://docs.anthropic.com/en/docs/claude-code/hooks)
-- [Plugins Guide](https://docs.anthropic.com/en/docs/claude-code/plugins)
+- JSONL files at `~/.claude/projects/{hash}/{session}.jsonl`
 
 ### LLM APIs
 - [Anthropic API](https://docs.anthropic.com/en/api/)

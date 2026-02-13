@@ -2,7 +2,8 @@
 import Layout from '@layouts/Layout.astro';
 import { Header } from '@components/Header';
 import { RepoActivity } from '@components/RepoActivity';
-import { getSessionUser } from '@lib/auth/session';
+import { getSessionData } from '@lib/auth/session';
+import { getRepoById } from '@lib/db/queries';
 import { ensureMigrated } from '@lib/db/migrate';
 
 let sessionData = null;
@@ -12,16 +13,12 @@ const repoId = Astro.params.id;
 if (Astro.locals.runtime?.env?.DB) {
   const db = Astro.locals.runtime.env.DB;
   await ensureMigrated(db);
-  sessionData = await getSessionUser(Astro.cookies, db);
+  sessionData = await getSessionData(Astro.cookies, db);
 
   if (sessionData && repoId) {
-    const repo = await db
-      .prepare('SELECT name FROM repos WHERE id = ? AND team_id = ?')
-      .bind(repoId, sessionData.team.id)
-      .first<{ name: string }>();
-
+    const repo = await getRepoById(db, repoId);
     if (repo) {
-      repoName = repo.name;
+      repoName = repo.display_name || repo.name;
     } else {
       return Astro.redirect('/repos');
     }
@@ -32,12 +29,11 @@ if (!sessionData) {
   return Astro.redirect('/');
 }
 
-const teamName = sessionData.team.name;
-const userName = sessionData.user.name;
+const teamName = sessionData.teamName;
 ---
 
 <Layout title={repoName}>
-  <Header teamName={teamName} userName={userName} client:load />
+  <Header teamName={teamName} client:load />
 
   <main class="container" style="padding-top: var(--space-xl); padding-bottom: var(--space-xl);">
     <div style="width: 100%; max-width: 800px; margin: 0 auto;">

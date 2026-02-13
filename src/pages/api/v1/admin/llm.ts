@@ -1,7 +1,7 @@
 import type { APIContext } from 'astro';
 import { z } from 'zod';
 import { authenticateAny, requireAdmin, isAdmin, errorResponse, successResponse } from '@lib/auth/middleware';
-import { updateTeamSettings, getTeam } from '@lib/db/queries';
+import { updateTeamConfig, getTeamConfig } from '@lib/db/queries';
 import { encrypt } from '@lib/utils/crypto';
 
 const UpdateLLMSchema = z.object({
@@ -22,15 +22,15 @@ export async function GET(context: APIContext) {
   }
 
   try {
-    const team = await getTeam(db);
-    if (!team) {
-      return errorResponse('Team not found', 404);
+    const config = await getTeamConfig(db);
+    if (!config) {
+      return errorResponse('Team not configured', 404);
     }
 
     return successResponse({
-      provider: team.llm_provider,
-      model: team.llm_model,
-      has_api_key: !!team.llm_api_key_encrypted,
+      provider: config.llm_provider,
+      model: config.llm_model,
+      has_api_key: !!config.llm_api_key_encrypted,
       is_admin: isAdmin(authResult.context),
     });
   } catch (error) {
@@ -55,8 +55,6 @@ export async function PUT(context: APIContext) {
   if (!adminCheck.success) {
     return errorResponse(adminCheck.error, adminCheck.status);
   }
-
-  const { team } = authResult.context;
 
   // Parse body
   let body: unknown;
@@ -83,7 +81,7 @@ export async function PUT(context: APIContext) {
       encryptedApiKey = await encrypt(input.api_key, encryptionKey);
     }
 
-    await updateTeamSettings(db, team.id, {
+    await updateTeamConfig(db, {
       llm_provider: input.provider,
       llm_model: input.model ?? null,
       llm_api_key_encrypted: encryptedApiKey,

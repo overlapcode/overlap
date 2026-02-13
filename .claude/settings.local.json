@@ -1,5 +1,9 @@
 {
   "enabledPlugins": {
-    "overlap@overlap": true
+  },
+  "permissions": {
+    "allow": [
+      "Bash(npm run build:*)"
+    ]
   }
 }

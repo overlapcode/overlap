@@ -37,3 +37,5 @@ __pycache__/
 *.pyo
 
 overlap_spec.md
+task.md
+docs/

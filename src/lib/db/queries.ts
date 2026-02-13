@@ -1,56 +1,64 @@
 import type { D1Database } from '@cloudflare/workers-types';
 import type {
-  Team,
-  User,
-  Device,
+  TeamConfig,
   Repo,
+  Member,
   Session,
-  Activity,
-  ParsedActivity,
-  SessionWithDetails,
-  PluginLog,
-  PluginLogWithUser,
+  FileOperation,
+  Prompt,
+  Overlap,
+  WebSession,
+  SessionWithMember,
+  SessionDetail,
+  TeamStats,
+  OverlapWithMembers,
+  IngestEvent,
 } from './types';
 
-function safeParseFiles(raw: string): string[] {
-  try {
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
-}
-
 // ============================================================================
-// TEAM QUERIES
+// TEAM CONFIG QUERIES
 // ============================================================================
 
-export async function getTeam(db: D1Database): Promise<Team | null> {
-  // Single-tenant: there's only one team per deployment
-  return db.prepare('SELECT * FROM teams LIMIT 1').first<Team>();
+export async function getTeamConfig(db: D1Database): Promise<TeamConfig | null> {
+  return db.prepare('SELECT * FROM team_config WHERE id = 1').first<TeamConfig>();
 }
 
-export async function createTeam(
+export async function createTeamConfig(
   db: D1Database,
-  data: Pick<Team, 'id' | 'name' | 'team_token' | 'dashboard_password_hash'>
+  data: Pick<TeamConfig, 'team_name' | 'password_hash' | 'team_join_code'>
 ): Promise<void> {
   await db
     .prepare(
-      `INSERT INTO teams (id, name, team_token, dashboard_password_hash)
-       VALUES (?, ?, ?, ?)`
+      `INSERT INTO team_config (id, team_name, password_hash, team_join_code)
+       VALUES (1, ?, ?, ?)`
     )
-    .bind(data.id, data.name, data.team_token, data.dashboard_password_hash)
+    .bind(data.team_name, data.password_hash, data.team_join_code)
     .run();
 }
 
-export async function updateTeamSettings(
+export async function updateTeamConfig(
   db: D1Database,
-  teamId: string,
-  settings: Partial<Pick<Team, 'llm_provider' | 'llm_model' | 'llm_api_key_encrypted' | 'stale_timeout_hours' | 'is_public'>>
+  settings: Partial<Omit<TeamConfig, 'id' | 'created_at'>>
 ): Promise<void> {
   const updates: string[] = [];
   const values: unknown[] = [];
 
+  if (settings.team_name !== undefined) {
+    updates.push('team_name = ?');
+    values.push(settings.team_name);
+  }
+  if (settings.password_hash !== undefined) {
+    updates.push('password_hash = ?');
+    values.push(settings.password_hash);
+  }
+  if (settings.team_join_code !== undefined) {
+    updates.push('team_join_code = ?');
+    values.push(settings.team_join_code);
+  }
+  if (settings.stale_timeout_hours !== undefined) {
+    updates.push('stale_timeout_hours = ?');
+    values.push(settings.stale_timeout_hours);
+  }
   if (settings.llm_provider !== undefined) {
     updates.push('llm_provider = ?');
     values.push(settings.llm_provider);
@@ -63,574 +71,295 @@ export async function updateTeamSettings(
     updates.push('llm_api_key_encrypted = ?');
     values.push(settings.llm_api_key_encrypted);
   }
-  if (settings.stale_timeout_hours !== undefined) {
-    updates.push('stale_timeout_hours = ?');
-    values.push(settings.stale_timeout_hours);
-  }
-  if (settings.is_public !== undefined) {
-    updates.push('is_public = ?');
-    values.push(settings.is_public);
-  }
 
   if (updates.length === 0) return;
 
-  updates.push("updated_at = datetime('now')");
-  values.push(teamId);
-
   await db
-    .prepare(`UPDATE teams SET ${updates.join(', ')} WHERE id = ?`)
+    .prepare(`UPDATE team_config SET ${updates.join(', ')} WHERE id = 1`)
     .bind(...values)
     .run();
-}
-
-// ============================================================================
-// USER QUERIES
-// ============================================================================
-
-export async function getUserByToken(db: D1Database, userToken: string): Promise<User | null> {
-  return db.prepare('SELECT * FROM users WHERE user_token = ?').bind(userToken).first<User>();
-}
-
-export async function getUserById(db: D1Database, userId: string): Promise<User | null> {
-  return db.prepare('SELECT * FROM users WHERE id = ?').bind(userId).first<User>();
-}
-
-export async function getTeamUsers(db: D1Database, teamId: string): Promise<User[]> {
-  const result = await db
-    .prepare('SELECT * FROM users WHERE team_id = ? AND is_active = 1 ORDER BY name')
-    .bind(teamId)
-    .all<User>();
-  return result.results;
-}
-
-export async function createUser(
-  db: D1Database,
-  data: Pick<User, 'id' | 'team_id' | 'user_token' | 'name' | 'email' | 'role'>
-): Promise<void> {
-  await db
-    .prepare(
-      `INSERT INTO users (id, team_id, user_token, name, email, role)
-       VALUES (?, ?, ?, ?, ?, ?)`
-    )
-    .bind(data.id, data.team_id, data.user_token, data.name, data.email, data.role)
-    .run();
-}
-
-export async function updateUserRole(db: D1Database, userId: string, role: 'admin' | 'member'): Promise<void> {
-  await db
-    .prepare("UPDATE users SET role = ?, updated_at = datetime('now') WHERE id = ?")
-    .bind(role, userId)
-    .run();
-}
-
-export async function deleteUser(db: D1Database, userId: string): Promise<void> {
-  // Delete related data first (due to foreign key constraints), batched for atomicity
-  await db.batch([
-    db.prepare('DELETE FROM web_sessions WHERE user_id = ?').bind(userId),
-    db.prepare('DELETE FROM magic_links WHERE user_id = ?').bind(userId),
-    db.prepare('DELETE FROM activity WHERE session_id IN (SELECT id FROM sessions WHERE user_id = ?)').bind(userId),
-    db.prepare('DELETE FROM sessions WHERE user_id = ?').bind(userId),
-    db.prepare('DELETE FROM devices WHERE user_id = ?').bind(userId),
-    db.prepare('DELETE FROM users WHERE id = ?').bind(userId),
-  ]);
-}
-
-// ============================================================================
-// DEVICE QUERIES
-// ============================================================================
-
-export async function getOrCreateDevice(
-  db: D1Database,
-  userId: string,
-  hostname: string,
-  isRemote: boolean,
-  name: string
-): Promise<Device> {
-  // Try to find existing device
-  const existing = await db
-    .prepare('SELECT * FROM devices WHERE user_id = ? AND hostname = ? AND is_remote = ?')
-    .bind(userId, hostname, isRemote ? 1 : 0)
-    .first<Device>();
-
-  if (existing) {
-    // Update last seen
-    await db
-      .prepare("UPDATE devices SET last_seen_at = datetime('now'), name = ? WHERE id = ?")
-      .bind(name, existing.id)
-      .run();
-    return { ...existing, last_seen_at: new Date().toISOString(), name };
-  }
-
-  // Create new device
-  const id = crypto.randomUUID();
-  await db
-    .prepare(
-      `INSERT INTO devices (id, user_id, name, hostname, is_remote, last_seen_at)
-       VALUES (?, ?, ?, ?, ?, datetime('now'))`
-    )
-    .bind(id, userId, name, hostname, isRemote ? 1 : 0)
-    .run();
-
-  return db.prepare('SELECT * FROM devices WHERE id = ?').bind(id).first<Device>() as Promise<Device>;
 }
 
 // ============================================================================
 // REPO QUERIES
 // ============================================================================
 
-export async function getOrCreateRepo(
+export async function getRepoById(db: D1Database, id: string): Promise<Repo | null> {
+  return db.prepare('SELECT * FROM repos WHERE id = ?').bind(id).first<Repo>();
+}
+
+export async function getRepoByName(db: D1Database, name: string): Promise<Repo | null> {
+  return db.prepare('SELECT * FROM repos WHERE name = ?').bind(name).first<Repo>();
+}
+
+export async function getAllRepos(db: D1Database): Promise<Repo[]> {
+  const result = await db.prepare('SELECT * FROM repos ORDER BY name').all<Repo>();
+  return result.results;
+}
+
+export async function createRepo(
   db: D1Database,
-  teamId: string,
-  remoteUrl: string | null,
-  name: string
+  data: Pick<Repo, 'id' | 'name'> & Partial<Pick<Repo, 'display_name' | 'description'>>
 ): Promise<Repo> {
-  if (remoteUrl) {
-    // Try to find by remote URL
-    const existing = await db
-      .prepare('SELECT * FROM repos WHERE team_id = ? AND remote_url = ?')
-      .bind(teamId, remoteUrl)
-      .first<Repo>();
-
-    if (existing) return existing;
-  }
-
-  // Create new repo
-  const id = crypto.randomUUID();
-  const repoToken = crypto.randomUUID();
-
   await db
     .prepare(
-      `INSERT INTO repos (id, team_id, name, remote_url, repo_token)
-       VALUES (?, ?, ?, ?, ?)`
+      `INSERT INTO repos (id, name, display_name, description)
+       VALUES (?, ?, ?, ?)`
     )
-    .bind(id, teamId, name, remoteUrl, repoToken)
+    .bind(data.id, data.name, data.display_name ?? null, data.description ?? null)
     .run();
 
-  return db.prepare('SELECT * FROM repos WHERE id = ?').bind(id).first<Repo>() as Promise<Repo>;
+  return db.prepare('SELECT * FROM repos WHERE id = ?').bind(data.id).first<Repo>() as Promise<Repo>;
 }
 
-export async function getTeamRepos(db: D1Database, teamId: string): Promise<Repo[]> {
-  const result = await db
-    .prepare('SELECT * FROM repos WHERE team_id = ? ORDER BY name')
-    .bind(teamId)
-    .all<Repo>();
+export async function updateRepo(
+  db: D1Database,
+  id: string,
+  updates: Partial<Pick<Repo, 'name' | 'display_name' | 'description'>>
+): Promise<void> {
+  const fields: string[] = [];
+  const values: unknown[] = [];
+
+  if (updates.name !== undefined) {
+    fields.push('name = ?');
+    values.push(updates.name);
+  }
+  if (updates.display_name !== undefined) {
+    fields.push('display_name = ?');
+    values.push(updates.display_name);
+  }
+  if (updates.description !== undefined) {
+    fields.push('description = ?');
+    values.push(updates.description);
+  }
+
+  if (fields.length === 0) return;
+
+  values.push(id);
+  await db.prepare(`UPDATE repos SET ${fields.join(', ')} WHERE id = ?`).bind(...values).run();
+}
+
+export async function deleteRepo(db: D1Database, id: string): Promise<void> {
+  await db.prepare('DELETE FROM repos WHERE id = ?').bind(id).run();
+}
+
+// ============================================================================
+// MEMBER QUERIES
+// ============================================================================
+
+export async function getMemberById(db: D1Database, userId: string): Promise<Member | null> {
+  return db.prepare('SELECT * FROM members WHERE user_id = ?').bind(userId).first<Member>();
+}
+
+export async function getMemberByTokenHash(db: D1Database, tokenHash: string): Promise<Member | null> {
+  return db.prepare('SELECT * FROM members WHERE token_hash = ?').bind(tokenHash).first<Member>();
+}
+
+export async function getAllMembers(db: D1Database): Promise<Member[]> {
+  const result = await db.prepare('SELECT * FROM members ORDER BY display_name').all<Member>();
   return result.results;
 }
 
-export async function getUserRepos(db: D1Database, teamId: string, userId: string): Promise<Repo[]> {
-  // Get repos where the user has at least one session
-  const result = await db
+export async function createMember(
+  db: D1Database,
+  data: Pick<Member, 'user_id' | 'display_name' | 'token_hash' | 'role'> & Partial<Pick<Member, 'email'>>
+): Promise<Member> {
+  await db
     .prepare(
-      `SELECT DISTINCT r.*
-       FROM repos r
-       JOIN sessions s ON s.repo_id = r.id
-       WHERE r.team_id = ? AND s.user_id = ?
-       ORDER BY r.name`
+      `INSERT INTO members (user_id, display_name, email, token_hash, role)
+       VALUES (?, ?, ?, ?, ?)`
     )
-    .bind(teamId, userId)
-    .all<Repo>();
-  return result.results;
+    .bind(data.user_id, data.display_name, data.email ?? null, data.token_hash, data.role)
+    .run();
+
+  return db.prepare('SELECT * FROM members WHERE user_id = ?').bind(data.user_id).first<Member>() as Promise<Member>;
+}
+
+export async function updateMember(
+  db: D1Database,
+  userId: string,
+  updates: Partial<Pick<Member, 'display_name' | 'email' | 'role' | 'token_hash'>>
+): Promise<void> {
+  const fields: string[] = [];
+  const values: unknown[] = [];
+
+  if (updates.display_name !== undefined) {
+    fields.push('display_name = ?');
+    values.push(updates.display_name);
+  }
+  if (updates.email !== undefined) {
+    fields.push('email = ?');
+    values.push(updates.email);
+  }
+  if (updates.role !== undefined) {
+    fields.push('role = ?');
+    values.push(updates.role);
+  }
+  if (updates.token_hash !== undefined) {
+    fields.push('token_hash = ?');
+    values.push(updates.token_hash);
+  }
+
+  if (fields.length === 0) return;
+
+  values.push(userId);
+  await db.prepare(`UPDATE members SET ${fields.join(', ')} WHERE user_id = ?`).bind(...values).run();
+}
+
+export async function updateMemberLastActive(db: D1Database, userId: string): Promise<void> {
+  await db
+    .prepare("UPDATE members SET last_active_at = datetime('now') WHERE user_id = ?")
+    .bind(userId)
+    .run();
+}
+
+export async function deleteMember(db: D1Database, userId: string): Promise<void> {
+  // Delete related data first (foreign key constraints)
+  await db.batch([
+    db.prepare('DELETE FROM prompts WHERE user_id = ?').bind(userId),
+    db.prepare('DELETE FROM file_operations WHERE user_id = ?').bind(userId),
+    db.prepare('DELETE FROM sessions WHERE user_id = ?').bind(userId),
+    db.prepare('DELETE FROM members WHERE user_id = ?').bind(userId),
+  ]);
 }
 
 // ============================================================================
 // SESSION QUERIES
 // ============================================================================
 
-export async function createSession(
-  db: D1Database,
-  data: Pick<Session, 'id' | 'user_id' | 'device_id' | 'repo_id' | 'branch' | 'worktree'>
-): Promise<Session> {
-  await db
-    .prepare(
-      `INSERT INTO sessions (id, user_id, device_id, repo_id, branch, worktree)
-       VALUES (?, ?, ?, ?, ?, ?)`
-    )
-    .bind(data.id, data.user_id, data.device_id, data.repo_id, data.branch, data.worktree)
-    .run();
-
-  return db.prepare('SELECT * FROM sessions WHERE id = ?').bind(data.id).first<Session>() as Promise<Session>;
+export async function getSessionById(db: D1Database, id: string): Promise<Session | null> {
+  return db.prepare('SELECT * FROM sessions WHERE id = ?').bind(id).first<Session>();
 }
 
-export async function updateSessionActivity(db: D1Database, sessionId: string): Promise<void> {
+export async function createSession(db: D1Database, event: IngestEvent): Promise<Session> {
+  // Look up repo_id by name
+  const repo = await getRepoByName(db, event.repo_name);
+
   await db
-    .prepare("UPDATE sessions SET last_activity_at = datetime('now'), status = 'active', ended_at = NULL WHERE id = ?")
+    .prepare(
+      `INSERT INTO sessions (id, user_id, repo_id, repo_name, agent_type, agent_version, cwd, git_branch, model, hostname, device_name, is_remote, started_at, status)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active')`
+    )
+    .bind(
+      event.session_id,
+      event.user_id,
+      repo?.id ?? null,
+      event.repo_name,
+      event.agent_type,
+      event.agent_version ?? null,
+      event.cwd ?? null,
+      event.git_branch ?? null,
+      event.model ?? null,
+      event.hostname ?? null,
+      event.device_name ?? null,
+      event.is_remote ? 1 : 0,
+      event.timestamp
+    )
+    .run();
+
+  return db.prepare('SELECT * FROM sessions WHERE id = ?').bind(event.session_id).first<Session>() as Promise<Session>;
+}
+
+export async function updateSessionOnEnd(db: D1Database, event: IngestEvent): Promise<void> {
+  await db
+    .prepare(
+      `UPDATE sessions SET
+        status = 'ended',
+        ended_at = ?,
+        total_cost_usd = ?,
+        duration_ms = ?,
+        num_turns = COALESCE(?, num_turns),
+        total_input_tokens = ?,
+        total_output_tokens = ?,
+        cache_creation_tokens = ?,
+        cache_read_tokens = ?,
+        result_summary = ?
+       WHERE id = ?`
+    )
+    .bind(
+      event.timestamp,
+      event.total_cost_usd ?? null,
+      event.duration_ms ?? null,
+      event.num_turns ?? null,
+      event.total_input_tokens ?? null,
+      event.total_output_tokens ?? null,
+      event.cache_creation_tokens ?? null,
+      event.cache_read_tokens ?? null,
+      event.result_summary ?? null,
+      event.session_id
+    )
+    .run();
+}
+
+export async function updateSessionSummary(db: D1Database, sessionId: string, summary: string): Promise<void> {
+  await db
+    .prepare(
+      `UPDATE sessions SET generated_summary = ?, summary_event_count = 0 WHERE id = ?`
+    )
+    .bind(summary, sessionId)
+    .run();
+}
+
+export async function incrementSessionEventCount(db: D1Database, sessionId: string): Promise<number> {
+  await db
+    .prepare(`UPDATE sessions SET summary_event_count = summary_event_count + 1 WHERE id = ?`)
+    .bind(sessionId)
+    .run();
+
+  const session = await db
+    .prepare('SELECT summary_event_count FROM sessions WHERE id = ?')
+    .bind(sessionId)
+    .first<{ summary_event_count: number }>();
+
+  return session?.summary_event_count ?? 0;
+}
+
+export async function reactivateSession(db: D1Database, sessionId: string): Promise<void> {
+  await db
+    .prepare(`UPDATE sessions SET status = 'active', ended_at = NULL WHERE id = ?`)
     .bind(sessionId)
     .run();
 }
 
-export async function endSession(db: D1Database, sessionId: string): Promise<void> {
-  await db
-    .prepare("UPDATE sessions SET status = 'ended', ended_at = datetime('now') WHERE id = ?")
-    .bind(sessionId)
-    .run();
-}
-
-export async function getActiveSessionsForUser(db: D1Database, userId: string): Promise<Session[]> {
-  const result = await db
-    .prepare("SELECT * FROM sessions WHERE user_id = ? AND status = 'active' ORDER BY last_activity_at DESC")
-    .bind(userId)
-    .all<Session>();
-  return result.results;
-}
-
-export async function getSessionById(db: D1Database, sessionId: string): Promise<Session | null> {
-  return db.prepare('SELECT * FROM sessions WHERE id = ?').bind(sessionId).first<Session>();
-}
-
 // ============================================================================
-// ACTIVITY QUERIES
+// SESSION LIST QUERIES
 // ============================================================================
 
-export async function createActivity(
-  db: D1Database,
-  data: Pick<Activity, 'id' | 'session_id' | 'files' | 'semantic_scope' | 'summary'>
-): Promise<Activity> {
-  const insertStmt = db
-    .prepare(
-      `INSERT INTO activity (id, session_id, files, semantic_scope, summary)
-       VALUES (?, ?, ?, ?, ?)`
-    )
-    .bind(data.id, data.session_id, data.files, data.semantic_scope, data.summary);
-
-  // Reactivate session: set active, update timestamp, clear ended_at (handles stale/ended → active)
-  const updateStmt = db
-    .prepare(
-      "UPDATE sessions SET last_activity_at = datetime('now'), status = 'active', ended_at = NULL WHERE id = ?"
-    )
-    .bind(data.session_id);
-
-  await db.batch([insertStmt, updateStmt]);
-
-  return db.prepare('SELECT * FROM activity WHERE id = ?').bind(data.id).first<Activity>() as Promise<Activity>;
-}
+export type SessionListOptions = {
+  limit?: number;
+  offset?: number;
+  userId?: string;
+  repoName?: string;
+  status?: 'active' | 'stale' | 'ended' | 'active_or_stale';
+  startDate?: string;
+  endDate?: string;
+};
 
 export type PaginatedSessions = {
-  sessions: SessionWithDetails[];
+  sessions: SessionWithMember[];
   total: number;
-  limit: number;
-  offset: number;
   hasMore: boolean;
 };
 
-export async function getRecentActivity(
-  db: D1Database,
-  teamId: string,
-  options: {
-    limit?: number;
-    offset?: number;
-    includeStale?: boolean;
-  } = {}
-): Promise<PaginatedSessions> {
-  const { limit = 20, offset = 0, includeStale = true } = options;
+export async function getSessions(db: D1Database, options: SessionListOptions = {}): Promise<PaginatedSessions> {
+  const { limit = 20, offset = 0, userId, repoName, status = 'active_or_stale', startDate, endDate } = options;
 
-  const statusA = 'active';
-  const statusB = includeStale ? 'stale' : 'active';
-
-  // Get total count
-  const countResult = await db
-    .prepare(
-      `SELECT COUNT(*) as count
-       FROM sessions s
-       JOIN users u ON s.user_id = u.id
-       WHERE u.team_id = ?
-       AND s.status IN (?, ?)`
-    )
-    .bind(teamId, statusA, statusB)
-    .first<{ count: number }>();
-
-  const total = countResult?.count ?? 0;
-
-  // Get recent sessions with their latest activity
-  const result = await db
-    .prepare(
-      `SELECT
-        s.*,
-        u.id as user_id, u.name as user_name,
-        d.id as device_id, d.name as device_name, d.is_remote as device_is_remote,
-        r.id as repo_id, r.name as repo_name, r.remote_url as repo_remote_url,
-        a.id as activity_id, a.files, a.semantic_scope, a.summary, a.created_at as activity_created_at
-      FROM sessions s
-      JOIN users u ON s.user_id = u.id
-      JOIN devices d ON s.device_id = d.id
-      LEFT JOIN repos r ON s.repo_id = r.id
-      LEFT JOIN (
-        SELECT session_id, id, files, semantic_scope, summary, created_at,
-               ROW_NUMBER() OVER (PARTITION BY session_id ORDER BY created_at DESC) as rn
-        FROM activity
-      ) a ON s.id = a.session_id AND a.rn = 1
-      WHERE u.team_id = ?
-      AND s.status IN (?, ?)
-      ORDER BY s.last_activity_at DESC
-      LIMIT ? OFFSET ?`
-    )
-    .bind(teamId, statusA, statusB, limit, offset)
-    .all();
-
-  const sessions = result.results.map((row: Record<string, unknown>) => ({
-    id: row.id as string,
-    user_id: row.user_id as string,
-    device_id: row.device_id as string,
-    repo_id: row.repo_id as string | null,
-    branch: row.branch as string | null,
-    worktree: row.worktree as string | null,
-    status: row.status as 'active' | 'stale' | 'ended',
-    started_at: row.started_at as string,
-    last_activity_at: row.last_activity_at as string,
-    ended_at: row.ended_at as string | null,
-    user: {
-      id: row.user_id as string,
-      name: row.user_name as string,
-    },
-    device: {
-      id: row.device_id as string,
-      name: row.device_name as string,
-      is_remote: row.device_is_remote as number,
-    },
-    repo: row.repo_id
-      ? {
-          id: row.repo_id as string,
-          name: row.repo_name as string,
-          remote_url: row.repo_remote_url as string | null,
-        }
-      : null,
-    latest_activity: row.activity_id
-      ? {
-          id: row.activity_id as string,
-          session_id: row.id as string,
-          files: safeParseFiles(row.files as string),
-          semantic_scope: row.semantic_scope as string | null,
-          summary: row.summary as string | null,
-          created_at: row.activity_created_at as string,
-        }
-      : null,
-  }));
-
-  return {
-    sessions,
-    total,
-    limit,
-    offset,
-    hasMore: offset + sessions.length < total,
-  };
-}
-
-export type UserActivitySummary = {
-  userId: string;
-  userName: string;
-  sessionCount: number;
-  latestActivity: string;
-};
-
-export async function getActivityByUser(
-  db: D1Database,
-  teamId: string,
-  includeStale: boolean = true
-): Promise<UserActivitySummary[]> {
-  const statusA = 'active';
-  const statusB = includeStale ? 'stale' : 'active';
-
-  const result = await db
-    .prepare(
-      `SELECT
-        u.id as user_id,
-        u.name as user_name,
-        COUNT(s.id) as session_count,
-        MAX(s.last_activity_at) as latest_activity
-      FROM users u
-      JOIN sessions s ON s.user_id = u.id
-      WHERE u.team_id = ?
-      AND s.status IN (?, ?)
-      GROUP BY u.id, u.name
-      ORDER BY latest_activity DESC`
-    )
-    .bind(teamId, statusA, statusB)
-    .all();
-
-  return result.results.map((row: Record<string, unknown>) => ({
-    userId: row.user_id as string,
-    userName: row.user_name as string,
-    sessionCount: row.session_count as number,
-    latestActivity: row.latest_activity as string,
-  }));
-}
-
-export async function getUserSessions(
-  db: D1Database,
-  teamId: string,
-  userId: string,
-  options: {
-    limit?: number;
-    offset?: number;
-    includeStale?: boolean;
-  } = {}
-): Promise<PaginatedSessions> {
-  const { limit = 20, offset = 0, includeStale = true } = options;
-
-  const statusA = 'active';
-  const statusB = includeStale ? 'stale' : 'active';
-
-  // Get total count for this user
-  const countResult = await db
-    .prepare(
-      `SELECT COUNT(*) as count
-       FROM sessions s
-       JOIN users u ON s.user_id = u.id
-       WHERE u.team_id = ?
-       AND s.user_id = ?
-       AND s.status IN (?, ?)`
-    )
-    .bind(teamId, userId, statusA, statusB)
-    .first<{ count: number }>();
-
-  const total = countResult?.count ?? 0;
-
-  // Get user's sessions with their latest activity
-  const result = await db
-    .prepare(
-      `SELECT
-        s.*,
-        u.id as user_id, u.name as user_name,
-        d.id as device_id, d.name as device_name, d.is_remote as device_is_remote,
-        r.id as repo_id, r.name as repo_name, r.remote_url as repo_remote_url,
-        a.id as activity_id, a.files, a.semantic_scope, a.summary, a.created_at as activity_created_at
-      FROM sessions s
-      JOIN users u ON s.user_id = u.id
-      JOIN devices d ON s.device_id = d.id
-      LEFT JOIN repos r ON s.repo_id = r.id
-      LEFT JOIN (
-        SELECT session_id, id, files, semantic_scope, summary, created_at,
-               ROW_NUMBER() OVER (PARTITION BY session_id ORDER BY created_at DESC) as rn
-        FROM activity
-      ) a ON s.id = a.session_id AND a.rn = 1
-      WHERE u.team_id = ?
-      AND s.user_id = ?
-      AND s.status IN (?, ?)
-      ORDER BY s.last_activity_at DESC
-      LIMIT ? OFFSET ?`
-    )
-    .bind(teamId, userId, statusA, statusB, limit, offset)
-    .all();
-
-  const sessions = result.results.map((row: Record<string, unknown>) => ({
-    id: row.id as string,
-    user_id: row.user_id as string,
-    device_id: row.device_id as string,
-    repo_id: row.repo_id as string | null,
-    branch: row.branch as string | null,
-    worktree: row.worktree as string | null,
-    status: row.status as 'active' | 'stale' | 'ended',
-    started_at: row.started_at as string,
-    last_activity_at: row.last_activity_at as string,
-    ended_at: row.ended_at as string | null,
-    user: {
-      id: row.user_id as string,
-      name: row.user_name as string,
-    },
-    device: {
-      id: row.device_id as string,
-      name: row.device_name as string,
-      is_remote: row.device_is_remote as number,
-    },
-    repo: row.repo_id
-      ? {
-          id: row.repo_id as string,
-          name: row.repo_name as string,
-          remote_url: row.repo_remote_url as string | null,
-        }
-      : null,
-    latest_activity: row.activity_id
-      ? {
-          id: row.activity_id as string,
-          session_id: row.id as string,
-          files: safeParseFiles(row.files as string),
-          semantic_scope: row.semantic_scope as string | null,
-          summary: row.summary as string | null,
-          created_at: row.activity_created_at as string,
-        }
-      : null,
-  }));
-
-  return {
-    sessions,
-    total,
-    limit,
-    offset,
-    hasMore: offset + sessions.length < total,
-  };
-}
-
-// ============================================================================
-// REPO ACTIVITY QUERIES
-// ============================================================================
-
-/**
- * Get distinct branches for a repo (for filter dropdown).
- */
-export async function getRepoBranches(db: D1Database, repoId: string): Promise<string[]> {
-  const result = await db
-    .prepare(
-      `SELECT DISTINCT branch FROM sessions
-       WHERE repo_id = ? AND branch IS NOT NULL
-       ORDER BY branch`
-    )
-    .bind(repoId)
-    .all<{ branch: string }>();
-  return result.results.map((r) => r.branch);
-}
-
-/**
- * Get distinct users who have sessions in a repo (for filter dropdown).
- */
-export async function getRepoUsers(
-  db: D1Database,
-  repoId: string
-): Promise<{ id: string; name: string }[]> {
-  const result = await db
-    .prepare(
-      `SELECT DISTINCT u.id, u.name
-       FROM users u
-       JOIN sessions s ON s.user_id = u.id
-       WHERE s.repo_id = ?
-       ORDER BY u.name`
-    )
-    .bind(repoId)
-    .all<{ id: string; name: string }>();
-  return result.results;
-}
-
-/**
- * Get paginated sessions for a specific repo, with optional filters.
- */
-export async function getRepoActivity(
-  db: D1Database,
-  teamId: string,
-  repoId: string,
-  options: {
-    limit?: number;
-    offset?: number;
-    includeStale?: boolean;
-    userId?: string;
-    branch?: string;
-    startDate?: string;
-    endDate?: string;
-  } = {}
-): Promise<PaginatedSessions> {
-  const { limit = 20, offset = 0, includeStale = true, userId, branch, startDate, endDate } = options;
-
-  const statusA = 'active';
-  const statusB = includeStale ? 'stale' : 'active';
-
-  // Build dynamic WHERE clause
-  let whereClause = `WHERE u.team_id = ? AND s.repo_id = ? AND s.status IN (?, ?)`;
-  const params: unknown[] = [teamId, repoId, statusA, statusB];
+  let whereClause = 'WHERE 1=1';
+  const params: unknown[] = [];
 
   if (userId) {
     whereClause += ' AND s.user_id = ?';
     params.push(userId);
   }
-  if (branch) {
-    whereClause += ' AND s.branch = ?';
-    params.push(branch);
+  if (repoName) {
+    whereClause += ' AND s.repo_name = ?';
+    params.push(repoName);
+  }
+  if (status === 'active_or_stale') {
+    whereClause += " AND s.status IN ('active', 'stale')";
+  } else {
+    whereClause += ' AND s.status = ?';
+    params.push(status);
   }
   if (startDate) {
     whereClause += ' AND s.started_at >= ?';
@@ -643,38 +372,21 @@ export async function getRepoActivity(
 
   // Get total count
   const countResult = await db
-    .prepare(
-      `SELECT COUNT(*) as count
-       FROM sessions s
-       JOIN users u ON s.user_id = u.id
-       ${whereClause}`
-    )
+    .prepare(`SELECT COUNT(*) as count FROM sessions s ${whereClause}`)
     .bind(...params)
     .first<{ count: number }>();
-
   const total = countResult?.count ?? 0;
 
-  // Get sessions with latest activity
+  // Get sessions with member and repo
   const result = await db
     .prepare(
-      `SELECT
-        s.*,
-        u.id as user_id, u.name as user_name,
-        d.id as device_id, d.name as device_name, d.is_remote as device_is_remote,
-        r.id as repo_id, r.name as repo_name, r.remote_url as repo_remote_url,
-        a.id as activity_id, a.files, a.semantic_scope, a.summary, a.created_at as activity_created_at
-      FROM sessions s
-      JOIN users u ON s.user_id = u.id
-      JOIN devices d ON s.device_id = d.id
-      LEFT JOIN repos r ON s.repo_id = r.id
-      LEFT JOIN (
-        SELECT session_id, id, files, semantic_scope, summary, created_at,
-               ROW_NUMBER() OVER (PARTITION BY session_id ORDER BY created_at DESC) as rn
-        FROM activity
-      ) a ON s.id = a.session_id AND a.rn = 1
-      ${whereClause}
-      ORDER BY s.last_activity_at DESC
-      LIMIT ? OFFSET ?`
+      `SELECT s.*, m.display_name as member_name, r.id as r_id, r.name as r_name, r.display_name as r_display_name
+       FROM sessions s
+       JOIN members m ON s.user_id = m.user_id
+       LEFT JOIN repos r ON s.repo_id = r.id
+       ${whereClause}
+       ORDER BY s.started_at DESC
+       LIMIT ? OFFSET ?`
     )
     .bind(...params, limit, offset)
     .all();
@@ -682,449 +394,501 @@ export async function getRepoActivity(
   const sessions = result.results.map((row: Record<string, unknown>) => ({
     id: row.id as string,
     user_id: row.user_id as string,
-    device_id: row.device_id as string,
     repo_id: row.repo_id as string | null,
-    branch: row.branch as string | null,
-    worktree: row.worktree as string | null,
-    status: row.status as 'active' | 'stale' | 'ended',
+    repo_name: row.repo_name as string,
+    agent_type: (row.agent_type as string) || 'claude_code',
+    agent_version: row.agent_version as string | null,
+    cwd: row.cwd as string | null,
+    git_branch: row.git_branch as string | null,
+    model: row.model as string | null,
+    hostname: row.hostname as string | null,
+    device_name: row.device_name as string | null,
+    is_remote: Boolean(row.is_remote),
     started_at: row.started_at as string,
-    last_activity_at: row.last_activity_at as string,
     ended_at: row.ended_at as string | null,
-    user: {
-      id: row.user_id as string,
-      name: row.user_name as string,
+    total_cost_usd: row.total_cost_usd as number | null,
+    duration_ms: row.duration_ms as number | null,
+    num_turns: row.num_turns as number,
+    total_input_tokens: row.total_input_tokens as number | null,
+    total_output_tokens: row.total_output_tokens as number | null,
+    cache_creation_tokens: row.cache_creation_tokens as number | null,
+    cache_read_tokens: row.cache_read_tokens as number | null,
+    result_summary: row.result_summary as string | null,
+    generated_summary: row.generated_summary as string | null,
+    summary_event_count: row.summary_event_count as number,
+    status: row.status as 'active' | 'ended' | 'stale',
+    created_at: row.created_at as string,
+    updated_at: row.updated_at as string,
+    member: {
+      user_id: row.user_id as string,
+      display_name: row.member_name as string,
     },
-    device: {
-      id: row.device_id as string,
-      name: row.device_name as string,
-      is_remote: row.device_is_remote as number,
-    },
-    repo: row.repo_id
+    repo: row.r_id
       ? {
-          id: row.repo_id as string,
-          name: row.repo_name as string,
-          remote_url: row.repo_remote_url as string | null,
-        }
-      : null,
-    latest_activity: row.activity_id
-      ? {
-          id: row.activity_id as string,
-          session_id: row.id as string,
-          files: safeParseFiles(row.files as string),
-          semantic_scope: row.semantic_scope as string | null,
-          summary: row.summary as string | null,
-          created_at: row.activity_created_at as string,
+          id: row.r_id as string,
+          name: row.r_name as string,
+          display_name: row.r_display_name as string | null,
         }
       : null,
   }));
 
+  return { sessions, total, hasMore: offset + sessions.length < total };
+}
+
+export async function getSessionDetail(db: D1Database, sessionId: string): Promise<SessionDetail | null> {
+  const session = await db
+    .prepare(
+      `SELECT s.*, m.display_name as member_name, r.id as r_id, r.name as r_name, r.display_name as r_display_name
+       FROM sessions s
+       JOIN members m ON s.user_id = m.user_id
+       LEFT JOIN repos r ON s.repo_id = r.id
+       WHERE s.id = ?`
+    )
+    .bind(sessionId)
+    .first();
+
+  if (!session) return null;
+
+  const row = session as Record<string, unknown>;
+
+  // Get file operations
+  const fileOpsResult = await db
+    .prepare('SELECT * FROM file_operations WHERE session_id = ? ORDER BY timestamp')
+    .bind(sessionId)
+    .all<FileOperation>();
+
+  // Get prompts
+  const promptsResult = await db
+    .prepare('SELECT * FROM prompts WHERE session_id = ? ORDER BY turn_number, timestamp')
+    .bind(sessionId)
+    .all<Prompt>();
+
   return {
-    sessions,
-    total,
-    limit,
-    offset,
-    hasMore: offset + sessions.length < total,
+    id: row.id as string,
+    user_id: row.user_id as string,
+    repo_id: row.repo_id as string | null,
+    repo_name: row.repo_name as string,
+    agent_type: (row.agent_type as string) || 'claude_code',
+    agent_version: row.agent_version as string | null,
+    cwd: row.cwd as string | null,
+    git_branch: row.git_branch as string | null,
+    model: row.model as string | null,
+    hostname: row.hostname as string | null,
+    device_name: row.device_name as string | null,
+    is_remote: Boolean(row.is_remote),
+    started_at: row.started_at as string,
+    ended_at: row.ended_at as string | null,
+    total_cost_usd: row.total_cost_usd as number | null,
+    duration_ms: row.duration_ms as number | null,
+    num_turns: row.num_turns as number,
+    total_input_tokens: row.total_input_tokens as number | null,
+    total_output_tokens: row.total_output_tokens as number | null,
+    cache_creation_tokens: row.cache_creation_tokens as number | null,
+    cache_read_tokens: row.cache_read_tokens as number | null,
+    result_summary: row.result_summary as string | null,
+    generated_summary: row.generated_summary as string | null,
+    summary_event_count: row.summary_event_count as number,
+    status: row.status as 'active' | 'ended' | 'stale',
+    created_at: row.created_at as string,
+    updated_at: row.updated_at as string,
+    member: {
+      user_id: row.user_id as string,
+      display_name: row.member_name as string,
+    },
+    repo: row.r_id
+      ? {
+          id: row.r_id as string,
+          name: row.r_name as string,
+          display_name: row.r_display_name as string | null,
+        }
+      : null,
+    file_operations: fileOpsResult.results,
+    prompts: promptsResult.results,
   };
 }
 
 // ============================================================================
-// OVERLAP DETECTION
+// FILE OPERATION QUERIES
 // ============================================================================
 
-export async function checkForOverlaps(
+export async function createFileOperation(db: D1Database, event: IngestEvent): Promise<void> {
+  const repo = await getRepoByName(db, event.repo_name);
+
+  await db
+    .prepare(
+      `INSERT INTO file_operations (session_id, user_id, repo_id, repo_name, agent_type, timestamp, tool_name, file_path, operation, bash_command)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    )
+    .bind(
+      event.session_id,
+      event.user_id,
+      repo?.id ?? null,
+      event.repo_name,
+      event.agent_type,
+      event.timestamp,
+      event.tool_name ?? null,
+      event.file_path ?? null,
+      event.operation ?? null,
+      event.bash_command ?? null
+    )
+    .run();
+}
+
+export async function getFileActivity(
   db: D1Database,
-  teamId: string,
-  userId: string,
-  files: string[],
-  semanticScope: string | null
-): Promise<SessionWithDetails[]> {
-  // Find active sessions from OTHER users that overlap
-  // Overlap = exact file match via json_each OR same semantic scope
-
-  const placeholders = files.map(() => '?').join(', ');
-
-  let query = `
-    SELECT DISTINCT
-      s.*,
-      u.id as user_id, u.name as user_name,
-      d.id as device_id, d.name as device_name, d.is_remote as device_is_remote,
-      r.id as repo_id, r.name as repo_name, r.remote_url as repo_remote_url,
-      a.id as activity_id, a.files, a.semantic_scope, a.summary, a.created_at as activity_created_at
-    FROM sessions s
-    JOIN users u ON s.user_id = u.id
-    JOIN devices d ON s.device_id = d.id
-    LEFT JOIN repos r ON s.repo_id = r.id
-    JOIN activity a ON s.id = a.session_id
-    WHERE u.team_id = ?
-    AND s.user_id != ?
-    AND s.status = 'active'
-    AND (
-      EXISTS (
-        SELECT 1 FROM json_each(a.files) je
-        WHERE je.value IN (${placeholders})
-      )`;
-
-  const bindParams: unknown[] = [teamId, userId, ...files];
-
-  // Add semantic scope overlap if provided
-  if (semanticScope) {
-    query += ' OR a.semantic_scope = ?';
-    bindParams.push(semanticScope);
-  }
-
-  query += `) ORDER BY s.last_activity_at DESC LIMIT 10`;
+  filePath: string,
+  repoName: string,
+  options: { limit?: number; days?: number } = {}
+): Promise<{
+  operations: Array<FileOperation & { display_name: string; git_branch: string | null }>;
+  sessions_count: number;
+  users_count: number;
+}> {
+  const { limit = 50, days = 7 } = options;
 
   const result = await db
-    .prepare(query)
-    .bind(...bindParams)
+    .prepare(
+      `SELECT fo.*, m.display_name, s.git_branch
+       FROM file_operations fo
+       JOIN members m ON fo.user_id = m.user_id
+       JOIN sessions s ON fo.session_id = s.id
+       WHERE fo.file_path = ? AND fo.repo_name = ?
+       AND fo.timestamp > datetime('now', '-' || ? || ' days')
+       ORDER BY fo.timestamp DESC
+       LIMIT ?`
+    )
+    .bind(filePath, repoName, days, limit)
     .all();
 
-  return result.results.map((row: Record<string, unknown>) => ({
-    id: row.id as string,
-    user_id: row.user_id as string,
-    device_id: row.device_id as string,
-    repo_id: row.repo_id as string | null,
-    branch: row.branch as string | null,
-    worktree: row.worktree as string | null,
-    status: row.status as 'active' | 'stale' | 'ended',
-    started_at: row.started_at as string,
-    last_activity_at: row.last_activity_at as string,
-    ended_at: row.ended_at as string | null,
-    user: {
-      id: row.user_id as string,
-      name: row.user_name as string,
-    },
-    device: {
-      id: row.device_id as string,
-      name: row.device_name as string,
-      is_remote: row.device_is_remote as number,
-    },
-    repo: row.repo_id
-      ? {
-          id: row.repo_id as string,
-          name: row.repo_name as string,
-          remote_url: row.repo_remote_url as string | null,
-        }
-      : null,
-    latest_activity: row.activity_id
-      ? {
-          id: row.activity_id as string,
-          session_id: row.id as string,
-          files: safeParseFiles(row.files as string),
-          semantic_scope: row.semantic_scope as string | null,
-          summary: row.summary as string | null,
-          created_at: row.activity_created_at as string,
-        }
-      : null,
-  }));
+  const statsResult = await db
+    .prepare(
+      `SELECT COUNT(DISTINCT session_id) as sessions_count, COUNT(DISTINCT user_id) as users_count
+       FROM file_operations
+       WHERE file_path = ? AND repo_name = ?
+       AND timestamp > datetime('now', '-' || ? || ' days')`
+    )
+    .bind(filePath, repoName, days)
+    .first<{ sessions_count: number; users_count: number }>();
+
+  return {
+    operations: result.results as Array<FileOperation & { display_name: string; git_branch: string | null }>,
+    sessions_count: statsResult?.sessions_count ?? 0,
+    users_count: statsResult?.users_count ?? 0,
+  };
 }
 
 // ============================================================================
-// STALE SESSION CLEANUP (on-demand, since Pages doesn't support cron)
+// PROMPT QUERIES
 // ============================================================================
 
+export async function createPrompt(db: D1Database, event: IngestEvent): Promise<void> {
+  const repo = await getRepoByName(db, event.repo_name);
+
+  await db
+    .prepare(
+      `INSERT INTO prompts (session_id, user_id, repo_id, repo_name, agent_type, timestamp, prompt_text, turn_number)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+    )
+    .bind(
+      event.session_id,
+      event.user_id,
+      repo?.id ?? null,
+      event.repo_name,
+      event.agent_type,
+      event.timestamp,
+      event.prompt_text ?? null,
+      event.turn_number ?? null
+    )
+    .run();
+}
+
+export async function getSessionPrompts(db: D1Database, sessionId: string): Promise<Prompt[]> {
+  const result = await db
+    .prepare('SELECT * FROM prompts WHERE session_id = ? ORDER BY turn_number, timestamp')
+    .bind(sessionId)
+    .all<Prompt>();
+  return result.results;
+}
+
+// ============================================================================
+// OVERLAP QUERIES
+// ============================================================================
+
+export async function createOverlap(db: D1Database, overlap: Omit<Overlap, 'id' | 'detected_at'>): Promise<void> {
+  await db
+    .prepare(
+      `INSERT INTO overlaps (type, severity, file_path, directory_path, repo_name, user_id_a, user_id_b, session_id_a, session_id_b, description)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    )
+    .bind(
+      overlap.type,
+      overlap.severity,
+      overlap.file_path ?? null,
+      overlap.directory_path ?? null,
+      overlap.repo_name,
+      overlap.user_id_a,
+      overlap.user_id_b,
+      overlap.session_id_a ?? null,
+      overlap.session_id_b ?? null,
+      overlap.description ?? null
+    )
+    .run();
+}
+
+export async function getOverlaps(
+  db: D1Database,
+  options: { repoName?: string; limit?: number; days?: number } = {}
+): Promise<OverlapWithMembers[]> {
+  const { repoName, limit = 50, days = 7 } = options;
+
+  let query = `
+    SELECT o.*, ma.display_name as member_a_name, mb.display_name as member_b_name
+    FROM overlaps o
+    JOIN members ma ON o.user_id_a = ma.user_id
+    JOIN members mb ON o.user_id_b = mb.user_id
+    WHERE o.detected_at > datetime('now', '-' || ? || ' days')
+  `;
+  const params: unknown[] = [days];
+
+  if (repoName) {
+    query += ' AND o.repo_name = ?';
+    params.push(repoName);
+  }
+
+  query += ' ORDER BY o.detected_at DESC LIMIT ?';
+  params.push(limit);
+
+  const result = await db.prepare(query).bind(...params).all<OverlapWithMembers>();
+  return result.results;
+}
+
 /**
- * Mark sessions as stale if they haven't had activity within the configured timeout.
- * This runs on-demand when fetching activity, rather than via cron.
- * Returns the number of sessions marked as stale.
+ * Detect file overlaps: same file, same repo, different user, within 2 hours.
+ * Called after processing file_op events.
  */
+export async function detectFileOverlaps(db: D1Database, repoName: string): Promise<void> {
+  // Find file overlaps within last 24 hours
+  const overlapsResult = await db
+    .prepare(
+      `SELECT fo1.user_id AS user_a, fo2.user_id AS user_b,
+              fo1.file_path, fo1.repo_name,
+              fo1.session_id AS session_a, fo2.session_id AS session_b
+       FROM file_operations fo1
+       JOIN file_operations fo2 ON fo1.file_path = fo2.file_path
+         AND fo1.repo_name = fo2.repo_name
+         AND fo1.user_id != fo2.user_id
+         AND fo1.operation IN ('create', 'modify')
+         AND fo2.operation IN ('create', 'modify')
+         AND abs(julianday(fo1.timestamp) - julianday(fo2.timestamp)) < (2.0/24.0)
+       WHERE fo1.repo_name = ?
+       AND fo1.timestamp > datetime('now', '-24 hours')
+       AND fo1.id < fo2.id`
+    )
+    .bind(repoName)
+    .all();
+
+  for (const row of overlapsResult.results) {
+    const r = row as Record<string, unknown>;
+
+    // Check if this overlap already exists
+    const existing = await db
+      .prepare(
+        `SELECT id FROM overlaps
+         WHERE type = 'file' AND file_path = ? AND repo_name = ?
+         AND ((user_id_a = ? AND user_id_b = ?) OR (user_id_a = ? AND user_id_b = ?))
+         AND detected_at > datetime('now', '-24 hours')`
+      )
+      .bind(r.file_path, r.repo_name, r.user_a, r.user_b, r.user_b, r.user_a)
+      .first();
+
+    if (!existing) {
+      await createOverlap(db, {
+        type: 'file',
+        severity: 'warning',
+        file_path: r.file_path as string,
+        directory_path: null,
+        repo_name: r.repo_name as string,
+        user_id_a: r.user_a as string,
+        user_id_b: r.user_b as string,
+        session_id_a: r.session_a as string,
+        session_id_b: r.session_b as string,
+        description: `Both users modified ${r.file_path} within 2 hours`,
+      });
+    }
+  }
+}
+
+// ============================================================================
+// STATS QUERIES
+// ============================================================================
+
+export async function getTeamStats(
+  db: D1Database,
+  options: { startDate?: string; endDate?: string } = {}
+): Promise<TeamStats> {
+  const { startDate, endDate } = options;
+
+  let dateFilter = '';
+  const params: unknown[] = [];
+
+  if (startDate) {
+    dateFilter += ' AND started_at >= ?';
+    params.push(startDate);
+  }
+  if (endDate) {
+    dateFilter += ' AND started_at <= ?';
+    params.push(endDate + 'T23:59:59');
+  }
+
+  // Basic stats
+  const basicStats = await db
+    .prepare(
+      `SELECT
+        COUNT(*) as total_sessions,
+        COALESCE(SUM(total_cost_usd), 0) as total_cost_usd,
+        COALESCE(AVG(duration_ms), 0) as avg_duration_ms
+       FROM sessions
+       WHERE 1=1 ${dateFilter}`
+    )
+    .bind(...params)
+    .first<{ total_sessions: number; total_cost_usd: number; avg_duration_ms: number }>();
+
+  // Total unique files
+  const filesStats = await db
+    .prepare(
+      `SELECT COUNT(DISTINCT file_path) as total_files
+       FROM file_operations fo
+       JOIN sessions s ON fo.session_id = s.id
+       WHERE 1=1 ${dateFilter.replace(/started_at/g, 's.started_at')}`
+    )
+    .bind(...params)
+    .first<{ total_files: number }>();
+
+  // By member
+  const byMemberResult = await db
+    .prepare(
+      `SELECT s.user_id, m.display_name, COUNT(*) as session_count, COALESCE(SUM(s.total_cost_usd), 0) as total_cost
+       FROM sessions s
+       JOIN members m ON s.user_id = m.user_id
+       WHERE 1=1 ${dateFilter}
+       GROUP BY s.user_id, m.display_name
+       ORDER BY session_count DESC`
+    )
+    .bind(...params)
+    .all();
+
+  // By repo
+  const byRepoResult = await db
+    .prepare(
+      `SELECT repo_name, COUNT(*) as session_count, COALESCE(SUM(total_cost_usd), 0) as total_cost
+       FROM sessions
+       WHERE 1=1 ${dateFilter}
+       GROUP BY repo_name
+       ORDER BY session_count DESC`
+    )
+    .bind(...params)
+    .all();
+
+  // By model
+  const byModelResult = await db
+    .prepare(
+      `SELECT COALESCE(model, 'unknown') as model, COUNT(*) as session_count, COALESCE(SUM(total_cost_usd), 0) as total_cost
+       FROM sessions
+       WHERE 1=1 ${dateFilter}
+       GROUP BY model
+       ORDER BY session_count DESC`
+    )
+    .bind(...params)
+    .all();
+
+  // Hottest files
+  const hottestFilesResult = await db
+    .prepare(
+      `SELECT file_path, COUNT(DISTINCT session_id) as session_count, COUNT(DISTINCT user_id) as user_count
+       FROM file_operations fo
+       JOIN sessions s ON fo.session_id = s.id
+       WHERE fo.operation IN ('create', 'modify')
+       ${dateFilter.replace(/started_at/g, 's.started_at')}
+       GROUP BY file_path
+       ORDER BY session_count DESC
+       LIMIT 10`
+    )
+    .bind(...params)
+    .all();
+
+  return {
+    total_sessions: basicStats?.total_sessions ?? 0,
+    total_cost_usd: basicStats?.total_cost_usd ?? 0,
+    total_files: filesStats?.total_files ?? 0,
+    avg_duration_ms: basicStats?.avg_duration_ms ?? 0,
+    by_member: byMemberResult.results.map((r: Record<string, unknown>) => ({
+      user_id: r.user_id as string,
+      display_name: r.display_name as string,
+      session_count: r.session_count as number,
+      total_cost: r.total_cost as number,
+    })),
+    by_repo: byRepoResult.results.map((r: Record<string, unknown>) => ({
+      repo_name: r.repo_name as string,
+      session_count: r.session_count as number,
+      total_cost: r.total_cost as number,
+    })),
+    by_model: byModelResult.results.map((r: Record<string, unknown>) => ({
+      model: r.model as string,
+      session_count: r.session_count as number,
+      total_cost: r.total_cost as number,
+    })),
+    hottest_files: hottestFilesResult.results.map((r: Record<string, unknown>) => ({
+      file_path: r.file_path as string,
+      session_count: r.session_count as number,
+      user_count: r.user_count as number,
+    })),
+  };
+}
+
+// ============================================================================
+// STALE SESSION HANDLING
+// ============================================================================
+
 export async function markStaleSessions(db: D1Database): Promise<number> {
-  const team = await db
-    .prepare('SELECT stale_timeout_hours FROM teams LIMIT 1')
-    .first<{ stale_timeout_hours: number }>();
+  const config = await getTeamConfig(db);
+  const timeout = config?.stale_timeout_hours ?? 8;
 
-  const timeout = team?.stale_timeout_hours ?? 8;
-
+  // Get the most recent file operation timestamp for each active session
   const result = await db
     .prepare(
       `UPDATE sessions
        SET status = 'stale'
        WHERE status = 'active'
-       AND last_activity_at < datetime('now', '-' || ? || ' hours')`
+       AND id NOT IN (
+         SELECT DISTINCT session_id FROM file_operations
+         WHERE timestamp > datetime('now', '-' || ? || ' hours')
+       )
+       AND started_at < datetime('now', '-' || ? || ' hours')`
     )
-    .bind(timeout)
-    .run();
-
-  // Also end sessions that have been stale for 24+ hours
-  await db
-    .prepare(
-      `UPDATE sessions
-       SET status = 'ended', ended_at = datetime('now')
-       WHERE status = 'stale'
-       AND last_activity_at < datetime('now', '-24 hours')`
-    )
-    .run();
-
-  return result.meta.changes ?? 0;
-}
-
-/**
- * Clean up expired magic links and web sessions.
- * Call this periodically (e.g., when fetching activity).
- */
-export async function cleanupExpiredTokens(db: D1Database): Promise<void> {
-  // Clean up old magic links
-  await db
-    .prepare(
-      `DELETE FROM magic_links
-       WHERE expires_at < datetime('now')
-       OR used_at IS NOT NULL`
-    )
-    .run();
-
-  // Clean up old web sessions
-  await db
-    .prepare(
-      `DELETE FROM web_sessions
-       WHERE expires_at < datetime('now')`
-    )
-    .run();
-}
-
-// ============================================================================
-// PLUGIN LOG QUERIES
-// ============================================================================
-
-export async function createPluginLog(
-  db: D1Database,
-  data: Pick<PluginLog, 'id' | 'user_id' | 'level' | 'hook' | 'session_id' | 'message' | 'data' | 'error'>
-): Promise<void> {
-  await db
-    .prepare(
-      `INSERT INTO plugin_logs (id, user_id, level, hook, session_id, message, data, error)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
-    )
-    .bind(
-      data.id,
-      data.user_id,
-      data.level,
-      data.hook,
-      data.session_id,
-      data.message,
-      data.data,
-      data.error
-    )
-    .run();
-}
-
-export async function createPluginLogsBatch(
-  db: D1Database,
-  logs: Pick<PluginLog, 'id' | 'user_id' | 'level' | 'hook' | 'session_id' | 'message' | 'data' | 'error'>[]
-): Promise<void> {
-  if (logs.length === 0) return;
-
-  // Use batch for efficiency
-  const statements = logs.map((log) =>
-    db
-      .prepare(
-        `INSERT INTO plugin_logs (id, user_id, level, hook, session_id, message, data, error)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
-      )
-      .bind(
-        log.id,
-        log.user_id,
-        log.level,
-        log.hook,
-        log.session_id,
-        log.message,
-        log.data,
-        log.error
-      )
-  );
-
-  await db.batch(statements);
-}
-
-export async function getPluginLogs(
-  db: D1Database,
-  teamId: string,
-  options: {
-    userId?: string;
-    level?: string;
-    limit?: number;
-    offset?: number;
-  } = {}
-): Promise<{ logs: PluginLogWithUser[]; total: number }> {
-  const { userId, level, limit = 100, offset = 0 } = options;
-
-  let whereClause = 'WHERE u.team_id = ?';
-  const params: unknown[] = [teamId];
-
-  if (userId) {
-    whereClause += ' AND pl.user_id = ?';
-    params.push(userId);
-  }
-
-  if (level) {
-    whereClause += ' AND pl.level = ?';
-    params.push(level);
-  }
-
-  // Get total count
-  const countResult = await db
-    .prepare(
-      `SELECT COUNT(*) as count
-       FROM plugin_logs pl
-       JOIN users u ON pl.user_id = u.id
-       ${whereClause}`
-    )
-    .bind(...params)
-    .first<{ count: number }>();
-
-  const total = countResult?.count ?? 0;
-
-  // Get logs with user info
-  const result = await db
-    .prepare(
-      `SELECT pl.*, u.name as user_name
-       FROM plugin_logs pl
-       JOIN users u ON pl.user_id = u.id
-       ${whereClause}
-       ORDER BY pl.created_at DESC
-       LIMIT ? OFFSET ?`
-    )
-    .bind(...params, limit, offset)
-    .all<PluginLogWithUser>();
-
-  return { logs: result.results, total };
-}
-
-export async function deleteOldPluginLogs(db: D1Database, daysToKeep: number = 30): Promise<number> {
-  const result = await db
-    .prepare(
-      `DELETE FROM plugin_logs
-       WHERE created_at < datetime('now', '-' || ? || ' days')`
-    )
-    .bind(daysToKeep)
+    .bind(timeout, timeout)
     .run();
 
   return result.meta.changes ?? 0;
 }
 
 // ============================================================================
-// SESSION DETAIL QUERIES
+// WEB SESSION QUERIES
 // ============================================================================
 
-export type PaginatedActivities = {
-  activities: ParsedActivity[];
-  total: number;
-  limit: number;
-  offset: number;
-  hasMore: boolean;
-};
-
-/**
- * Get paginated activities for a single session, ordered by newest first.
- */
-export async function getSessionActivities(
-  db: D1Database,
-  sessionId: string,
-  options: { limit?: number; offset?: number } = {}
-): Promise<PaginatedActivities> {
-  const { limit = 50, offset = 0 } = options;
-
-  const countResult = await db
-    .prepare('SELECT COUNT(*) as count FROM activity WHERE session_id = ?')
-    .bind(sessionId)
-    .first<{ count: number }>();
-
-  const total = countResult?.count ?? 0;
-
-  const result = await db
-    .prepare(
-      `SELECT * FROM activity
-       WHERE session_id = ?
-       ORDER BY created_at DESC
-       LIMIT ? OFFSET ?`
-    )
-    .bind(sessionId, limit, offset)
-    .all<Activity>();
-
-  const activities = result.results.map((a) => ({
-    ...a,
-    files: safeParseFiles(a.files),
-  }));
-
-  return {
-    activities,
-    total,
-    limit,
-    offset,
-    hasMore: offset + activities.length < total,
-  };
+export async function createWebSession(db: D1Database, id: string, tokenHash: string, expiresAt: string): Promise<void> {
+  await db
+    .prepare('INSERT INTO web_sessions (id, token_hash, expires_at) VALUES (?, ?, ?)')
+    .bind(id, tokenHash, expiresAt)
+    .run();
 }
 
-/**
- * Get a single session with full details (user, device, repo, latest activity).
- * Verifies the session belongs to the given team.
- */
-export async function getSessionWithDetails(
-  db: D1Database,
-  sessionId: string,
-  teamId: string
-): Promise<SessionWithDetails | null> {
-  const row = await db
-    .prepare(
-      `SELECT
-        s.*,
-        u.id as user_id, u.name as user_name,
-        d.id as device_id, d.name as device_name, d.is_remote as device_is_remote,
-        r.id as repo_id, r.name as repo_name, r.remote_url as repo_remote_url,
-        a.id as activity_id, a.files, a.semantic_scope, a.summary, a.created_at as activity_created_at
-      FROM sessions s
-      JOIN users u ON s.user_id = u.id
-      JOIN devices d ON s.device_id = d.id
-      LEFT JOIN repos r ON s.repo_id = r.id
-      LEFT JOIN (
-        SELECT session_id, id, files, semantic_scope, summary, created_at,
-               ROW_NUMBER() OVER (PARTITION BY session_id ORDER BY created_at DESC) as rn
-        FROM activity
-      ) a ON s.id = a.session_id AND a.rn = 1
-      WHERE s.id = ?
-      AND u.team_id = ?`
-    )
-    .bind(sessionId, teamId)
-    .first();
+export async function getWebSessionByTokenHash(db: D1Database, tokenHash: string): Promise<WebSession | null> {
+  return db
+    .prepare("SELECT * FROM web_sessions WHERE token_hash = ? AND expires_at > datetime('now')")
+    .bind(tokenHash)
+    .first<WebSession>();
+}
 
-  if (!row) return null;
-
-  const r = row as Record<string, unknown>;
-  return {
-    id: r.id as string,
-    user_id: r.user_id as string,
-    device_id: r.device_id as string,
-    repo_id: r.repo_id as string | null,
-    branch: r.branch as string | null,
-    worktree: r.worktree as string | null,
-    status: r.status as 'active' | 'stale' | 'ended',
-    started_at: r.started_at as string,
-    last_activity_at: r.last_activity_at as string,
-    ended_at: r.ended_at as string | null,
-    user: {
-      id: r.user_id as string,
-      name: r.user_name as string,
-    },
-    device: {
-      id: r.device_id as string,
-      name: r.device_name as string,
-      is_remote: r.device_is_remote as number,
-    },
-    repo: r.repo_id
-      ? {
-          id: r.repo_id as string,
-          name: r.repo_name as string,
-          remote_url: r.repo_remote_url as string | null,
-        }
-      : null,
-    latest_activity: r.activity_id
-      ? {
-          id: r.activity_id as string,
-          session_id: r.id as string,
-          files: safeParseFiles(r.files as string),
-          semantic_scope: r.semantic_scope as string | null,
-          summary: r.summary as string | null,
-          created_at: r.activity_created_at as string,
-        }
-      : null,
-  };
+export async function deleteExpiredWebSessions(db: D1Database): Promise<void> {
+  await db.prepare("DELETE FROM web_sessions WHERE expires_at < datetime('now')").run();
 }

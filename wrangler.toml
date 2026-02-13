@@ -21,6 +21,10 @@ ENVIRONMENT = "production"
 
 # Note: TEAM_ENCRYPTION_KEY must be set as a secret during setup
 
+# Stale session detection - every 15 minutes
+[triggers]
+crons = ["*/15 * * * *"]
+
 # Enable worker logs for debugging
 [observability]
 [observability.logs]

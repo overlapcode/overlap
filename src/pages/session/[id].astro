@@ -2,7 +2,7 @@
 import Layout from '@layouts/Layout.astro';
 import { Header } from '@components/Header';
 import { SessionDetail } from '@components/SessionDetail';
-import { getSessionUser } from '@lib/auth/session';
+import { getSessionData } from '@lib/auth/session';
 import { ensureMigrated } from '@lib/db/migrate';
 
 const { id } = Astro.params;
@@ -15,19 +15,18 @@ let sessionData = null;
 if (Astro.locals.runtime?.env?.DB) {
   const db = Astro.locals.runtime.env.DB;
   await ensureMigrated(db);
-  sessionData = await getSessionUser(Astro.cookies, db);
+  sessionData = await getSessionData(Astro.cookies, db);
 }
 
 if (!sessionData) {
   return Astro.redirect('/');
 }
 
-const teamName = sessionData.team.name;
-const userName = sessionData.user.name;
+const teamName = sessionData.teamName;
 ---
 
 <Layout title="Session Detail">
-  <Header teamName={teamName} userName={userName} client:load />
+  <Header teamName={teamName} client:load />
 
   <main class="container" style="padding-top: var(--space-xl); padding-bottom: var(--space-xl);">
     <div style="width: 100%; max-width: 800px; margin: 0 auto;">

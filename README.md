@@ -9,129 +9,127 @@
 
 > See where your team's heads are at.
 
-Overlap is a **Claude Code plugin + self-hosted cloud service** that tracks what you and your team are working on across Claude Code sessions, detects overlapping work, and displays a real-time timeline of team activity.
+Overlap is a **JSONL tracer + self-hosted dashboard** that tracks what you and your team are working on across Claude Code sessions, detects overlapping work, and displays a real-time timeline of team activity.
 
 ## Features
 
 - **Real-time Activity Feed** - See what everyone's working on as it happens
-- **Smart Overlap Detection** - File-level and semantic matching catches related work
+- **Smart Overlap Detection** - File-level matching catches conflicts early
+- **Full History Backfill** - Sync all your historical sessions on first join
 - **LLM-Powered Summaries** - AI summarizes what you're doing (BYOK)
 - **Personal History** - Searchable timeline of all your sessions
 - **Self-Hosted & Private** - Your data stays on your infrastructure
 - **Zero Platform Cost** - Deploy to Cloudflare free tier
 
-## Prerequisites
+## How It Works
 
-The Claude Code plugin requires **Python 3.7+** installed on your machine. Check with:
-
-```bash
-python3 --version
 ```
+┌─────────────────────────────────────────────────────────────────┐
+│                    DEVELOPER MACHINE                             │
+│                                                                  │
+│   Claude Code → JSONL logs → Overlap Tracer → API sync          │
+└──────────────────────────────┬──────────────────────────────────┘
+                               │
+                               ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                   CLOUDFLARE PAGES                               │
+│   Dashboard + API endpoints + SSE streaming                      │
+└──────────────────────────────┬──────────────────────────────────┘
+                               │
+                               ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                      CLOUDFLARE D1                               │
+│   team_config · repos · members · sessions · file_operations    │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+The **tracer binary** runs on your machine and parses Claude Code's local JSONL session logs, then syncs them to your self-hosted Overlap instance.
 
 ## Quick Start
 
-### Option A: One-Click Deploy
+### 1. Deploy the Dashboard
 
-[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/overlapcode/overlap)
+[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/overlapdev/overlap)
 
-Click the button above to deploy Overlap to your Cloudflare account. The D1 database and KV namespace will be created automatically.
+Click to deploy Overlap to your Cloudflare account. The D1 database will be created automatically.
 
-After deployment, visit your URL and go to `/setup` to create your team.
+After deployment:
+1. Visit your URL and go to `/setup`
+2. Create your team (set name and dashboard password)
+3. Add repositories to track in Settings → Repos
 
-### Option B: Manual Deploy
+### 2. Install the Tracer
+
+```bash
+# macOS
+brew install overlapdev/tap/overlap
+
+# Linux
+curl -fsSL https://overlap.dev/install.sh | sh
+```
+
+### 3. Join Your Team
+
+```bash
+# Join and backfill your full history
+overlap join https://your-team.pages.dev
+
+# Start the background sync daemon
+overlap start
+```
+
+The tracer will:
+- Prompt you for your user token (from `/join` page)
+- Backfill all historical sessions for registered repos
+- Watch for new sessions and sync them in real-time
+
+### 4. Invite Team Members
+
+Share your Overlap URL with team members. They can:
+1. Visit `/join` and enter the team join code
+2. Get their user token
+3. Install the tracer and run `overlap join <url>`
+
+## Tracer Commands
+
+| Command | Description |
+|---------|-------------|
+| `overlap join <url>` | Join a team and backfill history |
+| `overlap start` | Start background sync daemon |
+| `overlap stop` | Stop the daemon |
+| `overlap status` | Show sync status |
+| `overlap sync` | Manual sync trigger |
+| `overlap config` | View/edit configuration |
+
+## Manual Deploy
 
 ```bash
 # Clone and install
-git clone https://github.com/overlapcode/overlap
+git clone https://github.com/overlapdev/overlap
 cd overlap
 npm install
 
-# Build and deploy (D1/KV auto-created on first deploy)
+# Build and deploy
 npm run build
 wrangler deploy
 
 # Run database migrations
-wrangler d1 execute overlap-db --remote --file=migrations/001_initial.sql
-```
-
-### 2. Set Up Your Team
-
-1. Visit your deployed URL (e.g., `https://overlap.<account>.workers.dev`)
-2. Go to `/setup` to create your team
-3. Save the team token and your user token
-
-### 3. Install the Claude Code Plugin
-
-In Claude Code, run:
-
-```
-/plugin marketplace add overlapcode/overlap
-/plugin install overlap@overlap
-```
-
-That's it - no cloning required.
-
-#### Enable for All Projects (Optional)
-
-By default, the plugin installs with project scope. To use Overlap across all projects on your machine, edit `~/.claude/plugins/installed_plugins.json`:
-
-1. Find the `"overlap@overlap"` entry
-2. Change `"scope": "local"` to `"scope": "user"`
-3. Remove the `"projectPath"` line
-4. Restart Claude Code
-
-### 4. Configure the Plugin
-
-Run `/overlap:config` in Claude Code and enter:
-- Your Overlap server URL
-- Team token
-- User token
-
-### 5. Start Coding
-
-That's it! Your activity will now be tracked. Use these commands:
-
-| Command | Description |
-|---------|-------------|
-| `/overlap:team` | See team activity |
-| `/overlap:status` | Check connection |
-| `/overlap:history` | Your personal timeline |
-| `/overlap:link` | Get dashboard access link |
-
-## Architecture
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                    CLAUDE CODE PLUGIN                           │
-│   hooks/hooks.json → scripts/*.py → API calls                  │
-└───────────────────────────────┬─────────────────────────────────┘
-                                │
-                                ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                   CLOUDFLARE WORKERS                            │
-│   Astro + React frontend │ API endpoints │ SSE streaming       │
-└───────────────────────────────┬─────────────────────────────────┘
-                                │
-                                ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                      CLOUDFLARE D1                              │
-│   teams · users · devices · repos · sessions · activity        │
-└─────────────────────────────────────────────────────────────────┘
+npm run db:migrate:remote
 ```
 
 ## LLM Providers
 
-Configure an LLM provider for better activity classification:
+Configure an LLM provider for better activity summaries:
 
 | Provider | Models | Cost |
 |----------|--------|------|
 | Heuristic | Path-based | Free |
-| Anthropic | Claude 3.5 Haiku, Sonnet, Opus | $-$$$ |
+| Anthropic | Claude Haiku 3.5, Sonnet 4 | $-$$ |
 | OpenAI | GPT-4o, GPT-4o Mini | $-$$ |
-| Google | Gemini 2.0 Flash, 1.5 Pro | $-$$ |
-| xAI | Grok 2 | $-$$ |
+| Google | Gemini 2.0 Flash | $ |
+| xAI | Grok 2 | $$ |
 
-Configure in Settings → LLM Classification.
+Configure in Dashboard → Settings → LLM.
 
 ## Development
 
@@ -156,65 +154,41 @@ npm run build
 
 ```
 overlap/
-├── src/                    # Astro frontend + API
-│   ├── pages/              # Routes + API endpoints
-│   │   └── api/v1/         # API endpoints
+├── src/
+│   ├── pages/              # Astro pages
+│   │   ├── api/v1/         # Versioned API endpoints
+│   │   └── settings/       # Settings pages
 │   ├── components/         # React components
-│   └── lib/                # Utilities
-├── plugin/                 # Claude Code plugin
-│   ├── .claude-plugin/     # Plugin manifest
-│   ├── hooks/              # Hook configuration
-│   ├── scripts/            # Python hook scripts
-│   └── commands/           # Slash commands
-├── migrations/             # D1 schema
+│   └── lib/
+│       ├── db/             # D1 queries & types
+│       ├── llm/            # LLM providers
+│       └── auth/           # Authentication
+├── docs/
+│   ├── API.md              # API documentation
+│   └── TRACER_SPEC.md      # Tracer specification
+├── migrations/
+│   └── 001_initial.sql     # Database schema
 └── wrangler.toml           # Cloudflare config
 ```
 
-## API Endpoints
-
-### User Endpoints
-- `POST /api/v1/sessions/start` - Start a session
-- `POST /api/v1/sessions/:id/heartbeat` - Report activity
-- `POST /api/v1/sessions/:id/end` - End a session
-- `POST /api/v1/check` - Check for overlaps
-- `GET /api/v1/activity` - Get team activity
-- `GET /api/v1/users/me` - Get current user
-- `GET /api/v1/users/me/timeline` - Get personal timeline
-- `POST /api/v1/magic-link` - Generate magic link
-- `GET /api/v1/stream` - SSE activity stream
-
-### Admin Endpoints
-- `GET /api/v1/admin/users` - List users
-- `PUT /api/v1/admin/users/:id` - Update user
-- `GET /api/v1/admin/repos` - List repos
-- `PUT /api/v1/admin/repos/:id` - Update repo
-- `PUT /api/v1/admin/team` - Update team settings
-- `PUT /api/v1/admin/llm` - Update LLM settings
-- `GET /api/v1/version` - Get version info
-
 ## Updating
 
-### Update the Plugin
+### Update the Dashboard
 
-In Claude Code, run:
+Your forked repository can sync from upstream:
+1. Go to your fork on GitHub
+2. Click "Sync fork" → "Update branch"
+3. Cloudflare auto-deploys the changes
 
+### Update the Tracer
+
+```bash
+brew upgrade overlapdev/tap/overlap
 ```
-/plugin update overlap@overlapcode-overlap
-```
 
-### Update the Service
+### Check Version
 
-**Automatic Updates:** Your cloned repository includes a GitHub Action that automatically syncs from upstream daily. When updates are available, they're merged and Cloudflare auto-deploys them. No action needed!
-
-**Manual sync:** If you want to update immediately:
-1. Go to your cloned repo on GitHub
-2. Click **Actions** → **Sync from Upstream** → **Run workflow**
-
-**Disable auto-updates:** If you prefer manual control, go to Actions → Sync from Upstream → ⋯ → Disable workflow
-
-### Check Current Version
-
-Visit `https://your-instance.workers.dev/api/v1/version` to see your deployed version.
+Visit `https://your-instance.pages.dev/api/v1/version`
 
 ## License
 
@@ -222,5 +196,6 @@ MIT
 
 ## Links
 
-- [GitHub](https://github.com/overlapcode/overlap)
+- [GitHub](https://github.com/overlapdev/overlap)
+- [Documentation](https://overlap.dev/docs)
 - [Overlap](https://overlap.dev)

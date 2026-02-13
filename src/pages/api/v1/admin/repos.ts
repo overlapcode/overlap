@@ -1,6 +1,6 @@
 import type { APIContext } from 'astro';
-import { authenticateAny, errorResponse, successResponse } from '@lib/auth/middleware';
-import { getTeamRepos, getUserRepos } from '@lib/db/queries';
+import { authenticateAny, isAdmin, errorResponse, successResponse } from '@lib/auth/middleware';
+import { getAllRepos } from '@lib/db/queries';
 
 export async function GET(context: APIContext) {
   const { request } = context;
@@ -12,24 +12,18 @@ export async function GET(context: APIContext) {
     return errorResponse(authResult.error, authResult.status);
   }
 
-  const { team, user } = authResult.context;
-  const isAdmin = user.role === 'admin';
-
   try {
-    // Admins see all team repos, non-admins only see repos they've worked on
-    const repos = isAdmin
-      ? await getTeamRepos(db, team.id)
-      : await getUserRepos(db, team.id, user.id);
+    const repos = await getAllRepos(db);
 
     return successResponse({
       repos: repos.map((repo) => ({
         id: repo.id,
         name: repo.name,
-        remote_url: repo.remote_url,
-        is_public: repo.is_public === 1,
+        display_name: repo.display_name,
+        description: repo.description,
         created_at: repo.created_at,
       })),
-      is_admin: isAdmin,
+      is_admin: isAdmin(authResult.context),
     });
   } catch (error) {
     console.error('List repos error:', error);

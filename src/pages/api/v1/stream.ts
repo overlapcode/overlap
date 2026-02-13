@@ -1,35 +1,34 @@
 import type { APIContext } from 'astro';
-import type { SessionWithDetails } from '@lib/db/types';
+import type { SessionWithMember } from '@lib/db/types';
 import { authenticateAny, errorResponse } from '@lib/auth/middleware';
-import { getRecentActivity, markStaleSessions } from '@lib/db/queries';
+import { getSessions, markStaleSessions } from '@lib/db/queries';
 
 const POLL_INTERVAL_MS = 1000; // Check for changes every 1 second
 const KEEPALIVE_INTERVAL_MS = 15000; // Send keepalive every 15 seconds
 const STALE_CHECK_INTERVAL_MS = 30000; // Check for stale sessions every 30 seconds
 
-function formatSession(session: SessionWithDetails) {
+function formatSession(session: SessionWithMember) {
   return {
     id: session.id,
-    user: session.user,
-    device: {
-      id: session.device.id,
-      name: session.device.name,
-      is_remote: session.device.is_remote === 1,
+    user: {
+      id: session.member.user_id,
+      name: session.member.display_name,
     },
-    repo: session.repo,
-    branch: session.branch,
-    worktree: session.worktree,
+    repo: session.repo ? {
+      id: session.repo.id,
+      name: session.repo.name,
+      display_name: session.repo.display_name,
+    } : null,
+    repo_name: session.repo_name,
+    branch: session.git_branch,
     status: session.status,
     started_at: session.started_at,
-    last_activity_at: session.last_activity_at,
-    activity: session.latest_activity
-      ? {
-          semantic_scope: session.latest_activity.semantic_scope,
-          summary: session.latest_activity.summary,
-          files: session.latest_activity.files,
-          created_at: session.latest_activity.created_at,
-        }
-      : null,
+    ended_at: session.ended_at,
+    model: session.model,
+    total_cost_usd: session.total_cost_usd,
+    num_turns: session.num_turns,
+    duration_ms: session.duration_ms,
+    generated_summary: session.generated_summary,
   };
 }
 
@@ -37,12 +36,12 @@ function formatSession(session: SessionWithDetails) {
  * Build a fingerprint string for a session that changes whenever something
  * the client cares about has changed (new activity, status change, etc.).
  */
-function sessionFingerprint(session: SessionWithDetails): string {
+function sessionFingerprint(session: SessionWithMember): string {
   return [
     session.status,
-    session.last_activity_at,
-    session.latest_activity?.id ?? '',
-    session.latest_activity?.created_at ?? '',
+    session.ended_at ?? '',
+    session.generated_summary ?? '',
+    session.num_turns,
   ].join('|');
 }
 
@@ -55,7 +54,6 @@ export async function GET(context: APIContext) {
   if (!authResult.success) {
     return errorResponse(authResult.error, authResult.status);
   }
-  const { team } = authResult.context;
 
   const encoder = new TextEncoder();
 
@@ -71,7 +69,7 @@ export async function GET(context: APIContext) {
 
       // Send initial connected event
       controller.enqueue(
-        encoder.encode(`event: connected\ndata: ${JSON.stringify({ team_id: team.id })}\n\n`)
+        encoder.encode(`event: connected\ndata: ${JSON.stringify({ status: 'connected' })}\n\n`)
       );
 
       // Snapshot-diff approach: track fingerprint of each session
@@ -95,12 +93,10 @@ export async function GET(context: APIContext) {
           // Lightweight change check: single-row query to detect if anything changed
           const changeCheck = await db
             .prepare(
-              `SELECT COUNT(*) as cnt, MAX(s.last_activity_at) as latest
-               FROM sessions s
-               JOIN users u ON s.user_id = u.id
-               WHERE u.team_id = ? AND s.status IN ('active', 'stale')`
+              `SELECT COUNT(*) as cnt, MAX(started_at) as latest
+               FROM sessions
+               WHERE status IN ('active', 'stale')`
             )
-            .bind(team.id)
             .first<{ cnt: number; latest: string | null }>();
 
           const sig = `${changeCheck?.cnt ?? 0}|${changeCheck?.latest ?? ''}`;
@@ -119,10 +115,10 @@ export async function GET(context: APIContext) {
           lastChangeSignature = sig;
 
           // Something changed — fetch full session data
-          const result = await getRecentActivity(db, team.id, { limit: 50 });
+          const result = await getSessions(db, { limit: 50, status: 'active_or_stale' });
 
           // Build new snapshot
-          const currentSessions = new Map<string, SessionWithDetails>();
+          const currentSessions = new Map<string, SessionWithMember>();
           for (const session of result.sessions) {
             currentSessions.set(session.id, session);
           }

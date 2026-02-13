@@ -1,6 +1,10 @@
 import type { APIContext } from 'astro';
 import { authenticateAny, errorResponse, successResponse } from '@lib/auth/middleware';
 
+/**
+ * GET /api/v1/me
+ * Get information about the currently authenticated user/session.
+ */
 export async function GET(context: APIContext) {
   const { request } = context;
   const db = context.locals.runtime.env.DB;
@@ -11,25 +15,17 @@ export async function GET(context: APIContext) {
     return errorResponse(authResult.error, authResult.status);
   }
 
-  const { user, team } = authResult.context;
-
-  // Get the user's token from the database
-  const userRecord = await db
-    .prepare('SELECT user_token FROM users WHERE id = ?')
-    .bind(user.id)
-    .first<{ user_token: string }>();
+  const { member, teamConfig } = authResult.context;
 
   return successResponse({
     user: {
-      id: user.id,
-      name: user.name,
-      email: user.email,
-      role: user.role,
-      user_token: userRecord?.user_token || null,
+      id: member.user_id,
+      name: member.display_name,
+      email: member.email,
+      role: member.role,
     },
     team: {
-      id: team.id,
-      name: team.name,
+      name: teamConfig.team_name,
     },
   });
 }

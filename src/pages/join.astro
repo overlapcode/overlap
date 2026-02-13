@@ -12,23 +12,23 @@ import { Header } from '@components/Header';
       <div id="join-section">
         <h1 style="font-size: 1.5rem; margin-bottom: var(--space-md);">Join Your Team</h1>
         <p class="text-secondary" style="margin-bottom: var(--space-xl);">
-          Enter your team token to join an existing Overlap team.
+          Enter the team join code to join an existing Overlap team.
         </p>
 
         <form id="join-form" class="card">
           <div style="margin-bottom: var(--space-lg);">
             <label
-              for="team-token-input"
+              for="team-join-code-input"
               style="display: block; margin-bottom: var(--space-sm); font-weight: 500;"
             >
-              Team Token
+              Team Join Code
             </label>
             <input
               type="text"
-              id="team-token-input"
-              name="team_token"
+              id="team-join-code-input"
+              name="team_join_code"
               required
-              placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+              placeholder="Enter join code"
               style="
                 width: 100%;
                 padding: var(--space-sm) var(--space-md);
@@ -120,7 +120,7 @@ import { Header } from '@components/Header';
           </div>
           <h1 style="font-size: 1.5rem; margin-bottom: var(--space-sm);">Welcome to <span id="team-name-display">the Team</span>!</h1>
           <p class="text-secondary">
-            Save your user token - you'll need it to configure the Claude Code plugin.
+            Save your user token - you'll need it to configure the Overlap tracer.
           </p>
         </div>
 
@@ -156,18 +156,45 @@ import { Header } from '@components/Header';
               "
             />
             <p class="text-muted" style="font-size: 0.75rem; margin-top: var(--space-xs);">
-              Your personal token for the Claude Code plugin. Keep this private.
+              Your personal token for the Overlap tracer. Keep this private.
             </p>
           </div>
         </div>
 
         <div style="background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: var(--space-lg); margin-bottom: var(--space-lg);">
-          <h3 style="font-size: 1rem; margin-bottom: var(--space-md);">Next Steps</h3>
-          <ol style="padding-left: var(--space-lg); color: var(--text-secondary); font-size: 0.875rem; line-height: 1.8;">
-            <li>Install the Claude Code plugin: <code style="background: var(--bg-elevated); padding: 2px 6px; border-radius: 3px;">/plugin marketplace add overlapcode/overlap</code></li>
-            <li>Configure it with your token: <code style="background: var(--bg-elevated); padding: 2px 6px; border-radius: 3px;">/overlap:config</code></li>
-            <li>Start coding - your activity will appear on the dashboard!</li>
-          </ol>
+          <h3 style="font-size: 1rem; margin-bottom: var(--space-md);">Next Steps: Install the Tracer</h3>
+          <p class="text-secondary" style="font-size: 0.875rem; margin-bottom: var(--space-md);">
+            The Overlap tracer syncs your coding agent sessions to the dashboard. Install it with:
+          </p>
+
+          <div style="margin-bottom: var(--space-md);">
+            <div style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: var(--space-xs);">macOS / Linux</div>
+            <div style="display: flex; align-items: center; gap: var(--space-sm);">
+              <code id="install-cmd" style="flex: 1; background: var(--bg-elevated); padding: var(--space-sm) var(--space-md); border-radius: var(--radius-sm); font-size: 0.875rem; overflow-x: auto;">curl -fsSL https://overlap.sh/install.sh | sh</code>
+              <button type="button" class="copy-btn" data-target="install-cmd" style="
+                background: none;
+                border: 1px solid var(--border-default);
+                color: var(--text-secondary);
+                padding: 4px 8px;
+                border-radius: var(--radius-sm);
+                font-size: 0.75rem;
+                cursor: pointer;
+                flex-shrink: 0;
+              ">
+                Copy
+              </button>
+            </div>
+          </div>
+
+          <div style="margin-bottom: var(--space-md);">
+            <div style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: var(--space-xs);">Then run</div>
+            <code style="display: block; background: var(--bg-elevated); padding: var(--space-sm) var(--space-md); border-radius: var(--radius-sm); font-size: 0.875rem;">overlap join</code>
+          </div>
+
+          <p class="text-muted" style="font-size: 0.75rem; line-height: 1.5;">
+            When prompted, paste your <strong>instance URL</strong> (<span id="instance-url-display" style="font-family: var(--font-mono);"></span>) and <strong>user token</strong> above.
+            The tracer will start syncing your coding agent sessions automatically.
+          </p>
         </div>
 
         <a href="/" class="btn btn-primary" style="width: 100%; text-align: center; text-decoration: none;">
@@ -196,10 +223,10 @@ import { Header } from '@components/Header';
     errorMessage.style.display = 'none';
 
     const formData = new FormData(form);
-    const teamToken = formData.get('team_token') as string;
+    const teamJoinCode = formData.get('team_join_code') as string;
     const data = {
-      team_token: teamToken,
-      name: formData.get('name'),
+      team_join_code: teamJoinCode,
+      display_name: formData.get('name'),
       email: formData.get('email') || null,
     };
 
@@ -227,22 +254,6 @@ import { Header } from '@components/Header';
       userTokenInput.value = result.data.user_token;
       teamNameDisplay.textContent = result.data.team_name;
 
-      // Create a web session for the dashboard
-      try {
-        await fetch('/api/v1/auth/create-session', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            user_id: result.data.user_id,
-            user_token: result.data.user_token,
-            team_token: teamToken,
-          }),
-        });
-      } catch (sessionError) {
-        console.error('Failed to create session:', sessionError);
-        // Continue anyway - user can still use the token
-      }
-
       // Hide form, show success
       joinSection.style.display = 'none';
       successSection.style.display = 'block';
@@ -254,6 +265,12 @@ import { Header } from '@components/Header';
       submitBtn.textContent = 'Join Team';
     }
   });
+
+  // Show instance URL
+  const instanceUrlDisplay = document.getElementById('instance-url-display');
+  if (instanceUrlDisplay) {
+    instanceUrlDisplay.textContent = window.location.origin;
+  }
 
   // Copy button handlers
   document.querySelectorAll('.copy-btn').forEach((btn) => {

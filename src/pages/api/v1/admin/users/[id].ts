@@ -1,12 +1,12 @@
 import type { APIContext } from 'astro';
 import { z } from 'zod';
 import { authenticateAny, requireAdmin, errorResponse, successResponse } from '@lib/auth/middleware';
-import { getUserById, deleteUser } from '@lib/db/queries';
+import { getMemberById, updateMember, deleteMember } from '@lib/db/queries';
 
 const UpdateUserSchema = z.object({
   role: z.enum(['admin', 'member']).optional(),
-  is_active: z.boolean().optional(),
-  stale_timeout_hours: z.number().min(1).max(168).nullable().optional(),
+  display_name: z.string().min(1).optional(),
+  email: z.string().email().nullable().optional(),
 });
 
 export async function PUT(context: APIContext) {
@@ -41,17 +41,17 @@ export async function PUT(context: APIContext) {
   const input = parseResult.data;
 
   try {
-    // Get user to update
-    const user = await getUserById(db, userId);
-    if (!user) {
+    // Get member to update
+    const member = await getMemberById(db, userId);
+    if (!member) {
       return errorResponse('User not found', 404);
     }
 
     // Check if trying to demote from admin to member
-    if (input.role === 'member' && user.role === 'admin') {
+    if (input.role === 'member' && member.role === 'admin') {
       // Count how many admins exist
       const adminCount = await db
-        .prepare("SELECT COUNT(*) as count FROM users WHERE role = 'admin' AND is_active = 1")
+        .prepare("SELECT COUNT(*) as count FROM members WHERE role = 'admin'")
         .first<{ count: number }>();
 
       if (adminCount && adminCount.count <= 1) {
@@ -59,34 +59,12 @@ export async function PUT(context: APIContext) {
       }
     }
 
-    // Build update query
-    const updates: string[] = [];
-    const values: unknown[] = [];
-
-    if (input.role !== undefined) {
-      updates.push('role = ?');
-      values.push(input.role);
-    }
-    if (input.is_active !== undefined) {
-      updates.push('is_active = ?');
-      values.push(input.is_active ? 1 : 0);
-    }
-    if (input.stale_timeout_hours !== undefined) {
-      updates.push('stale_timeout_hours = ?');
-      values.push(input.stale_timeout_hours);
-    }
-
-    if (updates.length === 0) {
-      return successResponse({ message: 'No changes made' });
-    }
-
-    updates.push("updated_at = datetime('now')");
-    values.push(userId);
-
-    await db
-      .prepare(`UPDATE users SET ${updates.join(', ')} WHERE id = ?`)
-      .bind(...values)
-      .run();
+    // Update member
+    await updateMember(db, userId, {
+      role: input.role,
+      display_name: input.display_name,
+      email: input.email,
+    });
 
     return successResponse({ message: 'User updated successfully' });
   } catch (error) {
@@ -112,21 +90,21 @@ export async function DELETE(context: APIContext) {
   }
 
   // Cannot delete yourself
-  if (authResult.context.user.id === userId) {
+  if (authResult.context.member.user_id === userId) {
     return errorResponse('Cannot remove yourself', 400);
   }
 
   try {
-    // Get user to delete
-    const user = await getUserById(db, userId);
-    if (!user) {
+    // Get member to delete
+    const member = await getMemberById(db, userId);
+    if (!member) {
       return errorResponse('User not found', 404);
     }
 
     // If deleting an admin, ensure there's at least one other admin
-    if (user.role === 'admin') {
+    if (member.role === 'admin') {
       const adminCount = await db
-        .prepare("SELECT COUNT(*) as count FROM users WHERE role = 'admin' AND is_active = 1")
+        .prepare("SELECT COUNT(*) as count FROM members WHERE role = 'admin'")
         .first<{ count: number }>();
 
       if (adminCount && adminCount.count <= 1) {
@@ -134,7 +112,7 @@ export async function DELETE(context: APIContext) {
       }
     }
 
-    await deleteUser(db, userId);
+    await deleteMember(db, userId);
 
     return successResponse({ message: 'User removed successfully' });
   } catch (error) {

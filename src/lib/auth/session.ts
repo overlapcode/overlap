@@ -1,31 +1,22 @@
 /**
  * Server-side session utilities for Astro pages.
- * Used to get the current user from the session cookie.
+ * Used to check if the user has dashboard access via password authentication.
  */
 
 import type { D1Database } from '@cloudflare/workers-types';
-import { getUserById, getTeam } from '@lib/db/queries';
-
-export type SessionUser = {
-  id: string;
-  name: string;
-  email: string | null;
-  role: 'admin' | 'member';
-};
+import { getTeamConfig, getWebSessionByTokenHash } from '@lib/db/queries';
 
 export type SessionData = {
-  user: SessionUser;
-  team: {
-    id: string;
-    name: string;
-  };
+  teamName: string;
+  isAuthenticated: boolean;
 } | null;
 
 /**
- * Get the current user from the session cookie.
+ * Get session data from the session cookie.
+ * In v2, dashboard access is password-based, not user-based.
  * Returns null if not authenticated.
  */
-export async function getSessionUser(
+export async function getSessionData(
   cookies: { get: (name: string) => { value: string } | undefined },
   db: D1Database
 ): Promise<SessionData> {
@@ -44,43 +35,20 @@ export async function getSessionUser(
     const tokenHash = btoa(String.fromCharCode(...new Uint8Array(hashBuffer)));
 
     // Find session
-    const session = await db
-      .prepare(
-        `SELECT ws.user_id
-         FROM web_sessions ws
-         WHERE ws.token_hash = ?
-         AND ws.expires_at > datetime('now')`
-      )
-      .bind(tokenHash)
-      .first<{ user_id: string }>();
-
+    const session = await getWebSessionByTokenHash(db, tokenHash);
     if (!session) {
       return null;
     }
 
-    // Get user
-    const user = await getUserById(db, session.user_id);
-    if (!user || !user.is_active) {
-      return null;
-    }
-
-    // Get team
-    const team = await getTeam(db);
-    if (!team) {
+    // Get team config
+    const config = await getTeamConfig(db);
+    if (!config) {
       return null;
     }
 
     return {
-      user: {
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-      },
-      team: {
-        id: team.id,
-        name: team.name,
-      },
+      teamName: config.team_name,
+      isAuthenticated: true,
     };
   } catch (error) {
     console.error('Session lookup error:', error);

@@ -3,62 +3,71 @@ import Layout from '@layouts/Layout.astro';
 import { Header } from '@components/Header';
 ---
 
-<Layout title="My Account">
+<Layout title="Collector Setup">
   <Header client:load />
 
   <main class="container" style="padding-top: var(--space-xl); padding-bottom: var(--space-xl);">
     <div style="width: 100%; max-width: 600px; margin: 0 auto;">
       <div style="display: flex; align-items: center; gap: var(--space-md); margin-bottom: var(--space-xl);">
         <a href="/settings" class="text-muted" style="text-decoration: none;">← Back</a>
-        <h1 style="font-size: 1.5rem;">My Account</h1>
+        <h1 style="font-size: 1.5rem;">Collector Setup</h1>
       </div>
 
-      <!-- Loading state -->
-      <div id="loading-state" class="card" style="text-align: center; padding: var(--space-xl);">
-        <img src="/loading.gif" alt="Loading" width="48" height="48" style="opacity: 0.8;" />
-      </div>
-
-      <!-- Error state -->
-      <div id="error-state" class="card" style="text-align: center; padding: var(--space-xl); display: none;">
-        <p class="text-secondary" id="error-message">Failed to load account details</p>
-        <a href="/join" class="btn btn-primary" style="margin-top: var(--space-md);">Sign In</a>
-      </div>
-
-      <!-- Account details -->
-      <div id="account-section" style="display: none;">
-        <div class="card" style="margin-bottom: var(--space-lg);">
-          <h2 style="font-size: 1.125rem; margin-bottom: var(--space-lg);">Account Details</h2>
-
-          <div style="margin-bottom: var(--space-lg);">
-            <label style="display: block; margin-bottom: var(--space-xs); font-weight: 500; font-size: 0.875rem;">Name</label>
-            <p id="user-name" class="text-secondary" style="font-size: 1rem;">-</p>
-          </div>
-
-          <div style="margin-bottom: var(--space-lg);">
-            <label style="display: block; margin-bottom: var(--space-xs); font-weight: 500; font-size: 0.875rem;">Email</label>
-            <p id="user-email" class="text-secondary" style="font-size: 1rem;">-</p>
-          </div>
-
-          <div style="margin-bottom: var(--space-lg);">
-            <label style="display: block; margin-bottom: var(--space-xs); font-weight: 500; font-size: 0.875rem;">Role</label>
-            <p id="user-role" class="text-secondary" style="font-size: 1rem;">-</p>
-          </div>
-
-          <div>
-            <label style="display: block; margin-bottom: var(--space-xs); font-weight: 500; font-size: 0.875rem;">Team</label>
-            <p id="team-name" class="text-secondary" style="font-size: 1rem;">-</p>
-          </div>
+      <!-- Instance URL Section -->
+      <div class="card" style="margin-bottom: var(--space-lg);">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-sm);">
+          <label style="font-weight: 500;">Instance URL</label>
+          <button type="button" id="copy-url-btn" style="
+            background: none;
+            border: 1px solid var(--border-default);
+            color: var(--text-secondary);
+            padding: 4px 8px;
+            border-radius: var(--radius-sm);
+            font-size: 0.75rem;
+            cursor: pointer;
+          ">
+            Copy
+          </button>
         </div>
+        <input
+          type="text"
+          id="instance-url"
+          readonly
+          style="
+            width: 100%;
+            padding: var(--space-sm) var(--space-md);
+            background: var(--bg-primary);
+            border: 1px solid var(--border-subtle);
+            border-radius: var(--radius-sm);
+            color: var(--text-primary);
+            font-family: var(--font-mono);
+            font-size: 0.875rem;
+          "
+        />
+        <p class="text-muted" style="font-size: 0.75rem; margin-top: var(--space-xs);">
+          Use this URL when running <code style="background: var(--bg-elevated); padding: 2px 4px; border-radius: 2px;">overlap join</code>
+        </p>
+      </div>
 
-        <div class="card" style="margin-bottom: var(--space-lg);">
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-md);">
-            <div>
-              <h2 style="font-size: 1.125rem; margin-bottom: var(--space-xs);">Your User Token</h2>
-              <p class="text-muted" style="font-size: 0.75rem;">
-                Use this token to configure the Claude Code plugin
-              </p>
-            </div>
-            <button type="button" id="copy-token-btn" style="
+      <!-- Installation Instructions -->
+      <div style="background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: var(--space-lg);">
+        <h3 style="font-size: 1rem; margin-bottom: var(--space-lg);">Setting Up the Tracer</h3>
+
+        <div style="margin-bottom: var(--space-lg);">
+          <p class="text-secondary" style="font-size: 0.875rem; margin-bottom: var(--space-sm);">
+            <strong style="color: var(--text-primary);">1. Install the tracer</strong>
+          </p>
+          <div style="display: flex; gap: var(--space-sm); align-items: center;">
+            <code id="install-cmd" style="
+              flex: 1;
+              display: block;
+              background: var(--bg-elevated);
+              padding: var(--space-sm) var(--space-md);
+              border-radius: var(--radius-sm);
+              font-size: 0.875rem;
+              overflow-x: auto;
+            ">curl -fsSL https://overlap.sh/install.sh | sh</code>
+            <button type="button" class="copy-btn" data-target="install-cmd" style="
               background: none;
               border: 1px solid var(--border-default);
               color: var(--text-secondary);
@@ -66,32 +75,14 @@ import { Header } from '@components/Header';
               border-radius: var(--radius-sm);
               font-size: 0.75rem;
               cursor: pointer;
-            ">
-              Copy
-            </button>
+              flex-shrink: 0;
+            ">Copy</button>
           </div>
-          <input
-            type="text"
-            id="user-token"
-            readonly
-            style="
-              width: 100%;
-              padding: var(--space-sm) var(--space-md);
-              background: var(--bg-primary);
-              border: 1px solid var(--border-subtle);
-              border-radius: var(--radius-sm);
-              color: var(--text-primary);
-              font-family: var(--font-mono);
-              font-size: 0.875rem;
-            "
-          />
         </div>
 
-        <div style="background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: var(--space-lg);">
-          <h3 style="font-size: 1rem; margin-bottom: var(--space-md);">Plugin Configuration</h3>
-
+        <div style="margin-bottom: var(--space-lg);">
           <p class="text-secondary" style="font-size: 0.875rem; margin-bottom: var(--space-sm);">
-            <strong style="color: var(--text-primary);">1. Install the plugin</strong> (if not already installed):
+            <strong style="color: var(--text-primary);">2. Connect to your team</strong>
           </p>
           <code style="
             display: block;
@@ -99,11 +90,15 @@ import { Header } from '@components/Header';
             padding: var(--space-sm) var(--space-md);
             border-radius: var(--radius-sm);
             font-size: 0.875rem;
-            margin-bottom: var(--space-md);
-          ">/plugin marketplace add overlapcode/overlap</code>
+          ">overlap join</code>
+          <p class="text-muted" style="font-size: 0.75rem; margin-top: var(--space-xs);">
+            You'll be prompted for the instance URL (above) and your user token (from /join page).
+          </p>
+        </div>
 
+        <div>
           <p class="text-secondary" style="font-size: 0.875rem; margin-bottom: var(--space-sm);">
-            <strong style="color: var(--text-primary);">2. Configure the plugin</strong> with your tokens:
+            <strong style="color: var(--text-primary);">3. Verify it's working</strong>
           </p>
           <code style="
             display: block;
@@ -111,83 +106,81 @@ import { Header } from '@components/Header';
             padding: var(--space-sm) var(--space-md);
             border-radius: var(--radius-sm);
             font-size: 0.875rem;
-          ">/overlap:config</code>
+          ">overlap status</code>
         </div>
+      </div>
+
+      <!-- New Member Section -->
+      <div class="card" style="margin-top: var(--space-lg);">
+        <h3 style="font-size: 1rem; margin-bottom: var(--space-md);">Adding New Members</h3>
+        <p class="text-secondary" style="font-size: 0.875rem; margin-bottom: var(--space-md);">
+          New team members can join via the <a href="/join" style="color: var(--accent-blue);">/join</a> page using the team join code.
+          They'll receive a personal user token to configure their tracer.
+        </p>
+        <a href="/settings/team" class="btn btn-secondary" style="display: inline-block;">
+          View Join Code →
+        </a>
       </div>
     </div>
   </main>
 </Layout>
 
 <script>
-  const loadingState = document.getElementById('loading-state') as HTMLDivElement;
-  const errorState = document.getElementById('error-state') as HTMLDivElement;
-  const accountSection = document.getElementById('account-section') as HTMLDivElement;
-  const userName = document.getElementById('user-name') as HTMLParagraphElement;
-  const userEmail = document.getElementById('user-email') as HTMLParagraphElement;
-  const userRole = document.getElementById('user-role') as HTMLParagraphElement;
-  const teamName = document.getElementById('team-name') as HTMLParagraphElement;
-  const userToken = document.getElementById('user-token') as HTMLInputElement;
-  const copyTokenBtn = document.getElementById('copy-token-btn') as HTMLButtonElement;
+  const instanceUrl = document.getElementById('instance-url') as HTMLInputElement;
+  const copyUrlBtn = document.getElementById('copy-url-btn') as HTMLButtonElement;
 
-  async function loadProfile() {
+  // Set instance URL to current origin
+  instanceUrl.value = window.location.origin;
+
+  // Copy URL handler
+  copyUrlBtn?.addEventListener('click', async () => {
     try {
-      const response = await fetch('/api/v1/me');
-
-      if (!response.ok) {
-        throw new Error('Not authenticated');
-      }
-
-      const result = await response.json() as {
-        data: {
-          user: {
-            id: string;
-            name: string;
-            email: string | null;
-            role: string;
-            user_token: string | null;
-          };
-          team: {
-            id: string;
-            name: string;
-          };
-        }
-      };
-
-      // Populate the UI
-      userName.textContent = result.data.user.name;
-      userEmail.textContent = result.data.user.email || 'Not set';
-      userRole.textContent = result.data.user.role === 'admin' ? 'Admin' : 'Member';
-      teamName.textContent = result.data.team.name;
-      userToken.value = result.data.user.user_token || '';
-
-      // Show account section
-      loadingState.style.display = 'none';
-      accountSection.style.display = 'block';
-
-    } catch (error) {
-      console.error('Failed to load profile:', error);
-      loadingState.style.display = 'none';
-      errorState.style.display = 'block';
-    }
-  }
-
-  // Copy token handler
-  copyTokenBtn?.addEventListener('click', async () => {
-    try {
-      await navigator.clipboard.writeText(userToken.value);
-      copyTokenBtn.textContent = 'Copied!';
+      await navigator.clipboard.writeText(instanceUrl.value);
+      copyUrlBtn.textContent = 'Copied!';
       setTimeout(() => {
-        copyTokenBtn.textContent = 'Copy';
+        copyUrlBtn.textContent = 'Copy';
       }, 2000);
     } catch (err) {
-      userToken.select();
+      instanceUrl.select();
       document.execCommand('copy');
-      copyTokenBtn.textContent = 'Copied!';
+      copyUrlBtn.textContent = 'Copied!';
       setTimeout(() => {
-        copyTokenBtn.textContent = 'Copy';
+        copyUrlBtn.textContent = 'Copy';
       }, 2000);
     }
   });
 
-  loadProfile();
+  // Copy button handlers for code blocks
+  document.querySelectorAll('.copy-btn').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      const targetId = (btn as HTMLButtonElement).dataset.target;
+      if (!targetId) return;
+
+      const codeEl = document.getElementById(targetId);
+      if (!codeEl) return;
+
+      const text = codeEl.textContent || '';
+
+      try {
+        await navigator.clipboard.writeText(text);
+        const originalText = btn.textContent;
+        btn.textContent = 'Copied!';
+        setTimeout(() => {
+          btn.textContent = originalText;
+        }, 2000);
+      } catch (err) {
+        // Fallback
+        const textarea = document.createElement('textarea');
+        textarea.value = text;
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textarea);
+        btn.textContent = 'Copied!';
+        setTimeout(() => {
+          btn.textContent = 'Copy';
+        }, 2000);
+      }
+    });
+  });
 </script>

@@ -55,6 +55,11 @@ type ActivityCardProps = {
     status: 'active' | 'stale' | 'ended';
     started_at: string;
     last_activity_at: string;
+    // v2 fields
+    model?: string | null;
+    total_cost_usd?: number | null;
+    num_turns?: number;
+    duration_ms?: number | null;
     activity: {
       semantic_scope: string | null;
       summary: string | null;
@@ -63,9 +68,37 @@ type ActivityCardProps = {
   };
 };
 
+/**
+ * Format cost as a readable string
+ */
+function formatCost(cost: number | null | undefined): string | null {
+  if (cost === null || cost === undefined || cost === 0) return null;
+  if (cost < 0.01) return '<$0.01';
+  return `$${cost.toFixed(2)}`;
+}
+
+/**
+ * Get a short model name for display
+ */
+function getModelLabel(model: string | null | undefined): string | null {
+  if (!model) return null;
+  // Extract the model family name
+  const lowerModel = model.toLowerCase();
+  if (lowerModel.includes('opus')) return 'Opus';
+  if (lowerModel.includes('sonnet')) return 'Sonnet';
+  if (lowerModel.includes('haiku')) return 'Haiku';
+  if (lowerModel.includes('gpt-4')) return 'GPT-4';
+  if (lowerModel.includes('gpt-3')) return 'GPT-3.5';
+  if (lowerModel.includes('claude')) return 'Claude';
+  // Return first part if unknown
+  return model.split('-')[0];
+}
+
 export const ActivityCard = memo(function ActivityCard({ session }: ActivityCardProps) {
-  const { user, device, repo, branch, worktree, status, last_activity_at, activity } = session;
+  const { user, device, repo, branch, worktree, status, last_activity_at, activity, model, total_cost_usd, num_turns } = session;
   const relativeTime = useRelativeTime(last_activity_at);
+  const costLabel = formatCost(total_cost_usd);
+  const modelLabel = getModelLabel(model);
 
   const [expanded, setExpanded] = useState(false);
   const [recentActivities, setRecentActivities] = useState<CompactActivity[] | null>(null);
@@ -140,6 +173,49 @@ export const ActivityCard = memo(function ActivityCard({ session }: ActivityCard
           <span className="text-muted" style={{ fontSize: '0.875rem' }}>
             {relativeTime}
           </span>
+          {/* v2 badges: model, cost, turns */}
+          {modelLabel && (
+            <>
+              <span className="text-muted">·</span>
+              <span
+                style={{
+                  fontSize: '0.6875rem',
+                  padding: '2px 6px',
+                  borderRadius: '4px',
+                  backgroundColor: 'var(--bg-elevated)',
+                  color: 'var(--accent-blue)',
+                  fontFamily: 'var(--font-mono)',
+                }}
+              >
+                {modelLabel}
+              </span>
+            </>
+          )}
+          {num_turns !== undefined && num_turns > 0 && (
+            <>
+              <span className="text-muted">·</span>
+              <span className="text-secondary" style={{ fontSize: '0.75rem' }}>
+                {num_turns} turn{num_turns !== 1 ? 's' : ''}
+              </span>
+            </>
+          )}
+          {costLabel && (
+            <>
+              <span className="text-muted">·</span>
+              <span
+                style={{
+                  fontSize: '0.6875rem',
+                  padding: '2px 6px',
+                  borderRadius: '4px',
+                  backgroundColor: 'var(--bg-elevated)',
+                  color: 'var(--accent-green)',
+                  fontFamily: 'var(--font-mono)',
+                }}
+              >
+                {costLabel}
+              </span>
+            </>
+          )}
         </div>
       </div>
 

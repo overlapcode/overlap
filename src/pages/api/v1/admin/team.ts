@@ -2,11 +2,10 @@ import type { APIContext } from 'astro';
 import { z } from 'zod';
 import { authenticateAny, requireAdmin, errorResponse, successResponse } from '@lib/auth/middleware';
 import { hashPassword } from '@lib/utils/crypto';
-import { getTeam } from '@lib/db/queries';
+import { getTeamConfig, updateTeamConfig } from '@lib/db/queries';
 
 const UpdateTeamSchema = z.object({
-  name: z.string().min(1).max(100).optional(),
-  is_public: z.boolean().optional(),
+  team_name: z.string().min(1).max(100).optional(),
   stale_timeout_hours: z.number().min(1).max(168).optional(),
   dashboard_password: z.string().min(8).optional(),
 });
@@ -28,17 +27,19 @@ export async function GET(context: APIContext) {
   }
 
   try {
-    const team = await getTeam(db);
-    if (!team) {
-      return errorResponse('Team not found', 404);
+    const config = await getTeamConfig(db);
+    if (!config) {
+      return errorResponse('Team not configured', 404);
     }
 
     return successResponse({
-      name: team.name,
-      team_token: team.team_token,
-      is_public: team.is_public === 1,
-      stale_timeout_hours: team.stale_timeout_hours,
-      has_dashboard_password: !!team.dashboard_password_hash,
+      team_name: config.team_name,
+      team_join_code: config.team_join_code,
+      stale_timeout_hours: config.stale_timeout_hours,
+      has_dashboard_password: !!config.password_hash,
+      llm_provider: config.llm_provider,
+      llm_model: config.llm_model,
+      has_llm_api_key: !!config.llm_api_key_encrypted,
     });
   } catch (error) {
     console.error('Get team error:', error);
@@ -62,8 +63,6 @@ export async function PUT(context: APIContext) {
     return errorResponse(adminCheck.error, adminCheck.status);
   }
 
-  const { team } = authResult.context;
-
   // Parse body
   let body: unknown;
   try {
@@ -80,38 +79,27 @@ export async function PUT(context: APIContext) {
   const input = parseResult.data;
 
   try {
-    const updates: string[] = [];
-    const values: unknown[] = [];
+    const updates: Partial<{
+      team_name: string;
+      stale_timeout_hours: number;
+      password_hash: string;
+    }> = {};
 
-    if (input.name !== undefined) {
-      updates.push('name = ?');
-      values.push(input.name);
-    }
-    if (input.is_public !== undefined) {
-      updates.push('is_public = ?');
-      values.push(input.is_public ? 1 : 0);
+    if (input.team_name !== undefined) {
+      updates.team_name = input.team_name;
     }
     if (input.stale_timeout_hours !== undefined) {
-      updates.push('stale_timeout_hours = ?');
-      values.push(input.stale_timeout_hours);
+      updates.stale_timeout_hours = input.stale_timeout_hours;
     }
     if (input.dashboard_password !== undefined) {
-      const passwordHash = await hashPassword(input.dashboard_password);
-      updates.push('dashboard_password_hash = ?');
-      values.push(passwordHash);
+      updates.password_hash = await hashPassword(input.dashboard_password);
     }
 
-    if (updates.length === 0) {
+    if (Object.keys(updates).length === 0) {
       return successResponse({ message: 'No changes made' });
     }
 
-    updates.push("updated_at = datetime('now')");
-    values.push(team.id);
-
-    await db
-      .prepare(`UPDATE teams SET ${updates.join(', ')} WHERE id = ?`)
-      .bind(...values)
-      .run();
+    await updateTeamConfig(db, updates);
 
     return successResponse({ message: 'Team settings updated successfully' });
   } catch (error) {

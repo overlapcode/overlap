@@ -1,8 +1,7 @@
 import type { APIContext } from 'astro';
 import { z } from 'zod';
-import { errorResponse, successResponse } from '@lib/auth/middleware';
-import { getTeam, createTeam, createUser } from '@lib/db/queries';
-import { generateId, generateToken } from '@lib/utils/id';
+import { errorResponse, successResponse, generateToken, hashToken } from '@lib/auth/middleware';
+import { getTeamConfig, createTeamConfig, createMember } from '@lib/db/queries';
 import { hashPassword } from '@lib/utils/crypto';
 import { ensureMigrated } from '@lib/db/migrate';
 
@@ -21,11 +20,11 @@ export async function GET(context: APIContext) {
   await ensureMigrated(db);
 
   // Check if team already exists
-  const existingTeam = await getTeam(db);
+  const existingConfig = await getTeamConfig(db);
 
   return successResponse({
-    initialized: !!existingTeam,
-    team_name: existingTeam?.name ?? null,
+    initialized: !!existingConfig,
+    team_name: existingConfig?.team_name ?? null,
   });
 }
 
@@ -38,8 +37,8 @@ export async function POST(context: APIContext) {
   await ensureMigrated(db);
 
   // Check if team already exists
-  const existingTeam = await getTeam(db);
-  if (existingTeam) {
+  const existingConfig = await getTeamConfig(db);
+  if (existingConfig) {
     return errorResponse('Team already configured', 400);
   }
 
@@ -60,35 +59,32 @@ export async function POST(context: APIContext) {
 
   try {
     // Generate tokens
-    const teamId = generateId();
-    const teamToken = generateToken();
-    const userId = generateId();
+    const teamJoinCode = generateToken().replace('tok_', 'join_');
     const userToken = generateToken();
+    const userTokenHash = await hashToken(userToken);
+    const userId = crypto.randomUUID();
 
     // Hash password
     const passwordHash = await hashPassword(input.dashboard_password);
 
-    // Create team
-    await createTeam(db, {
-      id: teamId,
-      name: input.team_name,
-      team_token: teamToken,
-      dashboard_password_hash: passwordHash,
+    // Create team config
+    await createTeamConfig(db, {
+      team_name: input.team_name,
+      password_hash: passwordHash,
+      team_join_code: teamJoinCode,
     });
 
-    // Create admin user
-    await createUser(db, {
-      id: userId,
-      team_id: teamId,
-      user_token: userToken,
-      name: input.admin_name,
-      email: input.admin_email ?? null,
+    // Create admin member
+    await createMember(db, {
+      user_id: userId,
+      display_name: input.admin_name,
+      email: input.admin_email ?? undefined,
+      token_hash: userTokenHash,
       role: 'admin',
     });
 
     return successResponse({
-      team_id: teamId,
-      team_token: teamToken,
+      team_join_code: teamJoinCode,
       user_id: userId,
       user_token: userToken,
       message: 'Team created successfully',

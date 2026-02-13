@@ -19,7 +19,6 @@ import { Header } from '@components/Header';
         </div>
       </div>
 
-      <div id="toast" class="toast"></div>
     </div>
   </main>
 </Layout>
@@ -92,30 +91,12 @@ import { Header } from '@components/Header';
     white-space: nowrap;
   }
 
-  .repo-visibility {
-    flex-shrink: 0;
-  }
-
-  .badge {
-    display: inline-block;
-    font-size: 0.7rem;
-    font-weight: 500;
-    padding: 4px 10px;
-    border-radius: 4px;
-    text-transform: uppercase;
-    letter-spacing: 0.03em;
-  }
-
-  .badge-local {
-    background: var(--bg-elevated);
+  .repo-description {
+    font-size: 0.8rem;
     color: var(--text-secondary);
-    border: 1px solid var(--border-default);
-  }
-
-  .badge-github {
-    background: rgba(255, 152, 0, 0.15);
-    color: var(--accent-orange);
-    border: 1px solid rgba(255, 152, 0, 0.3);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .info-box {
@@ -146,30 +127,6 @@ import { Header } from '@components/Header';
     opacity: 0.5;
   }
 
-  .toast {
-    position: fixed;
-    bottom: 24px;
-    left: 50%;
-    transform: translateX(-50%);
-    background: var(--bg-elevated);
-    padding: 12px 24px;
-    border-radius: 8px;
-    font-size: 0.875rem;
-    display: none;
-    z-index: 1000;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-  }
-
-  .toast.success {
-    border: 1px solid var(--accent-green);
-    color: var(--accent-green);
-  }
-
-  .toast.error {
-    border: 1px solid var(--accent-orange);
-    color: var(--accent-orange);
-  }
-
   @media (max-width: 500px) {
     .repo-card-inner {
       flex-wrap: wrap;
@@ -186,40 +143,15 @@ import { Header } from '@components/Header';
   type Repo = {
     id: string;
     name: string;
-    remote_url: string | null;
-    is_public: boolean;
+    display_name: string | null;
+    description: string | null;
+    created_at: string;
   };
-
-  const toast = document.getElementById('toast') as HTMLDivElement;
-
-  function showToast(message: string, isError = true) {
-    toast.textContent = message;
-    toast.className = `toast ${isError ? 'error' : 'success'}`;
-    toast.style.display = 'block';
-    setTimeout(() => {
-      toast.style.display = 'none';
-    }, 4000);
-  }
 
   function escapeHtml(text: string): string {
     const div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML;
-  }
-
-  function isGitHubUrl(url: string | null): boolean {
-    return url ? url.includes('github.com') : false;
-  }
-
-  function formatRemoteUrl(url: string | null): string {
-    if (!url) return 'Local repository';
-    // Shorten GitHub URLs
-    if (url.includes('github.com')) {
-      const match = url.match(/github\.com[/:]([^/]+\/[^/]+?)(?:\.git)?$/);
-      if (match) return match[1];
-    }
-    // Remove .git suffix and protocol
-    return url.replace(/\.git$/, '').replace(/^https?:\/\//, '');
   }
 
   async function loadRepos() {
@@ -241,44 +173,28 @@ import { Header } from '@components/Header';
             <div class="empty-state-icon">📂</div>
             <p style="margin-bottom: var(--space-sm);">No repositories tracked yet</p>
             <p class="text-muted" style="font-size: 0.8rem;">
-              Repositories appear here automatically when you start<br>
-              working with the Overlap plugin installed.
+              Repositories appear here automatically when team members<br>
+              start working with the tracer running.
             </p>
           </div>
         `;
         return;
       }
 
-      // Sort repos: GitHub repos first, then by name
+      // Sort repos alphabetically by display name or name
       const sortedRepos = repos.sort((a, b) => {
-        const aIsGitHub = isGitHubUrl(a.remote_url);
-        const bIsGitHub = isGitHubUrl(b.remote_url);
-        if (aIsGitHub && !bIsGitHub) return -1;
-        if (!aIsGitHub && bIsGitHub) return 1;
-        return a.name.localeCompare(b.name);
+        const aName = a.display_name || a.name;
+        const bName = b.display_name || b.name;
+        return aName.localeCompare(bName);
       });
 
-      const gitHubRepos = sortedRepos.filter(r => isGitHubUrl(r.remote_url));
-      const localRepos = sortedRepos.filter(r => !isGitHubUrl(r.remote_url));
-
-      let html = '';
-
-      if (gitHubRepos.length > 0) {
-        html += `<div class="repos-section">
-          <div class="section-header">Connected Repositories (${gitHubRepos.length})</div>
-          ${gitHubRepos.map(repo => renderRepoCard(repo)).join('')}
-        </div>`;
-      }
-
-      if (localRepos.length > 0) {
-        html += `<div class="repos-section">
-          <div class="section-header">Local Repositories (${localRepos.length})</div>
-          ${localRepos.map(repo => renderRepoCard(repo)).join('')}
-        </div>`;
-      }
+      let html = `<div class="repos-section">
+        <div class="section-header">Repositories (${sortedRepos.length})</div>
+        ${sortedRepos.map(repo => renderRepoCard(repo)).join('')}
+      </div>`;
 
       html += `<div class="info-box">
-        <p>Repositories are automatically registered when team members<br>work in them with the Overlap plugin.</p>
+        <p>Repositories are automatically registered when team members<br>work in them with the tracer running.</p>
       </div>`;
 
       container.innerHTML = html;
@@ -288,19 +204,16 @@ import { Header } from '@components/Header';
   }
 
   function renderRepoCard(repo: Repo): string {
-    const safeName = escapeHtml(repo.name);
-    const formattedUrl = escapeHtml(formatRemoteUrl(repo.remote_url));
-    const isGitHub = isGitHubUrl(repo.remote_url);
+    const displayName = repo.display_name || repo.name;
+    const safeName = escapeHtml(displayName);
+    const safeDescription = repo.description ? escapeHtml(repo.description) : null;
 
     return `<a href="/repo/${repo.id}" class="repo-card-link">
       <div class="repo-card">
         <div class="repo-card-inner">
           <div class="repo-details">
             <div class="repo-name">${safeName}</div>
-            <div class="repo-url">${formattedUrl}</div>
-          </div>
-          <div class="repo-visibility">
-            <span class="badge badge-${isGitHub ? 'github' : 'local'}">${isGitHub ? 'GitHub' : 'Local'}</span>
+            ${safeDescription ? `<div class="repo-description">${safeDescription}</div>` : `<div class="repo-url">${escapeHtml(repo.name)}</div>`}
           </div>
         </div>
       </div>

@@ -1,17 +1,16 @@
 import type { APIContext } from 'astro';
 import { z } from 'zod';
-import { errorResponse, successResponse } from '@lib/auth/middleware';
-import { getUserByToken, getTeam } from '@lib/db/queries';
+import { errorResponse, successResponse, hashToken } from '@lib/auth/middleware';
+import { getTeamConfig, createWebSession } from '@lib/db/queries';
+import { verifyPassword } from '@lib/utils/crypto';
 
 const CreateSessionSchema = z.object({
-  user_id: z.string(),
-  user_token: z.string(),
-  team_token: z.string(),
+  password: z.string(),
 });
 
 /**
  * Create a web session for dashboard access.
- * Called after setup or join to authenticate the user for the web dashboard.
+ * In v2, dashboard access is via team password authentication.
  */
 export async function POST(context: APIContext) {
   const { request } = context;
@@ -30,19 +29,19 @@ export async function POST(context: APIContext) {
     return errorResponse(`Validation error: ${parseResult.error.message}`, 400);
   }
 
-  const { user_token, team_token } = parseResult.data;
+  const { password } = parseResult.data;
 
   try {
-    // Validate team token
-    const team = await getTeam(db);
-    if (!team || team.team_token !== team_token) {
-      return errorResponse('Invalid team token', 401);
+    // Get team config
+    const config = await getTeamConfig(db);
+    if (!config) {
+      return errorResponse('Team not configured', 404);
     }
 
-    // Validate user token
-    const user = await getUserByToken(db, user_token);
-    if (!user) {
-      return errorResponse('Invalid user token', 401);
+    // Verify password
+    const isValid = await verifyPassword(password, config.password_hash);
+    if (!isValid) {
+      return errorResponse('Invalid password', 401);
     }
 
     // Create web session
@@ -50,22 +49,13 @@ export async function POST(context: APIContext) {
     const sessionToken = crypto.randomUUID();
 
     // Hash the token for storage
-    const encoder = new TextEncoder();
-    const data = encoder.encode(sessionToken);
-    const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-    const tokenHash = btoa(String.fromCharCode(...new Uint8Array(hashBuffer)));
+    const tokenHash = await hashToken(sessionToken);
 
     // Session expires in 30 days
     const expiresAt = new Date();
     expiresAt.setDate(expiresAt.getDate() + 30);
 
-    await db
-      .prepare(
-        `INSERT INTO web_sessions (id, user_id, token_hash, expires_at)
-         VALUES (?, ?, ?, ?)`
-      )
-      .bind(sessionId, user.id, tokenHash, expiresAt.toISOString())
-      .run();
+    await createWebSession(db, sessionId, tokenHash, expiresAt.toISOString());
 
     // Return the session token in a Set-Cookie header
     const response = successResponse({ message: 'Session created' });

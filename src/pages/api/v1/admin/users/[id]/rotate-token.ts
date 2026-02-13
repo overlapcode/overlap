@@ -1,7 +1,6 @@
 import type { APIContext } from 'astro';
-import { authenticateRequest, requireAdmin, errorResponse, successResponse } from '@lib/auth/middleware';
-import { getUserById } from '@lib/db/queries';
-import { generateToken } from '@lib/utils/id';
+import { authenticateAny, requireAdmin, errorResponse, successResponse, generateToken, hashToken } from '@lib/auth/middleware';
+import { getMemberById, updateMember } from '@lib/db/queries';
 
 export async function POST(context: APIContext) {
   const { request, params } = context;
@@ -9,7 +8,7 @@ export async function POST(context: APIContext) {
   const db = context.locals.runtime.env.DB;
 
   // Authenticate and require admin
-  const authResult = await authenticateRequest(request, db);
+  const authResult = await authenticateAny(request, db);
   if (!authResult.success) {
     return errorResponse(authResult.error, authResult.status);
   }
@@ -20,23 +19,21 @@ export async function POST(context: APIContext) {
   }
 
   try {
-    // Get user
-    const user = await getUserById(db, userId);
-    if (!user) {
+    // Get member
+    const member = await getMemberById(db, userId);
+    if (!member) {
       return errorResponse('User not found', 404);
     }
 
-    // Generate new token
+    // Generate new token and hash it
     const newToken = generateToken();
+    const tokenHash = await hashToken(newToken);
 
-    await db
-      .prepare("UPDATE users SET user_token = ?, updated_at = datetime('now') WHERE id = ?")
-      .bind(newToken, userId)
-      .run();
+    await updateMember(db, userId, { token_hash: tokenHash });
 
     return successResponse({
       user_token: newToken,
-      message: 'Token rotated successfully. User must update their plugin configuration.',
+      message: 'Token rotated successfully. User must update their tracer configuration.',
     });
   } catch (error) {
     console.error('Rotate token error:', error);

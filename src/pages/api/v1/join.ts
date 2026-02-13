@@ -1,12 +1,17 @@
+/**
+ * POST /api/v1/join - Self-serve member registration
+ *
+ * Allows new members to join by providing the team join code.
+ */
+
 import type { APIContext } from 'astro';
 import { z } from 'zod';
-import { errorResponse, successResponse } from '@lib/auth/middleware';
-import { getTeam, createUser } from '@lib/db/queries';
-import { generateId, generateToken } from '@lib/utils/id';
+import { errorResponse, successResponse, generateToken, generateId, hashToken } from '@lib/auth/middleware';
+import { getTeamConfig, createMember, getAllMembers } from '@lib/db/queries';
 
 const JoinSchema = z.object({
-  team_token: z.string().min(1),
-  name: z.string().min(1).max(100),
+  team_join_code: z.string().min(1, 'Team join code is required'),
+  display_name: z.string().min(1, 'Name is required').max(100),
   email: z.string().email().nullable().optional(),
 });
 
@@ -24,61 +29,60 @@ export async function POST(context: APIContext) {
 
   const parseResult = JoinSchema.safeParse(body);
   if (!parseResult.success) {
-    return errorResponse(`Validation error: ${parseResult.error.message}`, 400);
+    const firstError = parseResult.error.errors[0];
+    return errorResponse(firstError?.message || 'Validation error', 400);
   }
 
   const input = parseResult.data;
 
   try {
-    // Validate team token
-    const team = await getTeam(db);
-    if (!team) {
-      return errorResponse('Team not found', 404);
+    // Get team config
+    const teamConfig = await getTeamConfig(db);
+    if (!teamConfig) {
+      return errorResponse('Team not configured. Please run /setup first.', 404);
     }
 
-    if (team.team_token !== input.team_token) {
-      return errorResponse('Invalid team token', 401);
+    // Validate join code
+    if (teamConfig.team_join_code !== input.team_join_code) {
+      return errorResponse('Invalid team join code', 401);
     }
 
-    // Idempotency: check if user with same name+email already exists
-    const existingUsers = await db
-      .prepare('SELECT * FROM users WHERE team_id = ? AND name = ? AND is_active = 1')
-      .bind(team.id, input.name)
-      .all();
-
-    const existingUser = existingUsers.results.find(
-      (u: Record<string, unknown>) => u.email === (input.email ?? null)
+    // Check for existing member with same name (idempotency)
+    const existingMembers = await getAllMembers(db);
+    const existingMember = existingMembers.find(
+      (m) => m.display_name.toLowerCase() === input.display_name.toLowerCase()
     );
 
-    if (existingUser) {
-      return successResponse({
-        user_id: existingUser.id as string,
-        user_token: existingUser.user_token as string,
-        team_name: team.name,
-        message: 'Already a member',
-      });
+    if (existingMember) {
+      return errorResponse(
+        'A member with this name already exists. Please use a different name or contact your admin.',
+        409
+      );
     }
 
-    // Generate user token
+    // Generate user ID and token
     const userId = generateId();
     const userToken = generateToken();
+    const tokenHash = await hashToken(userToken);
 
-    // Create user
-    await createUser(db, {
-      id: userId,
-      team_id: team.id,
-      user_token: userToken,
-      name: input.name,
-      email: input.email ?? null,
+    // Create member
+    await createMember(db, {
+      user_id: userId,
+      display_name: input.display_name,
+      email: input.email ?? undefined,
+      token_hash: tokenHash,
       role: 'member',
     });
 
-    return successResponse({
-      user_id: userId,
-      user_token: userToken,
-      team_name: team.name,
-      message: 'Joined team successfully',
-    }, 201);
+    return successResponse(
+      {
+        user_id: userId,
+        user_token: userToken, // Only time we return the raw token
+        team_name: teamConfig.team_name,
+        message: 'Welcome to the team!',
+      },
+      201
+    );
   } catch (error) {
     console.error('Join error:', error);
     return errorResponse('Failed to join team', 500);

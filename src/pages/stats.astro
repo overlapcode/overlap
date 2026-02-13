@@ -1,0 +1,24 @@
+---
+import Layout from '../layouts/Layout.astro';
+import { Header } from '../components/Header';
+import { StatsView } from '../components/StatsView';
+import { authenticateWebSession } from '@lib/auth/middleware';
+import { getTeamConfig } from '@lib/db/queries';
+
+const db = Astro.locals.runtime.env.DB;
+
+// Authenticate
+const authResult = await authenticateWebSession(Astro.request, db);
+if (!authResult.success) {
+  return Astro.redirect('/');
+}
+
+const teamConfig = await getTeamConfig(db);
+---
+
+<Layout title="Stats - Overlap">
+  <Header teamName={teamConfig?.team_name} userName="Dashboard" client:load />
+  <main style="padding: var(--space-lg); max-width: 1200px; margin: 0 auto;">
+    <StatsView client:load />
+  </main>
+</Layout>

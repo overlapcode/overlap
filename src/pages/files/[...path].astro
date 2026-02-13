@@ -1,0 +1,29 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import { Header } from '../../components/Header';
+import { FileHistoryView } from '../../components/FileHistoryView';
+import { authenticateWebSession } from '@lib/auth/middleware';
+import { getTeamConfig } from '@lib/db/queries';
+
+const db = Astro.locals.runtime.env.DB;
+const { path } = Astro.params;
+
+// Authenticate
+const authResult = await authenticateWebSession(Astro.request, db);
+if (!authResult.success) {
+  return Astro.redirect('/');
+}
+
+const teamConfig = await getTeamConfig(db);
+
+// Get repo from query param
+const url = new URL(Astro.request.url);
+const repoName = url.searchParams.get('repo') || '';
+---
+
+<Layout title={`${path} - File History - Overlap`}>
+  <Header teamName={teamConfig?.team_name} userName="Dashboard" client:load />
+  <main style="padding: var(--space-lg); max-width: 1200px; margin: 0 auto;">
+    <FileHistoryView filePath={path || ''} repoName={repoName} client:load />
+  </main>
+</Layout>

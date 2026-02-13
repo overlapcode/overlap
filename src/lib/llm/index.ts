@@ -1,4 +1,4 @@
-import type { Team } from '@lib/db/types';
+import type { TeamConfig } from '@lib/db/types';
 import { decrypt } from '@lib/utils/crypto';
 import type { ClassificationResult, LLMProvider, LLMProviderName } from './types';
 import { heuristicProvider } from './heuristic';
@@ -31,15 +31,15 @@ export function getProvider(name: LLMProviderName): LLMProvider {
  * Falls back to heuristic if LLM fails or is not configured.
  */
 export async function classifyActivity(
-  team: Team,
+  teamConfig: TeamConfig,
   files: string[],
   encryptionKey?: string,
   toolName?: string
 ): Promise<ClassificationResult> {
-  const providerName = team.llm_provider as LLMProviderName;
+  const providerName = teamConfig.llm_provider as LLMProviderName;
 
   // Use heuristic if no provider configured or no API key
-  if (providerName === 'heuristic' || !team.llm_api_key_encrypted) {
+  if (providerName === 'heuristic' || !teamConfig.llm_api_key_encrypted) {
     return heuristicProvider.classify(files, '', undefined, toolName);
   }
 
@@ -51,11 +51,11 @@ export async function classifyActivity(
 
   try {
     // Decrypt API key
-    const apiKey = await decrypt(team.llm_api_key_encrypted, encryptionKey);
+    const apiKey = await decrypt(teamConfig.llm_api_key_encrypted!, encryptionKey);
     const provider = getProvider(providerName);
 
     // Try LLM classification
-    return await provider.classify(files, apiKey, team.llm_model ?? undefined, toolName);
+    return await provider.classify(files, apiKey, teamConfig.llm_model ?? undefined, toolName);
   } catch (error) {
     const sanitizedError = error instanceof Error
       ? error.message

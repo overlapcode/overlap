@@ -68,7 +68,7 @@ export function RepoList() {
         <p className="text-secondary">No repositories tracked yet</p>
         <p className="text-muted" style={{ fontSize: '0.875rem', marginTop: 'var(--space-sm)' }}>
           Repositories appear here automatically when you start
-          working with the Overlap plugin installed.
+          working with the Overlap tracer running.
         </p>
       </div>
     );

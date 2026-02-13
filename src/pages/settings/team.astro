@@ -23,11 +23,11 @@ import { Header } from '@components/Header';
       </div>
 
       <div id="form-container" style="display: none;">
-        <!-- Team Token Section -->
+        <!-- Team Join Code Section -->
         <div class="card" style="margin-bottom: var(--space-lg);">
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-sm);">
-            <label style="font-weight: 500;">Team Token</label>
-            <button type="button" id="copy-token-btn" style="
+            <label style="font-weight: 500;">Team Join Code</label>
+            <button type="button" id="copy-code-btn" style="
               background: none;
               border: 1px solid var(--border-default);
               color: var(--text-secondary);
@@ -41,7 +41,7 @@ import { Header } from '@components/Header';
           </div>
           <input
             type="text"
-            id="team-token"
+            id="team-join-code"
             readonly
             style="
               width: 100%;
@@ -55,7 +55,7 @@ import { Header } from '@components/Header';
             "
           />
           <p class="text-muted" style="font-size: 0.75rem; margin-top: var(--space-xs);">
-            Share this with team members so they can join your team.
+            Share this with team members so they can join via /join page.
           </p>
         </div>
 
@@ -71,7 +71,7 @@ import { Header } from '@components/Header';
             <input
               type="text"
               id="team-name"
-              name="name"
+              name="team_name"
               placeholder="My Team"
               style="
                 width: 100%;
@@ -83,23 +83,6 @@ import { Header } from '@components/Header';
                 font-size: 1rem;
               "
             />
-          </div>
-
-          <div style="margin-bottom: var(--space-lg); opacity: 0.5;">
-            <label style="display: flex; align-items: center; gap: var(--space-sm); cursor: not-allowed;">
-              <input
-                type="checkbox"
-                id="is-public"
-                name="is_public"
-                disabled
-                style="width: 18px; height: 18px; cursor: not-allowed;"
-              />
-              <span style="font-weight: 500;">Public Timeline</span>
-              <span style="font-size: 0.7rem; color: var(--text-muted); background: var(--bg-elevated); padding: 2px 6px; border-radius: 4px;">Coming soon</span>
-            </label>
-            <p class="text-muted" style="font-size: 0.75rem; margin-top: var(--space-xs); margin-left: 26px;">
-              Allow anyone to view your team's activity without authentication
-            </p>
           </div>
 
           <div style="margin-bottom: var(--space-lg);">
@@ -158,7 +141,7 @@ import { Header } from '@components/Header';
               "
             />
             <p class="text-muted" style="font-size: 0.75rem; margin-top: var(--space-xs);">
-              Leave blank to keep current password. Share this with your team for dashboard access.
+              Leave blank to keep current password. This is for dashboard access only.
             </p>
           </div>
 
@@ -175,11 +158,13 @@ import { Header } from '@components/Header';
 
 <script>
   type TeamSettings = {
-    name: string;
-    team_token: string;
-    is_public: boolean;
+    team_name: string;
+    team_join_code: string;
     stale_timeout_hours: number;
     has_dashboard_password: boolean;
+    llm_provider: string | null;
+    llm_model: string | null;
+    has_llm_api_key: boolean;
   };
 
   const loadingState = document.getElementById('loading-state') as HTMLDivElement;
@@ -188,12 +173,11 @@ import { Header } from '@components/Header';
   const formContainer = document.getElementById('form-container') as HTMLDivElement;
   const form = document.getElementById('team-form') as HTMLFormElement;
   const statusMessage = document.getElementById('status-message') as HTMLParagraphElement;
-  const teamTokenInput = document.getElementById('team-token') as HTMLInputElement;
+  const teamJoinCodeInput = document.getElementById('team-join-code') as HTMLInputElement;
   const teamNameInput = document.getElementById('team-name') as HTMLInputElement;
-  const isPublicCheckbox = document.getElementById('is-public') as HTMLInputElement;
   const staleTimeoutInput = document.getElementById('stale-timeout') as HTMLInputElement;
   const passwordStatus = document.getElementById('password-status') as HTMLSpanElement;
-  const copyTokenBtn = document.getElementById('copy-token-btn') as HTMLButtonElement;
+  const copyCodeBtn = document.getElementById('copy-code-btn') as HTMLButtonElement;
 
   // Load existing settings
   async function loadSettings() {
@@ -208,9 +192,8 @@ import { Header } from '@components/Header';
       const settings = result.data!;
 
       // Populate form
-      teamTokenInput.value = settings.team_token;
-      teamNameInput.value = settings.name;
-      isPublicCheckbox.checked = settings.is_public;
+      teamJoinCodeInput.value = settings.team_join_code;
+      teamNameInput.value = settings.team_name;
       staleTimeoutInput.value = String(settings.stale_timeout_hours);
       passwordStatus.textContent = settings.has_dashboard_password ? '(Password set)' : '(No password set)';
 
@@ -226,20 +209,20 @@ import { Header } from '@components/Header';
 
   loadSettings();
 
-  // Copy token handler
-  copyTokenBtn?.addEventListener('click', async () => {
+  // Copy join code handler
+  copyCodeBtn?.addEventListener('click', async () => {
     try {
-      await navigator.clipboard.writeText(teamTokenInput.value);
-      copyTokenBtn.textContent = 'Copied!';
+      await navigator.clipboard.writeText(teamJoinCodeInput.value);
+      copyCodeBtn.textContent = 'Copied!';
       setTimeout(() => {
-        copyTokenBtn.textContent = 'Copy';
+        copyCodeBtn.textContent = 'Copy';
       }, 2000);
     } catch (err) {
-      teamTokenInput.select();
+      teamJoinCodeInput.select();
       document.execCommand('copy');
-      copyTokenBtn.textContent = 'Copied!';
+      copyCodeBtn.textContent = 'Copied!';
       setTimeout(() => {
-        copyTokenBtn.textContent = 'Copy';
+        copyCodeBtn.textContent = 'Copy';
       }, 2000);
     }
   });
@@ -251,10 +234,8 @@ import { Header } from '@components/Header';
     const formData = new FormData(form);
     const data: Record<string, unknown> = {};
 
-    const name = formData.get('name');
-    if (name) data.name = name;
-
-    data.is_public = formData.get('is_public') === 'on';
+    const name = formData.get('team_name');
+    if (name) data.team_name = name;
 
     const staleTimeout = formData.get('stale_timeout_hours');
     if (staleTimeout) data.stale_timeout_hours = parseInt(staleTimeout as string, 10);
