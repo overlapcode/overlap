@@ -313,14 +313,14 @@ import { Header } from '@components/Header';
 
       const result = await response.json() as {
         data: {
-          team_token: string;
+          team_join_code: string;
           user_token: string;
           user_id: string;
         }
       };
 
       // Show tokens in the success section
-      teamTokenInput.value = result.data.team_token;
+      teamTokenInput.value = result.data.team_join_code;
       userTokenInput.value = result.data.user_token;
 
       // Create a web session for the dashboard
@@ -331,7 +331,7 @@ import { Header } from '@components/Header';
           body: JSON.stringify({
             user_id: result.data.user_id,
             user_token: result.data.user_token,
-            team_token: result.data.team_token,
+            team_token: result.data.team_join_code,
           }),
         });
       } catch (sessionError) {
