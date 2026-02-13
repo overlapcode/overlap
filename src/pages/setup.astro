@@ -225,7 +225,7 @@ import { Header } from '@components/Header';
           <h3 style="font-size: 1rem; margin-bottom: var(--space-md);">Next Steps</h3>
           <ol style="padding-left: var(--space-lg); color: var(--text-secondary); font-size: 0.875rem; line-height: 1.8;">
             <li>Install the tracer: <code style="background: var(--bg-elevated); padding: 2px 6px; border-radius: 3px;">brew install overlapdev/tap/overlap</code></li>
-            <li>Join this team: <code style="background: var(--bg-elevated); padding: 2px 6px; border-radius: 3px;">overlap join {window.location.origin}</code></li>
+            <li>Join this team: <code style="background: var(--bg-elevated); padding: 2px 6px; border-radius: 3px;">overlap join <span id="origin-url"></span></code></li>
             <li>Share the join code and dashboard password with your team</li>
           </ol>
         </div>
@@ -239,6 +239,10 @@ import { Header } from '@components/Header';
 </Layout>
 
 <script>
+  // Populate origin URL (can't use window in Astro template - it's server-rendered)
+  const originEl = document.getElementById('origin-url');
+  if (originEl) originEl.textContent = window.location.origin;
+
   const form = document.getElementById('setup-form') as HTMLFormElement;
   const setupSection = document.getElementById('setup-section') as HTMLDivElement;
   const successSection = document.getElementById('success-section') as HTMLDivElement;
