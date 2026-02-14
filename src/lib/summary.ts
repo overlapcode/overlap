@@ -79,7 +79,7 @@ const openaiSummaryProvider: SummaryProvider = {
         Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: model || 'gpt-4o-mini',
+        model: model || 'gpt-5-nano',
         max_tokens: 200,
         messages: [{ role: 'user', content: prompt }],
       }),
@@ -111,7 +111,7 @@ const xaiSummaryProvider: SummaryProvider = {
         Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: model || 'grok-3-mini',
+        model: model || 'grok-4-fast-non-reasoning',
         max_tokens: 200,
         messages: [{ role: 'user', content: prompt }],
       }),

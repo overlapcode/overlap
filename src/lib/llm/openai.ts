@@ -2,7 +2,7 @@ import type { ClassificationResult, LLMProvider } from './types';
 import { buildPrompt, parseClassificationResponse } from './types';
 
 const API_URL = 'https://api.openai.com/v1/chat/completions';
-const DEFAULT_MODEL = 'gpt-4o-mini';
+const DEFAULT_MODEL = 'gpt-5-nano';
 
 export const openaiProvider: LLMProvider = {
   name: 'openai',

@@ -122,11 +122,9 @@ import { Header } from '@components/Header';
           >
             Model
           </label>
-          <input
-            type="text"
+          <select
             id="model"
             name="model"
-            placeholder="e.g., claude-3-5-haiku-latest"
             style="
               width: 100%;
               padding: var(--space-sm) var(--space-md);
@@ -136,9 +134,10 @@ import { Header } from '@components/Header';
               color: var(--text-primary);
               font-size: 1rem;
             "
-          />
+          >
+          </select>
           <p class="text-muted" style="font-size: 0.75rem; margin-top: var(--space-xs);">
-            Leave blank for default model
+            The first option is the recommended default for each provider
           </p>
         </div>
 
@@ -218,7 +217,7 @@ import { Header } from '@components/Header';
   const form = document.getElementById('llm-form') as HTMLFormElement | null;
   const readonlyView = document.getElementById('readonly-view') as HTMLDivElement | null;
   const providerSelect = document.getElementById('provider') as unknown as HTMLSelectElement | null;
-  const modelInput = document.getElementById('model') as HTMLInputElement | null;
+  const modelSelect = document.getElementById('model') as unknown as HTMLSelectElement | null;
   const apiKeyInput = document.getElementById('api-key') as HTMLInputElement | null;
   const modelSection = document.getElementById('model-section') as HTMLDivElement | null;
   const apiKeySection = document.getElementById('api-key-section') as HTMLDivElement | null;
@@ -238,11 +237,52 @@ import { Header } from '@components/Header';
     xai: 'xAI (Grok)',
   };
 
+  // Model options per provider (first option is default)
+  const providerModels: Record<string, Array<{ value: string; label: string }>> = {
+    anthropic: [
+      { value: 'claude-haiku-4-5', label: 'Claude Haiku 4.5 (Recommended)' },
+      { value: 'claude-sonnet-4-5', label: 'Claude Sonnet 4.5' },
+    ],
+    openai: [
+      { value: 'gpt-5-nano', label: 'GPT-5 Nano (Recommended)' },
+      { value: 'gpt-5-mini', label: 'GPT-5 Mini' },
+      { value: 'gpt-5.2', label: 'GPT-5.2' },
+    ],
+    google: [
+      { value: 'gemini-2.5-flash-lite', label: 'Gemini 2.5 Flash Lite (Recommended)' },
+      { value: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash' },
+      { value: 'gemini-3-flash-preview', label: 'Gemini 3 Flash Preview' },
+    ],
+    xai: [
+      { value: 'grok-4-fast-non-reasoning', label: 'Grok 4 Fast (Recommended)' },
+      { value: 'grok-4-1-fast-non-reasoning', label: 'Grok 4.1 Fast' },
+    ],
+  };
+
+  // Populate model dropdown based on selected provider
+  function updateModelOptions(selectedModel?: string | null) {
+    if (!modelSelect || !providerSelect) return;
+    const provider = providerSelect.value;
+    const models = providerModels[provider] || [];
+
+    modelSelect.innerHTML = '';
+    for (const m of models) {
+      const option = document.createElement('option');
+      option.value = m.value;
+      option.textContent = m.label;
+      if (selectedModel && m.value === selectedModel) {
+        option.selected = true;
+      }
+      modelSelect.appendChild(option);
+    }
+  }
+
   // Show/hide sections based on provider
   function updateSections() {
     const isHeuristic = providerSelect?.value === 'heuristic';
     if (modelSection) modelSection.style.display = isHeuristic ? 'none' : 'block';
     if (apiKeySection) apiKeySection.style.display = isHeuristic ? 'none' : 'block';
+    updateModelOptions();
   }
 
   providerSelect?.addEventListener('change', updateSections);
@@ -279,18 +319,17 @@ import { Header } from '@components/Header';
             providerSelect.value = result.data.provider;
           }
 
-          // Set model
-          if (modelInput && result.data.model) {
-            modelInput.value = result.data.model;
-          }
-
           // Show placeholder if API key is set
           if (apiKeyInput && result.data.has_api_key) {
             apiKeyInput.placeholder = '••••••••••••••••';
           }
 
-          // Update section visibility
+          // Update section visibility and model dropdown
           updateSections();
+          // Re-populate with saved model selected
+          if (result.data.model) {
+            updateModelOptions(result.data.model);
+          }
         } else {
           // Show read-only view for non-admins
           if (form) form.style.display = 'none';
@@ -330,7 +369,7 @@ import { Header } from '@components/Header';
     };
 
     if (data.provider !== 'heuristic') {
-      const model = formData.get('model');
+      const model = modelSelect?.value;
       if (model) data.model = model;
 
       const apiKey = formData.get('api_key');
