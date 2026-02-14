@@ -36,7 +36,7 @@ function formatSession(session: SessionWithMember) {
     activity: {
       semantic_scope: null,
       summary: session.generated_summary || session.result_summary || null,
-      files: [],
+      files: [] as string[],
     },
   };
 }
