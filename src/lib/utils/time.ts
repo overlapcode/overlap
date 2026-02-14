@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 
 function normalizeUTC(dateString: string): string {
+  if (!dateString) return new Date().toISOString();
   if (dateString.includes('Z') || dateString.includes('+') || dateString.includes('-', 10)) {
     return dateString;
   }
