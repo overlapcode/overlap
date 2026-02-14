@@ -2,7 +2,7 @@ import type { ClassificationResult, LLMProvider } from './types';
 import { buildPrompt, parseClassificationResponse } from './types';
 
 const API_URL = 'https://api.anthropic.com/v1/messages';
-const DEFAULT_MODEL = 'claude-3-5-haiku-latest';
+const DEFAULT_MODEL = 'claude-haiku-4-5';
 
 export const anthropicProvider: LLMProvider = {
   name: 'anthropic',

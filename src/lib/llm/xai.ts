@@ -2,7 +2,7 @@ import type { ClassificationResult, LLMProvider } from './types';
 import { buildPrompt, parseClassificationResponse } from './types';
 
 const API_URL = 'https://api.x.ai/v1/chat/completions';
-const DEFAULT_MODEL = 'grok-2-latest';
+const DEFAULT_MODEL = 'grok-3-mini';
 
 export const xaiProvider: LLMProvider = {
   name: 'xai',

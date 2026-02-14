@@ -2,7 +2,7 @@ import type { ClassificationResult, LLMProvider } from './types';
 import { buildPrompt, parseClassificationResponse } from './types';
 
 const API_URL = 'https://generativelanguage.googleapis.com/v1beta/models';
-const DEFAULT_MODEL = 'gemini-2.0-flash';
+const DEFAULT_MODEL = 'gemini-2.5-flash-lite';
 
 export const googleProvider: LLMProvider = {
   name: 'google',

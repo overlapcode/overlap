@@ -13,8 +13,10 @@ import { decrypt } from '@lib/utils/crypto';
 const SUMMARY_THRESHOLD = 3; // Generate summary after this many events
 
 // Prompt for summary generation
-const SUMMARY_PROMPT = `Summarize this Claude Code session in 1-2 sentences.
-Focus on WHAT is being done, not HOW.
+const SUMMARY_PROMPT = `Write a brief 1-2 sentence summary of this coding session's objective.
+Write in active voice, present tense, from a third-person perspective (e.g., "Building...", "Refactoring...", "Adding...").
+Focus on the goal and area of the codebase, not individual steps. Ensure the summary is concise and captures the main intent of the session for another developer to understand what is being worked on.
+Do NOT start with "The user" or "The developer". Start with a verb.
 
 Prompts:
 {prompts}
@@ -44,7 +46,7 @@ const anthropicSummaryProvider: SummaryProvider = {
         'anthropic-version': '2023-06-01',
       },
       body: JSON.stringify({
-        model: model || 'claude-3-5-haiku-latest',
+        model: model || 'claude-haiku-4-5',
         max_tokens: 200,
         messages: [{ role: 'user', content: prompt }],
       }),
@@ -109,7 +111,7 @@ const xaiSummaryProvider: SummaryProvider = {
         Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: model || 'grok-2-latest',
+        model: model || 'grok-3-mini',
         max_tokens: 200,
         messages: [{ role: 'user', content: prompt }],
       }),
@@ -133,7 +135,7 @@ const googleSummaryProvider: SummaryProvider = {
 
   async generateSummary(prompts: string[], files: string[], apiKey: string, model?: string): Promise<string> {
     const prompt = buildSummaryPrompt(prompts, files);
-    const modelName = model || 'gemini-1.5-flash';
+    const modelName = model || 'gemini-2.5-flash-lite';
 
     const response = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`,
