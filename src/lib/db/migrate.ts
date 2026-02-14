@@ -98,6 +98,9 @@ CREATE TABLE IF NOT EXISTS file_operations (
     tool_name TEXT,
     file_path TEXT,
     operation TEXT,
+    start_line INTEGER,
+    end_line INTEGER,
+    function_name TEXT,
     bash_command TEXT,
     created_at TEXT DEFAULT (datetime('now'))
 );
@@ -123,8 +126,12 @@ CREATE TABLE IF NOT EXISTS overlaps (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     type TEXT NOT NULL,
     severity TEXT DEFAULT 'info',
+    overlap_scope TEXT DEFAULT 'file',
     file_path TEXT,
     directory_path TEXT,
+    start_line INTEGER,
+    end_line INTEGER,
+    function_name TEXT,
     repo_name TEXT NOT NULL,
     user_id_a TEXT NOT NULL,
     user_id_b TEXT NOT NULL,
