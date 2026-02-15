@@ -1,0 +1,28 @@
+---
+/**
+ * /login?token=<session_token>
+ *
+ * Sets the session cookie from a login link and redirects to dashboard.
+ * Used by `overlap login` CLI command.
+ */
+
+const token = Astro.url.searchParams.get('token');
+
+if (token) {
+  const expiresAt = new Date();
+  expiresAt.setDate(expiresAt.getDate() + 30);
+
+  Astro.cookies.set('overlap_session', token, {
+    path: '/',
+    httpOnly: true,
+    secure: true,
+    sameSite: 'lax',
+    expires: expiresAt,
+  });
+
+  return Astro.redirect('/');
+}
+---
+
+<meta http-equiv="refresh" content="0;url=/" />
+<p>Redirecting...</p>

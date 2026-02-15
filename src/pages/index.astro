@@ -5,7 +5,7 @@ import { UpdateBanner } from '@components/UpdateBanner';
 import { LLMBanner } from '@components/LLMBanner';
 import { Timeline } from '@components/Timeline';
 import { getSessionData } from '@lib/auth/session';
-import { getTeamConfig } from '@lib/db/queries';
+import { getTeamConfig, markStaleSessions, deleteExpiredWebSessions } from '@lib/db/queries';
 import { ensureMigrated } from '@lib/db/migrate';
 
 // Get session data from cookie
@@ -21,6 +21,14 @@ if (Astro.locals.runtime?.env?.DB) {
 
   sessionData = await getSessionData(Astro.cookies, db);
 
+  // Stale session detection on each dashboard load (replaces cron trigger)
+  if (sessionData) {
+    try {
+      await markStaleSessions(db);
+      await deleteExpiredWebSessions(db);
+    } catch { /* non-fatal */ }
+  }
+
   // Check if a team exists (for non-authenticated visitors)
   const config = await getTeamConfig(db);
   if (config) {
@@ -33,7 +41,7 @@ const isAuthenticated = !!sessionData;
 ---
 
 <Layout title="Timeline">
-  <Header teamName={teamName} userName={isAuthenticated ? "Dashboard" : undefined} client:load />
+  <Header teamName={teamName} userName={isAuthenticated ? sessionData?.displayName : undefined} client:load />
   <UpdateBanner client:load />
   {isAuthenticated && <LLMBanner client:load />}
 
@@ -45,13 +53,36 @@ const isAuthenticated = !!sessionData;
         <Timeline client:load />
       ) : teamExists ? (
         <div class="card" style="text-align: center; padding: var(--space-xl);">
-          <h2 style="font-size: 1.25rem; margin-bottom: var(--space-md);">Welcome to Overlap</h2>
+          <h2 style="font-size: 1.25rem; margin-bottom: var(--space-md);">{teamName}</h2>
           <p class="text-secondary" style="margin-bottom: var(--space-lg);">
-            Track what your team is working on across coding agent sessions.
+            Enter your user token to view team activity.
           </p>
-          <div style="display: flex; gap: var(--space-md); justify-content: center;">
-            <a href="/join" class="btn btn-primary">Join Team</a>
-          </div>
+
+          <form id="login-form" style="margin-bottom: var(--space-lg);">
+            <div style="display: flex; gap: var(--space-sm); max-width: 360px; margin: 0 auto;">
+              <input
+                type="password"
+                id="login-token"
+                placeholder="Paste your token"
+                required
+                style="
+                  flex: 1;
+                  padding: var(--space-sm) var(--space-md);
+                  background: var(--bg-primary);
+                  border: 1px solid var(--border-default);
+                  border-radius: var(--radius-sm);
+                  color: var(--text-primary);
+                  font-size: 0.875rem;
+                "
+              />
+              <button type="submit" class="btn btn-primary" id="login-btn">Login</button>
+            </div>
+            <p id="login-error" style="color: var(--accent-red); font-size: 0.75rem; margin-top: var(--space-sm); display: none;"></p>
+          </form>
+
+          <p class="text-muted" style="font-size: 0.8rem;">
+            New member? <a href="/join" style="color: var(--accent-blue);">Join team</a>
+          </p>
         </div>
       ) : (
         <div class="card" style="text-align: center; padding: var(--space-xl);">
@@ -67,3 +98,41 @@ const isAuthenticated = !!sessionData;
     </div>
   </main>
 </Layout>
+
+{!isAuthenticated && teamExists && (
+<script>
+  const form = document.getElementById('login-form');
+  const tokenInput = document.getElementById('login-token') as HTMLInputElement;
+  const errorEl = document.getElementById('login-error') as HTMLElement;
+  const loginBtn = document.getElementById('login-btn') as HTMLButtonElement;
+
+  form?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    errorEl.style.display = 'none';
+    loginBtn.disabled = true;
+    loginBtn.textContent = '...';
+
+    try {
+      const resp = await fetch('/api/v1/auth/create-session', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token: tokenInput.value }),
+      });
+
+      if (resp.ok) {
+        window.location.reload();
+      } else {
+        const data = await resp.json().catch(() => null) as Record<string, string> | null;
+        errorEl.textContent = data?.error || 'Invalid token';
+        errorEl.style.display = 'block';
+      }
+    } catch {
+      errorEl.textContent = 'Connection error';
+      errorEl.style.display = 'block';
+    } finally {
+      loginBtn.disabled = false;
+      loginBtn.textContent = 'Login';
+    }
+  });
+</script>
+)}

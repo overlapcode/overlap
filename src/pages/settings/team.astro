@@ -114,37 +114,6 @@ import { Header } from '@components/Header';
             </p>
           </div>
 
-          <div style="margin-bottom: var(--space-lg);">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-sm);">
-              <label
-                for="new-password"
-                style="font-weight: 500;"
-              >
-                Dashboard Password
-              </label>
-              <span id="password-status" class="text-muted" style="font-size: 0.75rem;"></span>
-            </div>
-            <input
-              type="password"
-              id="new-password"
-              name="dashboard_password"
-              minlength="8"
-              placeholder="Enter new password to change"
-              style="
-                width: 100%;
-                padding: var(--space-sm) var(--space-md);
-                background: var(--bg-elevated);
-                border: 1px solid var(--border-default);
-                border-radius: var(--radius-sm);
-                color: var(--text-primary);
-                font-size: 1rem;
-              "
-            />
-            <p class="text-muted" style="font-size: 0.75rem; margin-top: var(--space-xs);">
-              Leave blank to keep current password. This is for dashboard access only.
-            </p>
-          </div>
-
           <button type="submit" class="btn btn-primary" style="width: 100%;">
             Save Changes
           </button>
@@ -161,7 +130,6 @@ import { Header } from '@components/Header';
     team_name: string;
     team_join_code: string;
     stale_timeout_hours: number;
-    has_dashboard_password: boolean;
     llm_provider: string | null;
     llm_model: string | null;
     has_llm_api_key: boolean;
@@ -176,7 +144,6 @@ import { Header } from '@components/Header';
   const teamJoinCodeInput = document.getElementById('team-join-code') as HTMLInputElement;
   const teamNameInput = document.getElementById('team-name') as HTMLInputElement;
   const staleTimeoutInput = document.getElementById('stale-timeout') as HTMLInputElement;
-  const passwordStatus = document.getElementById('password-status') as HTMLSpanElement;
   const copyCodeBtn = document.getElementById('copy-code-btn') as HTMLButtonElement;
 
   // Load existing settings
@@ -195,7 +162,6 @@ import { Header } from '@components/Header';
       teamJoinCodeInput.value = settings.team_join_code;
       teamNameInput.value = settings.team_name;
       staleTimeoutInput.value = String(settings.stale_timeout_hours);
-      passwordStatus.textContent = settings.has_dashboard_password ? '(Password set)' : '(No password set)';
 
       // Show form
       loadingState.style.display = 'none';
@@ -240,9 +206,6 @@ import { Header } from '@components/Header';
     const staleTimeout = formData.get('stale_timeout_hours');
     if (staleTimeout) data.stale_timeout_hours = parseInt(staleTimeout as string, 10);
 
-    const password = formData.get('dashboard_password');
-    if (password) data.dashboard_password = password;
-
     try {
       const response = await fetch('/api/v1/admin/team', {
         method: 'PUT',
@@ -259,11 +222,6 @@ import { Header } from '@components/Header';
       statusMessage.textContent = 'Settings saved successfully!';
       statusMessage.style.color = 'var(--accent-green)';
       statusMessage.style.display = 'block';
-
-      // Update password status if changed
-      if (password) {
-        passwordStatus.textContent = '(Password set)';
-      }
 
       setTimeout(() => {
         statusMessage.style.display = 'none';

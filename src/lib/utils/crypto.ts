@@ -44,15 +44,3 @@ export async function decrypt(encrypted: string, secret: string): Promise<string
   return new TextDecoder().decode(plaintext);
 }
 
-export async function hashPassword(password: string): Promise<string> {
-  const encoder = new TextEncoder();
-  const data = encoder.encode(password);
-  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-  const hashArray = new Uint8Array(hashBuffer);
-  return btoa(String.fromCharCode(...hashArray));
-}
-
-export async function verifyPassword(password: string, hash: string): Promise<boolean> {
-  const computedHash = await hashPassword(password);
-  return computedHash === hash;
-}

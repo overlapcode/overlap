@@ -90,35 +90,6 @@ import { Header } from '@components/Header';
             />
           </div>
 
-          <div style="margin-bottom: var(--space-lg);">
-            <label
-              for="dashboard-password"
-              style="display: block; margin-bottom: var(--space-sm); font-weight: 500;"
-            >
-              Dashboard Password
-            </label>
-            <input
-              type="password"
-              id="dashboard-password"
-              name="dashboard_password"
-              required
-              minlength="8"
-              placeholder="••••••••"
-              style="
-                width: 100%;
-                padding: var(--space-sm) var(--space-md);
-                background: var(--bg-elevated);
-                border: 1px solid var(--border-default);
-                border-radius: var(--radius-sm);
-                color: var(--text-primary);
-                font-size: 1rem;
-              "
-            />
-            <p class="text-muted" style="font-size: 0.75rem; margin-top: var(--space-xs);">
-              Used to access the web dashboard. Share with your team.
-            </p>
-          </div>
-
           <button type="submit" class="btn btn-primary" style="width: 100%;" id="submit-btn">
             Create Team
           </button>
@@ -238,7 +209,7 @@ import { Header } from '@components/Header';
                 <span class="cmd-copy-icon" style="color: var(--text-muted); font-size: 0.7rem; white-space: nowrap;">Copy</span>
               </span>
             </li>
-            <li>Share the join code and dashboard password with your team</li>
+            <li>Share the join code with your team</li>
           </ol>
         </div>
 
@@ -308,7 +279,6 @@ import { Header } from '@components/Header';
       team_name: formData.get('team_name'),
       admin_name: formData.get('admin_name'),
       admin_email: formData.get('admin_email') || null,
-      dashboard_password: formData.get('dashboard_password'),
     };
 
     try {
@@ -328,6 +298,7 @@ import { Header } from '@components/Header';
           team_join_code: string;
           user_token: string;
           user_id: string;
+          web_session_token: string;
         }
       };
 
@@ -335,18 +306,11 @@ import { Header } from '@components/Header';
       teamTokenInput.value = result.data.team_join_code;
       userTokenInput.value = result.data.user_token;
 
-      // Create a web session so the admin is logged into the dashboard
-      try {
-        await fetch('/api/v1/auth/create-session', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            password: data.dashboard_password,
-          }),
-        });
-      } catch (sessionError) {
-        console.error('Failed to create session:', sessionError);
-        // Continue anyway - user can still log in manually
+      // Set session cookie directly (server already created the web session)
+      if (result.data.web_session_token) {
+        const expires = new Date();
+        expires.setDate(expires.getDate() + 30);
+        document.cookie = `overlap_session=${result.data.web_session_token}; path=/; secure; samesite=lax; expires=${expires.toUTCString()}`;
       }
 
       // Hide form, show success

@@ -29,9 +29,9 @@ ENVIRONMENT = "production"
 
 # Note: TEAM_ENCRYPTION_KEY must be set as a secret during setup
 
-# Stale session detection - every 15 minutes
-[triggers]
-crons = ["*/15 * * * *"]
+# Stale session detection runs on authenticated page loads (no cron needed).
+# Astro's Cloudflare adapter doesn't export scheduled(), so cron triggers
+# would produce "Handler does not export a scheduled() function" errors.
 
 # Enable worker logs for debugging
 [observability]

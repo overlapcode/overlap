@@ -1,19 +1,21 @@
 /**
  * Server-side session utilities for Astro pages.
- * Used to check if the user has dashboard access via password authentication.
+ * Used to check if the user has dashboard access via token authentication.
  */
 
 import type { D1Database } from '@cloudflare/workers-types';
-import { getTeamConfig, getWebSessionByTokenHash } from '@lib/db/queries';
+import { getMemberById, getTeamConfig, getWebSessionByTokenHash } from '@lib/db/queries';
 
 export type SessionData = {
   teamName: string;
   isAuthenticated: boolean;
+  userId: string;
+  displayName: string;
+  role: 'admin' | 'member';
 } | null;
 
 /**
  * Get session data from the session cookie.
- * In v2, dashboard access is password-based, not user-based.
  * Returns null if not authenticated.
  */
 export async function getSessionData(
@@ -36,7 +38,13 @@ export async function getSessionData(
 
     // Find session
     const session = await getWebSessionByTokenHash(db, tokenHash);
-    if (!session) {
+    if (!session?.user_id) {
+      return null;
+    }
+
+    // Get member info
+    const member = await getMemberById(db, session.user_id);
+    if (!member) {
       return null;
     }
 
@@ -49,6 +57,9 @@ export async function getSessionData(
     return {
       teamName: config.team_name,
       isAuthenticated: true,
+      userId: member.user_id,
+      displayName: member.display_name,
+      role: member.role as 'admin' | 'member',
     };
   } catch (error) {
     console.error('Session lookup error:', error);

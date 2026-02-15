@@ -8,7 +8,7 @@
 export type TeamConfig = {
   id: 1;
   team_name: string;
-  password_hash: string;
+  password_hash: string | null;
   team_join_code: string;
   stale_timeout_hours: number;
   llm_provider: 'heuristic' | 'anthropic' | 'openai' | 'xai' | 'google' | null;
@@ -147,6 +147,7 @@ export type Overlap = {
 export type WebSession = {
   id: string;
   token_hash: string;
+  user_id: string | null;
   expires_at: string;
   created_at: string;
 };

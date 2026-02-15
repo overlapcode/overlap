@@ -399,6 +399,7 @@ import { Header } from '@components/Header';
     let actionsHtml = '';
     if (isCurrentUserAdmin) {
       const buttons: string[] = [];
+      buttons.push(`<button class="btn-action" onclick="regenerateToken('${user.id}', '${safeName}')">Regenerate Token</button>`);
       if (user.role === 'member') {
         buttons.push(`<button class="btn-action" onclick="promoteUser('${user.id}', '${safeName}')">Promote</button>`);
       } else if (!isSelf) {
@@ -456,6 +457,22 @@ import { Header } from '@components/Header';
     } catch (e) { showToast(e instanceof Error ? e.message : 'Failed'); }
   }
 
+  async function regenerateToken(userId: string, userName: string) {
+    if (!confirm(`Regenerate token for ${userName}?\n\nTheir current token will stop working immediately. You'll need to share the new token with them.`)) return;
+    try {
+      const r = await fetch(`/api/v1/admin/users/${userId}/rotate-token`, { method: 'POST' });
+      const result = await r.json() as { data?: { user_token: string }; error?: string };
+      if (!r.ok) throw new Error(result.error || 'Failed');
+
+      // Show the new token in the existing token display section
+      memberNameSpan.textContent = userName;
+      tokenInput.value = result.data?.user_token || '';
+      tokenSection.style.display = 'block';
+      showToast(`Token regenerated for ${userName}`, false);
+    } catch (e) { showToast(e instanceof Error ? e.message : 'Failed'); }
+  }
+
+  (window as any).regenerateToken = regenerateToken;
   (window as any).promoteUser = promoteUser;
   (window as any).demoteUser = demoteUser;
   (window as any).removeUser = removeUser;

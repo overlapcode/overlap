@@ -963,10 +963,10 @@ export async function markStaleSessions(db: D1Database): Promise<number> {
 // WEB SESSION QUERIES
 // ============================================================================
 
-export async function createWebSession(db: D1Database, id: string, tokenHash: string, expiresAt: string): Promise<void> {
+export async function createWebSession(db: D1Database, id: string, tokenHash: string, expiresAt: string, userId: string): Promise<void> {
   await db
-    .prepare('INSERT INTO web_sessions (id, token_hash, expires_at) VALUES (?, ?, ?)')
-    .bind(id, tokenHash, expiresAt)
+    .prepare('INSERT INTO web_sessions (id, token_hash, user_id, expires_at) VALUES (?, ?, ?, ?)')
+    .bind(id, tokenHash, userId, expiresAt)
     .run();
 }
 

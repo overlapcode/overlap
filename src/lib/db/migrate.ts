@@ -21,7 +21,7 @@ INSERT OR IGNORE INTO schema_version (version) VALUES (1);
 CREATE TABLE IF NOT EXISTS team_config (
     id INTEGER PRIMARY KEY CHECK (id = 1),
     team_name TEXT NOT NULL,
-    password_hash TEXT NOT NULL,
+    password_hash TEXT DEFAULT '',
     team_join_code TEXT NOT NULL,
     stale_timeout_hours INTEGER DEFAULT 8,
     llm_provider TEXT,
@@ -146,6 +146,7 @@ CREATE TABLE IF NOT EXISTS overlaps (
 CREATE TABLE IF NOT EXISTS web_sessions (
     id TEXT PRIMARY KEY,
     token_hash TEXT UNIQUE NOT NULL,
+    user_id TEXT REFERENCES members(user_id),
     expires_at TEXT NOT NULL,
     created_at TEXT DEFAULT (datetime('now'))
 );

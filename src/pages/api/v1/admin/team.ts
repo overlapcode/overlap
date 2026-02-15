@@ -1,13 +1,11 @@
 import type { APIContext } from 'astro';
 import { z } from 'zod';
 import { authenticateAny, requireAdmin, errorResponse, successResponse } from '@lib/auth/middleware';
-import { hashPassword } from '@lib/utils/crypto';
 import { getTeamConfig, updateTeamConfig } from '@lib/db/queries';
 
 const UpdateTeamSchema = z.object({
   team_name: z.string().min(1).max(100).optional(),
   stale_timeout_hours: z.number().min(1).max(168).optional(),
-  dashboard_password: z.string().min(8).optional(),
 });
 
 // GET: Retrieve team settings
@@ -36,7 +34,6 @@ export async function GET(context: APIContext) {
       team_name: config.team_name,
       team_join_code: config.team_join_code,
       stale_timeout_hours: config.stale_timeout_hours,
-      has_dashboard_password: !!config.password_hash,
       llm_provider: config.llm_provider,
       llm_model: config.llm_model,
       has_llm_api_key: !!config.llm_api_key_encrypted,
@@ -82,7 +79,6 @@ export async function PUT(context: APIContext) {
     const updates: Partial<{
       team_name: string;
       stale_timeout_hours: number;
-      password_hash: string;
     }> = {};
 
     if (input.team_name !== undefined) {
@@ -90,9 +86,6 @@ export async function PUT(context: APIContext) {
     }
     if (input.stale_timeout_hours !== undefined) {
       updates.stale_timeout_hours = input.stale_timeout_hours;
-    }
-    if (input.dashboard_password !== undefined) {
-      updates.password_hash = await hashPassword(input.dashboard_password);
     }
 
     if (Object.keys(updates).length === 0) {

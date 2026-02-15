@@ -1,15 +1,13 @@
 import type { APIContext } from 'astro';
 import { z } from 'zod';
 import { errorResponse, successResponse, generateToken, hashToken } from '@lib/auth/middleware';
-import { getTeamConfig, createTeamConfig, createMember } from '@lib/db/queries';
-import { hashPassword } from '@lib/utils/crypto';
+import { getTeamConfig, createTeamConfig, createMember, createWebSession } from '@lib/db/queries';
 import { ensureMigrated } from '@lib/db/migrate';
 
 const SetupSchema = z.object({
   team_name: z.string().min(1).max(100),
   admin_name: z.string().min(1).max(100),
   admin_email: z.string().email().nullable().optional(),
-  dashboard_password: z.string().min(8),
 });
 
 // GET: Check setup status and ensure database is migrated
@@ -64,13 +62,10 @@ export async function POST(context: APIContext) {
     const userTokenHash = await hashToken(userToken);
     const userId = crypto.randomUUID();
 
-    // Hash password
-    const passwordHash = await hashPassword(input.dashboard_password);
-
-    // Create team config
+    // Create team config (no password)
     await createTeamConfig(db, {
       team_name: input.team_name,
-      password_hash: passwordHash,
+      password_hash: '',
       team_join_code: teamJoinCode,
     });
 
@@ -83,10 +78,21 @@ export async function POST(context: APIContext) {
       role: 'admin',
     });
 
+    // Auto-create web session so admin is logged in immediately
+    const sessionId = crypto.randomUUID();
+    const webSessionToken = crypto.randomUUID();
+    const sessionTokenHash = await hashToken(webSessionToken);
+
+    const expiresAt = new Date();
+    expiresAt.setDate(expiresAt.getDate() + 30);
+
+    await createWebSession(db, sessionId, sessionTokenHash, expiresAt.toISOString(), userId);
+
     return successResponse({
       team_join_code: teamJoinCode,
       user_id: userId,
       user_token: userToken,
+      web_session_token: webSessionToken,
       message: 'Team created successfully',
     }, 201);
   } catch (error) {

@@ -1,5 +1,5 @@
 import type { D1Database } from '@cloudflare/workers-types';
-import { getMemberByTokenHash, getTeamConfig, getWebSessionByTokenHash } from '@lib/db/queries';
+import { getMemberById, getMemberByTokenHash, getTeamConfig, getWebSessionByTokenHash } from '@lib/db/queries';
 import type { Member, TeamConfig } from '@lib/db/types';
 
 export type AuthContext = {
@@ -64,20 +64,17 @@ export async function authenticateWebSession(
     return { success: false, error: 'Team not configured', status: 500 };
   }
 
-  // For web sessions, we create a virtual "admin" member since dashboard access
-  // is password-based, not token-based. The dashboard user has admin access.
-  const virtualMember: Member = {
-    user_id: 'dashboard',
-    display_name: 'Dashboard User',
-    email: null,
-    token_hash: '',
-    role: 'admin',
-    last_active_at: null,
-    created_at: webSession.created_at,
-    updated_at: webSession.created_at,
-  };
+  // Look up real member from web session
+  if (!webSession.user_id) {
+    return { success: false, error: 'Session has no user', status: 401 };
+  }
 
-  return { success: true, context: { member: virtualMember, teamConfig } };
+  const member = await getMemberById(db, webSession.user_id);
+  if (!member) {
+    return { success: false, error: 'User not found', status: 401 };
+  }
+
+  return { success: true, context: { member, teamConfig } };
 }
 
 /**
