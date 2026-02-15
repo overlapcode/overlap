@@ -96,7 +96,7 @@ function getModelLabel(model: string | null | undefined): string | null {
 
 export const ActivityCard = memo(function ActivityCard({ session }: ActivityCardProps) {
   const { user, device, repo, branch, worktree, status, last_activity_at, activity, model, total_cost_usd, num_turns } = session;
-  const relativeTime = useRelativeTime(last_activity_at);
+  const relativeTime = useRelativeTime(last_activity_at || session.started_at);
   const costLabel = formatCost(total_cost_usd);
   const modelLabel = getModelLabel(model);
 
@@ -157,10 +157,10 @@ export const ActivityCard = memo(function ActivityCard({ session }: ActivityCard
           >
             ▶
           </span>
-          <span style={{ fontWeight: 600 }}>{user.name}</span>
+          <span style={{ fontWeight: 600 }}>{user?.name ?? 'Unknown'}</span>
           <span className="text-muted">·</span>
-          <span className="text-secondary">{device.name}</span>
-          {device.is_remote && (
+          <span className="text-secondary">{device?.name ?? 'local'}</span>
+          {device?.is_remote && (
             <span className="text-muted" style={{ fontSize: '0.75rem' }}>(remote)</span>
           )}
           <span className="text-muted">·</span>

@@ -382,7 +382,12 @@ export async function getSessions(db: D1Database, options: SessionListOptions = 
   // Get sessions with member and repo
   const result = await db
     .prepare(
-      `SELECT s.*, m.display_name as member_name, r.id as r_id, r.name as r_name, r.display_name as r_display_name
+      `SELECT s.*, m.display_name as member_name, r.id as r_id, r.name as r_name, r.display_name as r_display_name,
+              COALESCE(
+                (SELECT MAX(timestamp) FROM file_operations WHERE session_id = s.id),
+                (SELECT MAX(timestamp) FROM prompts WHERE session_id = s.id),
+                s.started_at
+              ) as last_activity_at
        FROM sessions s
        JOIN members m ON s.user_id = m.user_id
        LEFT JOIN repos r ON s.repo_id = r.id
@@ -432,6 +437,7 @@ export async function getSessions(db: D1Database, options: SessionListOptions = 
           display_name: row.r_display_name as string | null,
         }
       : null,
+    last_activity_at: row.last_activity_at as string,
   }));
 
   return { sessions, total, hasMore: offset + sessions.length < total };
@@ -880,12 +886,12 @@ export async function getTeamStats(
   // Hottest files
   const hottestFilesResult = await db
     .prepare(
-      `SELECT file_path, COUNT(DISTINCT session_id) as session_count, COUNT(DISTINCT user_id) as user_count
+      `SELECT fo.file_path, COUNT(DISTINCT fo.session_id) as session_count, COUNT(DISTINCT fo.user_id) as user_count
        FROM file_operations fo
        JOIN sessions s ON fo.session_id = s.id
        WHERE fo.operation IN ('create', 'modify')
        ${dateFilter.replace(/started_at/g, 's.started_at')}
-       GROUP BY file_path
+       GROUP BY fo.file_path
        ORDER BY session_count DESC
        LIMIT 10`
     )

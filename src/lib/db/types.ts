@@ -207,6 +207,7 @@ export type IngestEvent = {
 export type SessionWithMember = Session & {
   member: Pick<Member, 'user_id' | 'display_name'>;
   repo: Pick<Repo, 'id' | 'name' | 'display_name'> | null;
+  last_activity_at?: string;
 };
 
 // Session detail with all related data

@@ -45,7 +45,7 @@ function formatSession(session: SessionWithMember) {
     worktree: null, // v2 doesn't track worktree separately
     status: session.status,
     started_at: session.started_at,
-    last_activity_at: session.started_at, // Use started_at as proxy
+    last_activity_at: session.last_activity_at || session.started_at,
     ended_at: session.ended_at,
     // v2 specific fields
     model: session.model,
