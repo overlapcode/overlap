@@ -792,8 +792,10 @@ export async function getActiveSessionsWithRegions(db: D1Database): Promise<Reco
        LEFT JOIN file_operations fo ON fo.session_id = s.id
          AND fo.operation IN ('create', 'modify')
        WHERE s.status = 'active'
-       GROUP BY s.id, fo.file_path, fo.function_name
-       ORDER BY fo.timestamp DESC`
+       GROUP BY s.id, s.user_id, m.display_name, s.repo_name, s.started_at,
+                s.generated_summary, s.status, fo.file_path, fo.start_line,
+                fo.end_line, fo.function_name
+       ORDER BY MAX(fo.timestamp) DESC`
     )
     .all();
 
@@ -810,19 +812,23 @@ export async function getTeamStats(
 ): Promise<TeamStats> {
   const { startDate, endDate } = options;
 
-  let dateFilter = '';
+  // Build separate date filters: one for sessions-only queries, one for JOIN queries
+  let sessionDateFilter = '';
+  let joinDateFilter = '';
   const params: unknown[] = [];
 
   if (startDate) {
-    dateFilter += ' AND started_at >= ?';
+    sessionDateFilter += ' AND started_at >= ?';
+    joinDateFilter += ' AND s.started_at >= ?';
     params.push(startDate);
   }
   if (endDate) {
-    dateFilter += ' AND started_at <= ?';
+    sessionDateFilter += ' AND started_at <= ?';
+    joinDateFilter += ' AND s.started_at <= ?';
     params.push(endDate + 'T23:59:59');
   }
 
-  // Basic stats
+  // Basic stats (sessions only)
   const basicStats = await db
     .prepare(
       `SELECT
@@ -830,67 +836,67 @@ export async function getTeamStats(
         COALESCE(SUM(total_cost_usd), 0) as total_cost_usd,
         COALESCE(AVG(duration_ms), 0) as avg_duration_ms
        FROM sessions
-       WHERE 1=1 ${dateFilter}`
+       WHERE 1=1 ${sessionDateFilter}`
     )
     .bind(...params)
     .first<{ total_sessions: number; total_cost_usd: number; avg_duration_ms: number }>();
 
-  // Total unique files
+  // Total unique files (JOIN query)
   const filesStats = await db
     .prepare(
-      `SELECT COUNT(DISTINCT file_path) as total_files
+      `SELECT COUNT(DISTINCT fo.file_path) as total_files
        FROM file_operations fo
        JOIN sessions s ON fo.session_id = s.id
-       WHERE 1=1 ${dateFilter.replace(/started_at/g, 's.started_at')}`
+       WHERE 1=1 ${joinDateFilter}`
     )
     .bind(...params)
     .first<{ total_files: number }>();
 
-  // By member
+  // By member (JOIN query)
   const byMemberResult = await db
     .prepare(
       `SELECT s.user_id, m.display_name, COUNT(*) as session_count, COALESCE(SUM(s.total_cost_usd), 0) as total_cost
        FROM sessions s
        JOIN members m ON s.user_id = m.user_id
-       WHERE 1=1 ${dateFilter}
+       WHERE 1=1 ${joinDateFilter}
        GROUP BY s.user_id, m.display_name
        ORDER BY session_count DESC`
     )
     .bind(...params)
     .all();
 
-  // By repo
+  // By repo (sessions only)
   const byRepoResult = await db
     .prepare(
       `SELECT repo_name, COUNT(*) as session_count, COALESCE(SUM(total_cost_usd), 0) as total_cost
        FROM sessions
-       WHERE 1=1 ${dateFilter}
+       WHERE 1=1 ${sessionDateFilter}
        GROUP BY repo_name
        ORDER BY session_count DESC`
     )
     .bind(...params)
     .all();
 
-  // By model
+  // By model (sessions only)
   const byModelResult = await db
     .prepare(
       `SELECT COALESCE(model, 'unknown') as model, COUNT(*) as session_count, COALESCE(SUM(total_cost_usd), 0) as total_cost
        FROM sessions
-       WHERE 1=1 ${dateFilter}
+       WHERE 1=1 ${sessionDateFilter}
        GROUP BY model
        ORDER BY session_count DESC`
     )
     .bind(...params)
     .all();
 
-  // Hottest files
+  // Hottest files (JOIN query)
   const hottestFilesResult = await db
     .prepare(
       `SELECT fo.file_path, COUNT(DISTINCT fo.session_id) as session_count, COUNT(DISTINCT fo.user_id) as user_count
        FROM file_operations fo
        JOIN sessions s ON fo.session_id = s.id
        WHERE fo.operation IN ('create', 'modify')
-       ${dateFilter.replace(/started_at/g, 's.started_at')}
+       ${joinDateFilter}
        GROUP BY fo.file_path
        ORDER BY session_count DESC
        LIMIT 10`

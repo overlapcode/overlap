@@ -219,8 +219,8 @@ export async function generateSessionSummary(
     // Get file operations for this session
     const fileOpsResult = await db
       .prepare(
-        `SELECT DISTINCT file_path, tool_name FROM file_operations
-         WHERE session_id = ? ORDER BY timestamp`
+        `SELECT file_path, tool_name, MAX(timestamp) as last_ts FROM file_operations
+         WHERE session_id = ? GROUP BY file_path, tool_name ORDER BY last_ts`
       )
       .bind(sessionId)
       .all<{ file_path: string; tool_name: string }>();
