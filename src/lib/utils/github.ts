@@ -78,6 +78,16 @@ export function getBranchUrl(githubBaseUrl: string | null, branch: string | null
   return `${githubBaseUrl}/tree/${encodeBranchForUrl(branch)}`;
 }
 
+/** Derive a GitHub URL from a repo name like "owner/repo" */
+export function deriveGitHubUrl(repoName: string | null | undefined): string | null {
+  if (!repoName) return null;
+  // Match "owner/repo" pattern (no slashes beyond the single separator)
+  if (/^[a-zA-Z0-9._-]+\/[a-zA-Z0-9._-]+$/.test(repoName)) {
+    return `https://github.com/${repoName}`;
+  }
+  return null;
+}
+
 /** Build a GitHub file URL from a file path, repo URL, and branch */
 export function getFileUrl(
   filePath: string,

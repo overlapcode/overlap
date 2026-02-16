@@ -1,6 +1,6 @@
 import { memo, useState } from 'react';
 import { useRelativeTime, formatRelativeTime } from '@lib/utils/time';
-import { parseGitHubUrl, getRelativeFilePath, getStatusLabel, getAgentLabel, getFileUrl, getBranchUrl } from '@lib/utils/github';
+import { parseGitHubUrl, deriveGitHubUrl, getRelativeFilePath, getStatusLabel, getAgentLabel, getFileUrl, getBranchUrl } from '@lib/utils/github';
 import { fetchWithTimeout } from '@lib/utils/fetch';
 
 const WAITING_MESSAGES = [
@@ -107,7 +107,7 @@ export const ActivityCard = memo(function ActivityCard({ session }: ActivityCard
   const [loadingActivities, setLoadingActivities] = useState(false);
 
   // GitHub URL helpers
-  const githubBaseUrl = parseGitHubUrl(repo?.remote_url ?? null);
+  const githubBaseUrl = parseGitHubUrl(repo?.remote_url ?? null) ?? deriveGitHubUrl(repo?.name);
   const branchUrl = getBranchUrl(githubBaseUrl, branch);
 
   const handleToggleExpand = async () => {

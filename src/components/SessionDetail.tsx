@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, memo } from 'react';
 import { useRelativeTime, formatRelativeTime } from '@lib/utils/time';
-import { parseGitHubUrl, getRelativeFilePath, getStatusLabel, getAgentLabel, getFileUrl, getBranchUrl } from '@lib/utils/github';
+import { parseGitHubUrl, deriveGitHubUrl, getRelativeFilePath, getStatusLabel, getAgentLabel, getFileUrl, getBranchUrl } from '@lib/utils/github';
 import { fetchWithTimeout } from '@lib/utils/fetch';
 
 type SessionInfo = {
@@ -40,13 +40,13 @@ const PAGE_SIZE = 20;
 
 function SessionHeader({ session }: { session: SessionInfo }) {
   const relativeTime = useRelativeTime(session.last_activity_at);
-  const githubBaseUrl = parseGitHubUrl(session.repo?.remote_url ?? null);
+  const githubBaseUrl = parseGitHubUrl(session.repo?.remote_url ?? null) ?? deriveGitHubUrl(session.repo?.name);
   const branchUrl = getBranchUrl(githubBaseUrl, session.branch);
-  const repoUrl = githubBaseUrl;
+  const agentLabel = getAgentLabel(session.agent_type);
 
   return (
     <div className="card" style={{ marginBottom: 'var(--space-lg)' }}>
-      {/* User + Device + Status */}
+      {/* User + Device + Status + Agent */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-sm)', flexWrap: 'wrap', marginBottom: 'var(--space-md)' }}>
         <span style={{ fontWeight: 600, fontSize: '1.125rem' }}>{session.user.name}</span>
         <span className="text-muted">·</span>
@@ -61,6 +61,23 @@ function SessionHeader({ session }: { session: SessionInfo }) {
             {getStatusLabel(session.status)}
           </span>
         </span>
+        {agentLabel && (
+          <>
+            <span className="text-muted">·</span>
+            <span
+              style={{
+                fontSize: '0.6875rem',
+                padding: '2px 6px',
+                borderRadius: '4px',
+                backgroundColor: 'var(--bg-elevated)',
+                color: 'var(--accent-orange)',
+                fontFamily: 'var(--font-mono)',
+              }}
+            >
+              {agentLabel}
+            </span>
+          </>
+        )}
       </div>
 
       {/* Repo + Branch */}
@@ -84,13 +101,9 @@ function SessionHeader({ session }: { session: SessionInfo }) {
           )}
           {session.branch && session.repo && <span> · </span>}
           {session.repo && (
-            repoUrl ? (
-              <a href={repoUrl} target="_blank" rel="noopener noreferrer" className="footer-link">
-                {session.repo.name}
-              </a>
-            ) : (
-              <span>{session.repo.name}</span>
-            )
+            <a href={`/repo/${session.repo.id}`} className="footer-link">
+              {session.repo.name}
+            </a>
           )}
         </div>
       )}
@@ -327,7 +340,7 @@ export function SessionDetail({ sessionId }: SessionDetailProps) {
 
   if (!session) return null;
 
-  const githubBaseUrl = parseGitHubUrl(session.repo?.remote_url ?? null);
+  const githubBaseUrl = parseGitHubUrl(session.repo?.remote_url ?? null) ?? deriveGitHubUrl(session.repo?.name);
 
   return (
     <div>
