@@ -24,7 +24,7 @@ function formatSession(session: SessionWithMember) {
       is_remote: !!session.is_remote,
     },
     repo: session.repo
-      ? { id: session.repo.id, name: session.repo.name, remote_url: null }
+      ? { id: session.repo.id, name: session.repo.name, remote_url: session.repo.remote_url ?? null }
       : session.repo_name
         ? { id: 'unknown', name: session.repo_name, remote_url: null }
         : null,

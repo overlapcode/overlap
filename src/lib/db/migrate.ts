@@ -37,6 +37,7 @@ CREATE TABLE IF NOT EXISTS repos (
     name TEXT NOT NULL UNIQUE,
     display_name TEXT,
     description TEXT,
+    remote_url TEXT,
     created_at TEXT DEFAULT (datetime('now'))
 );
 
@@ -193,6 +194,8 @@ CREATE INDEX IF NOT EXISTS idx_web_sessions_expires ON web_sessions(expires_at);
 const MIGRATIONS = [
   // v1.2.0: Add user_id to web_sessions (auth redesign: token-based login)
   `ALTER TABLE web_sessions ADD COLUMN user_id TEXT REFERENCES members(user_id)`,
+  // v1.4.3: Add remote_url to repos (for VCS file links)
+  `ALTER TABLE repos ADD COLUMN remote_url TEXT`,
 ];
 
 export async function ensureMigrated(db: D1Database): Promise<void> {

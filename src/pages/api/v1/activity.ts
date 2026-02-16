@@ -34,7 +34,7 @@ function formatSession(session: SessionWithMember) {
       ? {
           id: session.repo.id,
           name: session.repo.name,
-          remote_url: null, // v2 repos don't store remote_url
+          remote_url: session.repo.remote_url ?? null,
         }
       : {
           id: 'unknown',
@@ -42,7 +42,7 @@ function formatSession(session: SessionWithMember) {
           remote_url: null,
         },
     branch: session.git_branch,
-    worktree: null, // v2 doesn't track worktree separately
+    worktree: session.cwd || null,
     status: session.status,
     started_at: session.started_at,
     last_activity_at: session.last_activity_at || session.started_at,

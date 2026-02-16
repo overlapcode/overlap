@@ -109,8 +109,9 @@ export function getFileUrl(
   branch: string | null,
   worktree: string | null
 ): string | null {
-  if (!githubBaseUrl || !branch) return null;
+  if (!githubBaseUrl) return null;
+  const effectiveBranch = branch || 'main';
   const relativePath = getRelativeFilePath(filePath, worktree);
   const encodedPath = relativePath.split('/').map(encodeURIComponent).join('/');
-  return `${githubBaseUrl}/blob/${encodeBranchForUrl(branch)}/${encodedPath}`;
+  return `${githubBaseUrl}/blob/${encodeBranchForUrl(effectiveBranch)}/${encodedPath}`;
 }

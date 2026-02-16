@@ -26,6 +26,7 @@ export type Repo = {
   name: string;
   display_name: string | null;
   description: string | null;
+  remote_url: string | null;
   created_at: string;
 };
 
@@ -229,14 +230,14 @@ export type IngestEvent = {
 // Session with member info for timeline display
 export type SessionWithMember = Session & {
   member: Pick<Member, 'user_id' | 'display_name'>;
-  repo: Pick<Repo, 'id' | 'name' | 'display_name'> | null;
+  repo: Pick<Repo, 'id' | 'name' | 'display_name' | 'remote_url'> | null;
   last_activity_at?: string;
 };
 
 // Session detail with all related data
 export type SessionDetail = Session & {
   member: Pick<Member, 'user_id' | 'display_name'>;
-  repo: Pick<Repo, 'id' | 'name' | 'display_name'> | null;
+  repo: Pick<Repo, 'id' | 'name' | 'display_name' | 'remote_url'> | null;
   file_operations: FileOperation[];
   prompts: Prompt[];
   agent_responses: AgentResponse[];

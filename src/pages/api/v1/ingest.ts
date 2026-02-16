@@ -13,6 +13,7 @@ import { authenticateTracer, errorResponse, successResponse } from '@lib/auth/mi
 import {
   getSessionById,
   getRepoByName,
+  getTeamConfig,
   updateMemberLastActive,
   detectFileOverlaps,
 } from '@lib/db/queries';
@@ -36,6 +37,7 @@ const IngestEventSchema = z.object({
   hostname: z.string().optional(),
   device_name: z.string().optional(),
   is_remote: z.boolean().optional(),
+  git_remote_url: z.string().optional(),
 
   // file_op only
   tool_name: z.string().optional(),
@@ -80,6 +82,9 @@ export async function POST(context: APIContext) {
   }
 
   const { member } = authResult.context;
+
+  // Fetch team config for stale timeout check
+  const teamConfig = await getTeamConfig(db);
 
   // Parse and validate request body
   let payload: z.infer<typeof IngestPayloadSchema>;
@@ -141,11 +146,15 @@ export async function POST(context: APIContext) {
         case 'session_start': {
           const existing = sessionCache.get(event.session_id);
           if (existing) {
-            // Reactivate if stale/ended
+            // Only reactivate if this is a genuinely recent session_start, not a backfill
             if (existing.status === 'stale' || existing.status === 'ended') {
-              statements.push(
-                db.prepare(`UPDATE sessions SET status = 'active', ended_at = NULL WHERE id = ?`).bind(event.session_id)
-              );
+              const eventAge = Date.now() - new Date(event.timestamp).getTime();
+              const staleMs = (teamConfig?.stale_timeout_hours ?? 8) * 60 * 60 * 1000;
+              if (eventAge < staleMs) {
+                statements.push(
+                  db.prepare(`UPDATE sessions SET status = 'active', ended_at = NULL WHERE id = ?`).bind(event.session_id)
+                );
+              }
             }
             // Backfill null git_branch/model
             const updates: string[] = [];
@@ -189,6 +198,14 @@ export async function POST(context: APIContext) {
             // Mark as cached so subsequent events in this batch skip creation
             sessionCache.set(event.session_id, { id: event.session_id, status: 'active' } as Session);
             results.sessions_created++;
+          }
+
+          // Store git remote URL on repo (first-write-wins)
+          if (event.git_remote_url && repoId) {
+            statements.push(
+              db.prepare(`UPDATE repos SET remote_url = ? WHERE id = ? AND remote_url IS NULL`)
+                .bind(event.git_remote_url, repoId)
+            );
           }
           break;
         }

@@ -201,7 +201,7 @@ export async function GET(context: APIContext) {
         ? {
             id: detail.repo.id,
             name: detail.repo.name,
-            remote_url: null,
+            remote_url: detail.repo.remote_url ?? null,
           }
         : {
             id: 'unknown',
@@ -209,7 +209,7 @@ export async function GET(context: APIContext) {
             remote_url: null,
           },
       branch: detail.git_branch,
-      worktree: null,
+      worktree: detail.cwd || null,
       agent_type: detail.agent_type,
       status: detail.status,
       started_at: detail.started_at,

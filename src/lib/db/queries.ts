@@ -399,7 +399,7 @@ export async function getSessions(db: D1Database, options: SessionListOptions = 
   // Get sessions with member and repo
   const result = await db
     .prepare(
-      `SELECT s.*, m.display_name as member_name, r.id as r_id, r.name as r_name, r.display_name as r_display_name,
+      `SELECT s.*, m.display_name as member_name, r.id as r_id, r.name as r_name, r.display_name as r_display_name, r.remote_url as r_remote_url,
               COALESCE(
                 MAX(
                   (SELECT MAX(timestamp) FROM file_operations WHERE session_id = s.id),
@@ -455,6 +455,7 @@ export async function getSessions(db: D1Database, options: SessionListOptions = 
           id: row.r_id as string,
           name: row.r_name as string,
           display_name: row.r_display_name as string | null,
+          remote_url: row.r_remote_url as string | null,
         }
       : null,
     last_activity_at: row.last_activity_at as string,
@@ -466,7 +467,7 @@ export async function getSessions(db: D1Database, options: SessionListOptions = 
 export async function getSessionDetail(db: D1Database, sessionId: string): Promise<SessionDetail | null> {
   const session = await db
     .prepare(
-      `SELECT s.*, m.display_name as member_name, r.id as r_id, r.name as r_name, r.display_name as r_display_name
+      `SELECT s.*, m.display_name as member_name, r.id as r_id, r.name as r_name, r.display_name as r_display_name, r.remote_url as r_remote_url
        FROM sessions s
        JOIN members m ON s.user_id = m.user_id
        LEFT JOIN repos r ON s.repo_id = r.id
@@ -534,6 +535,7 @@ export async function getSessionDetail(db: D1Database, sessionId: string): Promi
           id: row.r_id as string,
           name: row.r_name as string,
           display_name: row.r_display_name as string | null,
+          remote_url: row.r_remote_url as string | null,
         }
       : null,
     file_operations: fileOpsResult.results,
@@ -1017,10 +1019,13 @@ export async function markStaleSessions(db: D1Database): Promise<number> {
          UNION
          SELECT DISTINCT session_id FROM agent_responses
          WHERE timestamp > datetime('now', '-' || ? || ' hours')
+         UNION
+         SELECT DISTINCT session_id FROM prompts
+         WHERE timestamp > datetime('now', '-' || ? || ' hours')
        )
        AND started_at < datetime('now', '-' || ? || ' hours')`
     )
-    .bind(timeout, timeout, timeout)
+    .bind(timeout, timeout, timeout, timeout)
     .run();
 
   return result.meta.changes ?? 0;
