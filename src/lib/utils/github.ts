@@ -51,6 +51,22 @@ export function getStatusLabel(status: string): string {
   }
 }
 
+/** Get display name for a coding agent type */
+export function getAgentLabel(agentType: string | null | undefined): string {
+  if (!agentType) return 'Agent';
+  switch (agentType) {
+    case 'claude_code': return 'Claude';
+    case 'codex': return 'Codex';
+    case 'cursor': return 'Cursor';
+    case 'windsurf': return 'Windsurf';
+    case 'copilot': return 'Copilot';
+    case 'aider': return 'Aider';
+    case 'cline': return 'Cline';
+    case 'devin': return 'Devin';
+    default: return agentType.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+  }
+}
+
 /** Encode a branch name for use in GitHub URLs, preserving `/` separators */
 export function encodeBranchForUrl(branch: string): string {
   return branch.split('/').map(encodeURIComponent).join('/');

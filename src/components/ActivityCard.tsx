@@ -1,6 +1,6 @@
 import { memo, useState } from 'react';
 import { useRelativeTime, formatRelativeTime } from '@lib/utils/time';
-import { parseGitHubUrl, getRelativeFilePath, getStatusLabel, getFileUrl, getBranchUrl } from '@lib/utils/github';
+import { parseGitHubUrl, getRelativeFilePath, getStatusLabel, getAgentLabel, getFileUrl, getBranchUrl } from '@lib/utils/github';
 import { fetchWithTimeout } from '@lib/utils/fetch';
 
 const WAITING_MESSAGES = [
@@ -56,6 +56,7 @@ type ActivityCardProps = {
     started_at: string;
     last_activity_at: string;
     // v2 fields
+    agent_type?: string;
     model?: string | null;
     total_cost_usd?: number | null;
     num_turns?: number;
@@ -95,10 +96,11 @@ function getModelLabel(model: string | null | undefined): string | null {
 }
 
 export const ActivityCard = memo(function ActivityCard({ session }: ActivityCardProps) {
-  const { user, device, repo, branch, worktree, status, last_activity_at, activity, model, total_cost_usd, num_turns } = session;
+  const { user, device, repo, branch, worktree, status, last_activity_at, activity, model, total_cost_usd, num_turns, agent_type } = session;
   const relativeTime = useRelativeTime(last_activity_at || session.started_at);
   const costLabel = formatCost(total_cost_usd);
   const modelLabel = getModelLabel(model);
+  const agentLabel = getAgentLabel(agent_type);
 
   const [expanded, setExpanded] = useState(false);
   const [recentActivities, setRecentActivities] = useState<CompactActivity[] | null>(null);
@@ -173,7 +175,24 @@ export const ActivityCard = memo(function ActivityCard({ session }: ActivityCard
           <span className="text-muted" style={{ fontSize: '0.875rem' }}>
             {relativeTime}
           </span>
-          {/* v2 badges: model, cost, turns */}
+          {/* v2 badges: agent, model, cost, turns */}
+          {agentLabel && (
+            <>
+              <span className="text-muted">·</span>
+              <span
+                style={{
+                  fontSize: '0.6875rem',
+                  padding: '2px 6px',
+                  borderRadius: '4px',
+                  backgroundColor: 'var(--bg-elevated)',
+                  color: 'var(--accent-orange)',
+                  fontFamily: 'var(--font-mono)',
+                }}
+              >
+                {agentLabel}
+              </span>
+            </>
+          )}
           {modelLabel && (
             <>
               <span className="text-muted">·</span>

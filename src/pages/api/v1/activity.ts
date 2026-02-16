@@ -48,6 +48,7 @@ function formatSession(session: SessionWithMember) {
     last_activity_at: session.last_activity_at || session.started_at,
     ended_at: session.ended_at,
     // v2 specific fields
+    agent_type: session.agent_type,
     model: session.model,
     total_cost_usd: session.total_cost_usd,
     num_turns: session.num_turns,

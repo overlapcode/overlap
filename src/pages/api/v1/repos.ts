@@ -14,7 +14,7 @@ import {
   successResponse,
   generateId,
 } from '@lib/auth/middleware';
-import { getAllRepos, createRepo } from '@lib/db/queries';
+import { getAllRepos, createRepo, backfillRepoId } from '@lib/db/queries';
 
 // GET /api/v1/repos - List repos (tracer pulls this)
 export async function GET(context: APIContext) {
@@ -76,6 +76,9 @@ export async function POST(context: APIContext) {
     display_name: body.display_name,
     description: body.description,
   });
+
+  // Backfill repo_id on existing rows that have matching repo_name but no repo_id
+  await backfillRepoId(db, repo.id, repo.name);
 
   return successResponse(repo, 201);
 }

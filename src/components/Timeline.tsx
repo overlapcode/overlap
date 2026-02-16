@@ -14,6 +14,7 @@ type Session = {
   repo: { id: string; name: string; remote_url: string | null } | null;
   branch: string | null;
   worktree: string | null;
+  agent_type?: string;
   status: 'active' | 'stale' | 'ended';
   started_at: string;
   last_activity_at: string;

@@ -14,21 +14,41 @@ function formatSession(session: SessionWithMember) {
       id: session.member.user_id,
       name: session.member.display_name,
     },
-    repo: session.repo ? {
-      id: session.repo.id,
-      name: session.repo.name,
-      display_name: session.repo.display_name,
-    } : null,
-    repo_name: session.repo_name,
+    device: {
+      id: 'default',
+      name: 'local',
+      is_remote: false,
+    },
+    repo: session.repo
+      ? {
+          id: session.repo.id,
+          name: session.repo.name,
+          remote_url: null,
+        }
+      : {
+          id: 'unknown',
+          name: session.repo_name,
+          remote_url: null,
+        },
     branch: session.git_branch,
+    worktree: null,
     status: session.status,
     started_at: session.started_at,
+    last_activity_at: session.last_activity_at || session.started_at,
     ended_at: session.ended_at,
+    agent_type: session.agent_type,
     model: session.model,
     total_cost_usd: session.total_cost_usd,
     num_turns: session.num_turns,
     duration_ms: session.duration_ms,
-    generated_summary: session.generated_summary,
+    activity: session.generated_summary || session.result_summary
+      ? {
+          semantic_scope: null,
+          summary: session.generated_summary || session.result_summary,
+          files: [],
+          created_at: session.started_at,
+        }
+      : null,
   };
 }
 
@@ -42,6 +62,7 @@ function sessionFingerprint(session: SessionWithMember): string {
     session.ended_at ?? '',
     session.generated_summary ?? '',
     session.num_turns,
+    session.last_activity_at ?? '',
   ].join('|');
 }
 
@@ -93,13 +114,13 @@ export async function GET(context: APIContext) {
           // Lightweight change check: single-row query to detect if anything changed
           const changeCheck = await db
             .prepare(
-              `SELECT COUNT(*) as cnt, MAX(started_at) as latest
+              `SELECT COUNT(*) as cnt, MAX(started_at) as latest, SUM(summary_event_count) as events
                FROM sessions
                WHERE status IN ('active', 'stale')`
             )
-            .first<{ cnt: number; latest: string | null }>();
+            .first<{ cnt: number; latest: string | null; events: number | null }>();
 
-          const sig = `${changeCheck?.cnt ?? 0}|${changeCheck?.latest ?? ''}`;
+          const sig = `${changeCheck?.cnt ?? 0}|${changeCheck?.latest ?? ''}|${changeCheck?.events ?? 0}`;
 
           // Skip full query if nothing changed (after initial load)
           if (sig === lastChangeSignature && knownSessions.size > 0) {

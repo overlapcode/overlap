@@ -141,7 +141,22 @@ export async function updateRepo(
 }
 
 export async function deleteRepo(db: D1Database, id: string): Promise<void> {
-  await db.prepare('DELETE FROM repos WHERE id = ?').bind(id).run();
+  await db.batch([
+    db.prepare('UPDATE sessions SET repo_id = NULL WHERE repo_id = ?').bind(id),
+    db.prepare('UPDATE file_operations SET repo_id = NULL WHERE repo_id = ?').bind(id),
+    db.prepare('UPDATE prompts SET repo_id = NULL WHERE repo_id = ?').bind(id),
+    db.prepare('UPDATE agent_responses SET repo_id = NULL WHERE repo_id = ?').bind(id),
+    db.prepare('DELETE FROM repos WHERE id = ?').bind(id),
+  ]);
+}
+
+export async function backfillRepoId(db: D1Database, repoId: string, repoName: string): Promise<void> {
+  await db.batch([
+    db.prepare('UPDATE sessions SET repo_id = ? WHERE repo_name = ? AND repo_id IS NULL').bind(repoId, repoName),
+    db.prepare('UPDATE file_operations SET repo_id = ? WHERE repo_name = ? AND repo_id IS NULL').bind(repoId, repoName),
+    db.prepare('UPDATE prompts SET repo_id = ? WHERE repo_name = ? AND repo_id IS NULL').bind(repoId, repoName),
+    db.prepare('UPDATE agent_responses SET repo_id = ? WHERE repo_name = ? AND repo_id IS NULL').bind(repoId, repoName),
+  ]);
 }
 
 // ============================================================================

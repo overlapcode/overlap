@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, memo } from 'react';
 import { useRelativeTime, formatRelativeTime } from '@lib/utils/time';
-import { parseGitHubUrl, getRelativeFilePath, getStatusLabel, getFileUrl, getBranchUrl } from '@lib/utils/github';
+import { parseGitHubUrl, getRelativeFilePath, getStatusLabel, getAgentLabel, getFileUrl, getBranchUrl } from '@lib/utils/github';
 import { fetchWithTimeout } from '@lib/utils/fetch';
 
 type SessionInfo = {
@@ -10,6 +10,7 @@ type SessionInfo = {
   repo: { id: string; name: string; remote_url: string | null } | null;
   branch: string | null;
   worktree: string | null;
+  agent_type?: string;
   status: 'active' | 'stale' | 'ended';
   started_at: string;
   last_activity_at: string;
@@ -120,6 +121,7 @@ function SessionHeader({ session }: { session: SessionInfo }) {
 }
 
 const ActivityRow = memo(function ActivityRow({ activity, session, githubBaseUrl }: { activity: ActivityItem; session: SessionInfo; githubBaseUrl: string | null }) {
+  const agentLabel = getAgentLabel(session.agent_type);
 
   return (
     <div style={{
@@ -136,14 +138,27 @@ const ActivityRow = memo(function ActivityRow({ activity, session, githubBaseUrl
         )}
       </div>
 
-      {/* Summary (user prompt) */}
+      {/* User prompt */}
       {activity.summary && (
-        <p className="text-primary" style={{ marginBottom: 'var(--space-sm)', fontSize: '0.875rem' }}>
-          {activity.summary}
-        </p>
+        <div style={{ marginBottom: 'var(--space-sm)' }}>
+          <span style={{
+            fontSize: '0.6875rem',
+            fontWeight: 600,
+            color: 'var(--accent-green)',
+            textTransform: 'uppercase',
+            letterSpacing: '0.05em',
+            display: 'block',
+            marginBottom: '2px',
+          }}>
+            {session.user.name}
+          </span>
+          <p className="text-primary" style={{ margin: 0, fontSize: '0.875rem' }}>
+            {activity.summary}
+          </p>
+        </div>
       )}
 
-      {/* Files (shown first for visibility) */}
+      {/* Files */}
       {activity.files && activity.files.length > 0 && (
         <div className="files-list" style={{ marginBottom: 'var(--space-sm)' }}>
           {activity.files.map((file, i) => {
@@ -190,11 +205,17 @@ const ActivityRow = memo(function ActivityRow({ activity, session, githubBaseUrl
                 wordBreak: 'break-word',
               }}
             >
-              {resp.type === 'thinking' && (
-                <span style={{ fontSize: '0.6875rem', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: '2px', opacity: 0.7 }}>
-                  Thinking
-                </span>
-              )}
+              <span style={{
+                fontSize: '0.6875rem',
+                fontWeight: 600,
+                color: resp.type === 'thinking' ? 'var(--text-muted)' : 'var(--accent-blue)',
+                textTransform: 'uppercase',
+                letterSpacing: '0.05em',
+                display: 'block',
+                marginBottom: '2px',
+              }}>
+                {resp.type === 'thinking' ? `${agentLabel} thinking` : agentLabel}
+              </span>
               {resp.text}
             </div>
           ))}

@@ -210,6 +210,7 @@ export async function GET(context: APIContext) {
           },
       branch: detail.git_branch,
       worktree: null,
+      agent_type: detail.agent_type,
       status: detail.status,
       started_at: detail.started_at,
       last_activity_at: [
