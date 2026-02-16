@@ -273,6 +273,7 @@ export type TeamStats = {
   }>;
   by_repo: Array<{
     repo_name: string;
+    repo_id: string | null;
     session_count: number;
     total_cost: number;
   }>;
@@ -283,6 +284,7 @@ export type TeamStats = {
   }>;
   hottest_files: Array<{
     file_path: string;
+    repo_name: string;
     session_count: number;
     user_count: number;
   }>;

@@ -926,13 +926,14 @@ export async function getTeamStats(
     .bind(...params)
     .all();
 
-  // By repo (sessions only)
+  // By repo (JOIN to get repo_id for linking)
   const byRepoResult = await db
     .prepare(
-      `SELECT repo_name, COUNT(*) as session_count, COALESCE(SUM(total_cost_usd), 0) as total_cost
-       FROM sessions
-       WHERE 1=1 ${sessionDateFilter}
-       GROUP BY repo_name
+      `SELECT s.repo_name, r.id as repo_id, COUNT(*) as session_count, COALESCE(SUM(s.total_cost_usd), 0) as total_cost
+       FROM sessions s
+       LEFT JOIN repos r ON s.repo_id = r.id
+       WHERE 1=1 ${joinDateFilter}
+       GROUP BY s.repo_name, r.id
        ORDER BY session_count DESC`
     )
     .bind(...params)
@@ -941,7 +942,7 @@ export async function getTeamStats(
   // By model (sessions only)
   const byModelResult = await db
     .prepare(
-      `SELECT COALESCE(model, 'unknown') as model, COUNT(*) as session_count, COALESCE(SUM(total_cost_usd), 0) as total_cost
+      `SELECT COALESCE(model, 'Not specified') as model, COUNT(*) as session_count, COALESCE(SUM(total_cost_usd), 0) as total_cost
        FROM sessions
        WHERE 1=1 ${sessionDateFilter}
        GROUP BY model
@@ -950,15 +951,15 @@ export async function getTeamStats(
     .bind(...params)
     .all();
 
-  // Hottest files (JOIN query)
+  // Hottest files (JOIN query, include repo_name)
   const hottestFilesResult = await db
     .prepare(
-      `SELECT fo.file_path, COUNT(DISTINCT fo.session_id) as session_count, COUNT(DISTINCT fo.user_id) as user_count
+      `SELECT fo.file_path, fo.repo_name, COUNT(DISTINCT fo.session_id) as session_count, COUNT(DISTINCT fo.user_id) as user_count
        FROM file_operations fo
        JOIN sessions s ON fo.session_id = s.id
        WHERE fo.operation IN ('create', 'modify')
        ${joinDateFilter}
-       GROUP BY fo.file_path
+       GROUP BY fo.file_path, fo.repo_name
        ORDER BY session_count DESC
        LIMIT 10`
     )
@@ -978,6 +979,7 @@ export async function getTeamStats(
     })),
     by_repo: byRepoResult.results.map((r: Record<string, unknown>) => ({
       repo_name: r.repo_name as string,
+      repo_id: (r.repo_id as string) || null,
       session_count: r.session_count as number,
       total_cost: r.total_cost as number,
     })),
@@ -988,6 +990,7 @@ export async function getTeamStats(
     })),
     hottest_files: hottestFilesResult.results.map((r: Record<string, unknown>) => ({
       file_path: r.file_path as string,
+      repo_name: r.repo_name as string,
       session_count: r.session_count as number,
       user_count: r.user_count as number,
     })),

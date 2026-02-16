@@ -88,6 +88,20 @@ export function deriveGitHubUrl(repoName: string | null | undefined): string | n
   return null;
 }
 
+/** Strip repo root from an absolute path using repo name as a heuristic.
+ * e.g. repoName="owner/my-app", path="/Users/me/work/my-app/src/index.ts" → "src/index.ts"
+ * Falls back to the basename segments if no match. */
+export function stripRepoRoot(filePath: string, repoName: string | null): string {
+  if (!repoName || !filePath.startsWith('/')) return filePath;
+  const repoDir = repoName.includes('/') ? repoName.split('/').pop()! : repoName;
+  const marker = `/${repoDir}/`;
+  const idx = filePath.indexOf(marker);
+  if (idx !== -1) {
+    return filePath.slice(idx + marker.length);
+  }
+  return filePath;
+}
+
 /** Build a GitHub file URL from a file path, repo URL, and branch */
 export function getFileUrl(
   filePath: string,

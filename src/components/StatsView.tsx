@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { fetchWithTimeout } from '@lib/utils/fetch';
+import { deriveGitHubUrl, stripRepoRoot } from '@lib/utils/github';
 
 type TeamStats = {
   total_sessions: number;
@@ -14,6 +15,7 @@ type TeamStats = {
   }>;
   by_repo: Array<{
     repo_name: string;
+    repo_id: string | null;
     session_count: number;
     total_cost: number;
   }>;
@@ -24,6 +26,7 @@ type TeamStats = {
   }>;
   hottest_files: Array<{
     file_path: string;
+    repo_name: string;
     session_count: number;
     user_count: number;
   }>;
@@ -156,15 +159,15 @@ export function StatsView() {
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-sm)' }}>
             {stats.by_member.map((m) => (
-              <div key={m.user_id} style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-md)' }}>
+              <a key={m.user_id} href={`/?userId=${encodeURIComponent(m.user_id)}`} style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-md)', textDecoration: 'none', color: 'inherit' }}>
                 <div style={{ flex: 1 }}>
-                  <span style={{ fontWeight: 500 }}>{m.display_name}</span>
+                  <span style={{ fontWeight: 500 }} className="footer-link">{m.display_name}</span>
                 </div>
                 <span className="text-secondary" style={{ fontSize: '0.875rem' }}>{m.session_count} sessions</span>
                 <span style={{ fontSize: '0.875rem', color: 'var(--accent-green)', fontFamily: 'var(--font-mono)' }}>
                   {formatCost(m.total_cost)}
                 </span>
-              </div>
+              </a>
             ))}
           </div>
         )}
@@ -180,7 +183,11 @@ export function StatsView() {
             {stats.by_repo.map((r) => (
               <div key={r.repo_name} style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-md)' }}>
                 <div style={{ flex: 1, fontFamily: 'var(--font-mono)' }}>
-                  <span>{r.repo_name}</span>
+                  {r.repo_id ? (
+                    <a href={`/repo/${r.repo_id}`} className="footer-link">{r.repo_name}</a>
+                  ) : (
+                    <span>{r.repo_name}</span>
+                  )}
                 </div>
                 <span className="text-secondary" style={{ fontSize: '0.875rem' }}>{r.session_count} sessions</span>
                 <span style={{ fontSize: '0.875rem', color: 'var(--accent-green)', fontFamily: 'var(--font-mono)' }}>
@@ -232,16 +239,26 @@ export function StatsView() {
           <p className="text-muted">No file activity in this period</p>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-sm)' }}>
-            {stats.hottest_files.map((f, i) => (
-              <div key={f.file_path} style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-md)' }}>
-                <span className="text-muted" style={{ fontSize: '0.75rem', width: '1.5rem' }}>{i + 1}.</span>
-                <div style={{ flex: 1, fontFamily: 'var(--font-mono)', fontSize: '0.875rem', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                  {f.file_path}
+            {stats.hottest_files.map((f, i) => {
+              const ghUrl = deriveGitHubUrl(f.repo_name);
+              const relativePath = stripRepoRoot(f.file_path, f.repo_name);
+              const fileUrl = ghUrl ? `${ghUrl}/blob/main/${relativePath.split('/').map(encodeURIComponent).join('/')}` : null;
+              return (
+                <div key={`${f.repo_name}:${f.file_path}`} style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-md)' }}>
+                  <span className="text-muted" style={{ fontSize: '0.75rem', width: '1.5rem' }}>{i + 1}.</span>
+                  <div style={{ flex: 1, fontFamily: 'var(--font-mono)', fontSize: '0.875rem', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    {fileUrl ? (
+                      <a href={fileUrl} target="_blank" rel="noopener noreferrer" className="footer-link">{f.file_path}</a>
+                    ) : (
+                      <span>{f.file_path}</span>
+                    )}
+                    <span className="text-muted" style={{ fontSize: '0.6875rem', marginLeft: 'var(--space-xs)' }}>{f.repo_name}</span>
+                  </div>
+                  <span className="text-secondary" style={{ fontSize: '0.75rem' }}>{f.session_count} sessions</span>
+                  <span className="text-muted" style={{ fontSize: '0.75rem' }}>{f.user_count} people</span>
                 </div>
-                <span className="text-secondary" style={{ fontSize: '0.75rem' }}>{f.session_count} sessions</span>
-                <span className="text-muted" style={{ fontSize: '0.75rem' }}>{f.user_count} people</span>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>

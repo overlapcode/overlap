@@ -182,6 +182,21 @@ async function processEvent(
         if (existing.status === 'stale' || existing.status === 'ended') {
           await reactivateSession(db, event.session_id);
         }
+        // Backfill any null fields the original session_start missed
+        const updates: string[] = [];
+        const values: unknown[] = [];
+        if (!existing.git_branch && event.git_branch) {
+          updates.push('git_branch = ?');
+          values.push(event.git_branch);
+        }
+        if (!existing.model && event.model) {
+          updates.push('model = ?');
+          values.push(event.model);
+        }
+        if (updates.length > 0) {
+          values.push(event.session_id);
+          await db.prepare(`UPDATE sessions SET ${updates.join(', ')} WHERE id = ?`).bind(...values).run();
+        }
         return;
       }
 
