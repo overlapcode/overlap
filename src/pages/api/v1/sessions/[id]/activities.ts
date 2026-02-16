@@ -144,8 +144,8 @@ export async function GET(context: APIContext) {
       return errorResponse('Session not found', 404);
     }
 
-    // Build activities from prompts + file operations + agent responses
-    const allActivities = buildActivities(sessionId, detail.prompts, detail.file_operations, detail.agent_responses);
+    // Build activities from prompts + file operations + agent responses (newest first)
+    const allActivities = buildActivities(sessionId, detail.prompts, detail.file_operations, detail.agent_responses).reverse();
 
     // Parse pagination
     const url = new URL(context.request.url);

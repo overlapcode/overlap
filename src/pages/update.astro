@@ -1,155 +1,213 @@
 ---
 import Layout from '@layouts/Layout.astro';
 import { Header } from '@components/Header';
-
-// Fetch current version
-let currentVersion = 'unknown';
-try {
-  // Import version from the version endpoint module
-  currentVersion = '0.1.0'; // This matches what's in version.ts
-} catch (e) {
-  // Fallback
-}
+import { VERSION } from '@lib/version';
 ---
 
 <Layout title="Update Overlap">
   <Header client:load />
 
   <main class="container" style="padding-top: var(--space-xl); padding-bottom: var(--space-xl);">
-    <div style="width: 100%; max-width: 700px; margin: 0 auto;">
-      <h1 style="font-size: 1.75rem; margin-bottom: var(--space-sm);">Update Overlap</h1>
-      <p class="text-secondary" style="margin-bottom: var(--space-xl);">
-        Keep your instance up to date with the latest features and bug fixes.
-      </p>
-
-      <!-- Current Version -->
-      <div class="card" style="margin-bottom: var(--space-lg);">
-        <div style="display: flex; justify-content: space-between; align-items: center;">
-          <div>
-            <div class="text-muted" style="font-size: 0.75rem; margin-bottom: var(--space-xs);">
-              CURRENT VERSION
-            </div>
-            <code style="font-family: var(--font-mono); font-size: 1.25rem;">
-              v{currentVersion}
-            </code>
+    <div class="keep-updated-card">
+      <div class="keep-updated-content">
+        <h2>Keep it updated</h2>
+        <p>Stay current with new features and fixes by adding a one-minute sync workflow to your repo. Cloudflare redeploys automatically after each sync.</p>
+        <div class="autosync-form">
+          <div class="autosync-input-row">
+            <input type="text" id="repo-input" placeholder="username/overlap" spellcheck="false" autocomplete="off" />
+            <button id="add-workflow-btn" class="btn btn-primary btn-small" disabled>Add workflow to repo</button>
           </div>
-          <a
-            href="https://github.com/overlapcode/overlap/commits/main"
-            target="_blank"
-            rel="noopener noreferrer"
-            class="btn btn-secondary"
-            style="font-size: 0.75rem;"
-          >
-            View Changelog
-          </a>
+          <p class="autosync-hint">Your GitHub repo name, e.g. <code>acme/overlap</code></p>
         </div>
+        <p class="keep-updated-detail">Syncs daily via GitHub Actions. Need an update now? Go to <strong>Actions &rarr; Sync from Upstream &rarr; Run workflow</strong> in your repo.</p>
       </div>
-
-      <!-- Update Instructions -->
-      <h2 style="font-size: 1.25rem; margin-bottom: var(--space-md);">How to Update</h2>
-
-      <div class="card" style="margin-bottom: var(--space-lg);">
-        <h3 style="font-size: 1rem; margin-bottom: var(--space-md); color: var(--accent-orange);">
-          Option 1: Manual Sync (Recommended)
-        </h3>
-        <p class="text-secondary" style="margin-bottom: var(--space-md); font-size: 0.875rem;">
-          Run these commands locally to sync your clone with the latest upstream changes:
-        </p>
-        <div
-          style="
-            background-color: var(--bg-primary);
-            border: 1px solid var(--border-subtle);
-            border-radius: var(--radius-sm);
-            padding: var(--space-md);
-            font-family: var(--font-mono);
-            font-size: 0.8rem;
-            line-height: 1.8;
-            overflow-x: auto;
-          "
-        >
-          <div class="text-muted"># Clone your repo if you haven't already</div>
-          <div>git clone https://github.com/YOUR_USERNAME/overlap.git</div>
-          <div>cd overlap</div>
-          <br />
-          <div class="text-muted"># Add upstream and sync</div>
-          <div>git remote add upstream https://github.com/overlapcode/overlap.git</div>
-          <div>git fetch upstream</div>
-          <div>git merge upstream/main --no-edit</div>
-          <div>git push origin main</div>
-        </div>
-        <p class="text-muted" style="margin-top: var(--space-md); font-size: 0.75rem;">
-          After pushing, Cloudflare will automatically rebuild and deploy your instance.
-        </p>
+      <div class="version-tag">
+        Currently running <code>v{VERSION}</code>
       </div>
+    </div>
 
-      <div class="card" style="margin-bottom: var(--space-lg);">
-        <h3 style="font-size: 1rem; margin-bottom: var(--space-md); color: var(--accent-blue);">
-          Option 2: Enable Auto-Updates
-        </h3>
-        <p class="text-secondary" style="margin-bottom: var(--space-md); font-size: 0.875rem;">
-          Set up a GitHub Action to automatically sync updates daily. Create this file in your repo:
-        </p>
-        <div
-          style="
-            background-color: var(--bg-primary);
-            border: 1px solid var(--border-subtle);
-            border-radius: var(--radius-sm);
-            padding: var(--space-md);
-            font-family: var(--font-mono);
-            font-size: 0.75rem;
-            margin-bottom: var(--space-md);
-          "
-        >
-          <div class="text-muted">.github/workflows/sync-upstream.yml</div>
-        </div>
-        <p class="text-secondary" style="margin-bottom: var(--space-md); font-size: 0.875rem;">
-          Copy the workflow file from the upstream repository:
-        </p>
-        <a
-          href="https://github.com/overlapcode/overlap/blob/main/.github/workflows/sync-upstream.yml"
-          target="_blank"
-          rel="noopener noreferrer"
-          class="btn btn-secondary"
-          style="font-size: 0.75rem;"
-        >
-          View Workflow File
-        </a>
-        <p class="text-muted" style="margin-top: var(--space-md); font-size: 0.75rem;">
-          Once added, updates will be synced automatically. You can also trigger it manually from the Actions tab.
-        </p>
-      </div>
-
-      <div class="card">
-        <h3 style="font-size: 1rem; margin-bottom: var(--space-md); color: var(--text-muted);">
-          Option 3: Fresh Deploy
-        </h3>
-        <p class="text-secondary" style="margin-bottom: var(--space-md); font-size: 0.875rem;">
-          If you prefer a clean slate, you can delete your current deployment and re-deploy:
-        </p>
-        <ol
-          style="
-            padding-left: var(--space-lg);
-            color: var(--text-secondary);
-            font-size: 0.875rem;
-            line-height: 1.8;
-          "
-        >
-          <li>Delete your cloned repo on GitHub</li>
-          <li>Delete the Worker and D1 database in Cloudflare Dashboard</li>
-          <li>Click the Deploy button again from the original repo</li>
-          <li>Re-run setup at <code>/setup</code></li>
-        </ol>
-        <p class="text-muted" style="margin-top: var(--space-md); font-size: 0.75rem;">
-          Note: This will reset all your data. Only use this if you're okay losing existing sessions.
-        </p>
-      </div>
-
-      <!-- Back link -->
-      <div style="margin-top: var(--space-xl); text-align: center;">
-        <a href="/" class="text-secondary" style="font-size: 0.875rem;">
-          &larr; Back to Dashboard
-        </a>
-      </div>
+    <div style="margin-top: var(--space-xl); text-align: center;">
+      <a href="/" class="text-secondary" style="font-size: 0.875rem;">
+        &larr; Back to Dashboard
+      </a>
     </div>
   </main>
 </Layout>
+
+<style>
+  .keep-updated-card {
+    max-width: 640px;
+    margin: 0 auto;
+  }
+
+  .keep-updated-content h2 {
+    font-family: var(--font-mono);
+    font-size: 1.25rem;
+    margin-bottom: var(--space-sm);
+  }
+
+  .keep-updated-content > p {
+    font-size: 0.9375rem;
+    line-height: 1.7;
+    color: var(--text-secondary);
+    margin-bottom: var(--space-lg);
+  }
+
+  .keep-updated-detail {
+    font-size: 0.8125rem !important;
+    color: var(--text-muted) !important;
+    margin-bottom: 0 !important;
+  }
+
+  .autosync-form {
+    margin-bottom: var(--space-lg);
+  }
+
+  .autosync-input-row {
+    display: flex;
+    gap: var(--space-sm);
+    align-items: center;
+  }
+
+  .autosync-input-row input {
+    flex: 1;
+    max-width: 280px;
+    padding: var(--space-sm) var(--space-md);
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-sm);
+    color: var(--text-primary);
+    font-family: var(--font-mono);
+    font-size: 0.875rem;
+  }
+
+  .autosync-input-row input::placeholder {
+    color: var(--text-muted);
+  }
+
+  .autosync-input-row input:focus {
+    outline: none;
+    border-color: var(--accent-blue);
+  }
+
+  .autosync-hint {
+    margin-top: var(--space-xs);
+    margin-bottom: 0;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+  }
+
+  .btn-small {
+    padding: var(--space-sm) var(--space-md);
+    font-size: 0.8125rem;
+    white-space: nowrap;
+  }
+
+  .version-tag {
+    margin-top: var(--space-xl);
+    padding-top: var(--space-md);
+    border-top: 1px solid var(--border-subtle);
+    font-size: 0.8125rem;
+    color: var(--text-muted);
+  }
+
+  .version-tag code {
+    color: var(--text-secondary);
+  }
+
+  @media (max-width: 480px) {
+    .autosync-input-row {
+      flex-direction: column;
+      align-items: stretch;
+    }
+
+    .autosync-input-row input {
+      max-width: none;
+    }
+  }
+</style>
+
+<script>
+  const repoInput = document.getElementById('repo-input') as HTMLInputElement;
+  const addWorkflowBtn = document.getElementById('add-workflow-btn') as HTMLButtonElement;
+
+  const workflowYaml = `name: Sync from Upstream
+
+on:
+  schedule:
+    # Run daily at 00:00 UTC
+    - cron: '0 0 * * *'
+  workflow_dispatch:
+    # Allow manual trigger from Actions tab
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    # Only run if this is a clone (not the original repo)
+    if: github.repository != 'overlapcode/overlap'
+
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: \${{ secrets.GITHUB_TOKEN }}
+
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Add upstream remote
+        run: |
+          git remote add upstream https://github.com/overlapcode/overlap.git || true
+          git fetch upstream
+
+      - name: Check for updates
+        id: check
+        run: |
+          LOCAL=\$(git rev-parse HEAD)
+          UPSTREAM=\$(git rev-parse upstream/main)
+          if [ "\$LOCAL" = "\$UPSTREAM" ]; then
+            echo "Already up to date"
+            echo "has_updates=false" >> \$GITHUB_OUTPUT
+          else
+            echo "Updates available"
+            echo "has_updates=true" >> \$GITHUB_OUTPUT
+          fi
+
+      - name: Sync with upstream
+        if: steps.check.outputs.has_updates == 'true'
+        run: |
+          if git merge upstream/main --no-edit -m "Sync with upstream overlapcode/overlap"; then
+            echo "Merge successful"
+          else
+            echo "Merge failed, resetting to upstream (this repo is a deployment vehicle)"
+            git merge --abort || true
+            git reset --hard upstream/main
+          fi
+
+      - name: Push changes
+        if: steps.check.outputs.has_updates == 'true'
+        run: |
+          git push origin main --force-with-lease
+          echo "Successfully synced with upstream!"
+          echo "Cloudflare will auto-deploy the changes."
+`;
+
+  repoInput?.addEventListener('input', () => {
+    const val = repoInput.value.trim();
+    addWorkflowBtn.disabled = !val.match(/^[^/]+\/[^/]+$/);
+  });
+
+  addWorkflowBtn?.addEventListener('click', () => {
+    const repo = repoInput.value.trim();
+    if (!repo.match(/^[^/]+\/[^/]+$/)) return;
+    const encoded = encodeURIComponent(workflowYaml);
+    const url = `https://github.com/${repo}/new/main?filename=.github/workflows/sync-upstream.yml&value=${encoded}`;
+    window.open(url, '_blank');
+  });
+</script>

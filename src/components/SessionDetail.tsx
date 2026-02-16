@@ -143,9 +143,36 @@ const ActivityRow = memo(function ActivityRow({ activity, session, githubBaseUrl
         </p>
       )}
 
+      {/* Files (shown first for visibility) */}
+      {activity.files && activity.files.length > 0 && (
+        <div className="files-list" style={{ marginBottom: 'var(--space-sm)' }}>
+          {activity.files.map((file, i) => {
+            const url = getFileUrl(file, githubBaseUrl, session.branch, session.worktree);
+            const fileName = file.split('/').pop();
+            const key = `${i}:${file}`;
+            return url ? (
+              <a
+                key={key}
+                href={url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="file-tag file-tag-link"
+                title={getRelativeFilePath(file, session.worktree)}
+              >
+                {fileName}
+              </a>
+            ) : (
+              <span key={key} className="file-tag" title={file}>
+                {fileName}
+              </span>
+            );
+          })}
+        </div>
+      )}
+
       {/* Agent responses */}
       {activity.agent_responses && activity.agent_responses.length > 0 && (
-        <div style={{ marginBottom: 'var(--space-sm)' }}>
+        <div>
           {activity.agent_responses.map((resp, i) => (
             <div
               key={i}
@@ -173,33 +200,6 @@ const ActivityRow = memo(function ActivityRow({ activity, session, githubBaseUrl
           ))}
         </div>
       )}
-
-      {/* Files */}
-      {activity.files && activity.files.length > 0 && (
-        <div className="files-list">
-          {activity.files.map((file, i) => {
-            const url = getFileUrl(file, githubBaseUrl, session.branch, session.worktree);
-            const fileName = file.split('/').pop();
-            const key = `${i}:${file}`;
-            return url ? (
-              <a
-                key={key}
-                href={url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="file-tag file-tag-link"
-                title={getRelativeFilePath(file, session.worktree)}
-              >
-                {fileName}
-              </a>
-            ) : (
-              <span key={key} className="file-tag" title={file}>
-                {fileName}
-              </span>
-            );
-          })}
-        </div>
-      )}
     </div>
   );
 });
@@ -213,10 +213,10 @@ export function SessionDetail({ sessionId }: SessionDetailProps) {
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchActivities = useCallback(async (offset: number, append: boolean = false) => {
+  const fetchActivities = useCallback(async (offset: number, append: boolean = false, silent: boolean = false) => {
     if (append) {
       setIsLoadingMore(true);
-    } else {
+    } else if (!silent) {
       setIsLoading(true);
     }
 
@@ -255,7 +255,10 @@ export function SessionDetail({ sessionId }: SessionDetailProps) {
       setHasMore(json.data.hasMore);
       setError(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load session');
+      // Don't show errors for silent poll refreshes
+      if (!silent) {
+        setError(err instanceof Error ? err.message : 'Failed to load session');
+      }
     } finally {
       setIsLoading(false);
       setIsLoadingMore(false);
@@ -265,6 +268,18 @@ export function SessionDetail({ sessionId }: SessionDetailProps) {
   useEffect(() => {
     fetchActivities(0);
   }, [fetchActivities]);
+
+  // Poll for new activities every 5 seconds when session is active
+  useEffect(() => {
+    if (!session || session.status !== 'active') return;
+
+    const interval = setInterval(() => {
+      // Silent re-fetch to pick up new activities without loading state
+      fetchActivities(0, false, true);
+    }, 5000);
+
+    return () => clearInterval(interval);
+  }, [session?.status, fetchActivities]);
 
   const handleLoadMore = () => {
     fetchActivities(activities.length, true);
