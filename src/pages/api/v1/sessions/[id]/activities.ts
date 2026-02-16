@@ -45,27 +45,53 @@ function buildActivities(
     return [];
   }
 
-  // If no prompts, group file operations into a single activity
+  // If no prompts, group file operations into time-based buckets (5 min windows)
   if (prompts.length === 0) {
-    const uniqueFiles = [...new Set(fileOps.map((fo) => fo.file_path).filter(Boolean))] as string[];
-    // Include any agent responses
-    const responses = agentResponses
-      .filter((ar) => ar.response_text)
-      .map((ar) => ({
-        text: truncateText(ar.response_text!, 500),
-        type: ar.response_type as 'text' | 'thinking',
-      }));
-    return [
-      {
-        id: `${sessionId}-fileops`,
+    const BUCKET_MS = 5 * 60 * 1000;
+    const allEvents = [
+      ...fileOps.map((fo) => ({ type: 'file' as const, ts: fo.timestamp, data: fo })),
+      ...agentResponses.map((ar) => ({ type: 'response' as const, ts: ar.timestamp, data: ar })),
+    ].sort((a, b) => a.ts.localeCompare(b.ts));
+
+    if (allEvents.length === 0) return [];
+
+    const buckets: typeof allEvents[] = [];
+    let currentBucket: typeof allEvents = [allEvents[0]];
+    let bucketStart = new Date(allEvents[0].ts).getTime();
+
+    for (let i = 1; i < allEvents.length; i++) {
+      const eventTime = new Date(allEvents[i].ts).getTime();
+      if (eventTime - bucketStart > BUCKET_MS) {
+        buckets.push(currentBucket);
+        currentBucket = [allEvents[i]];
+        bucketStart = eventTime;
+      } else {
+        currentBucket.push(allEvents[i]);
+      }
+    }
+    buckets.push(currentBucket);
+
+    return buckets.map((bucket, idx) => {
+      const files = bucket.filter((e) => e.type === 'file');
+      const responses = bucket.filter((e) => e.type === 'response');
+      const uniqueFiles = [...new Set(files.map((f) => (f.data as FileOperation).file_path).filter(Boolean))] as string[];
+      const formattedResponses = responses
+        .filter((r) => (r.data as AgentResponse).response_text)
+        .map((r) => ({
+          text: truncateText((r.data as AgentResponse).response_text!, 500),
+          type: (r.data as AgentResponse).response_type as 'text' | 'thinking',
+        }));
+
+      return {
+        id: `${sessionId}-bucket-${idx}`,
         session_id: sessionId,
         semantic_scope: null,
-        summary: `${fileOps.length} file operation${fileOps.length !== 1 ? 's' : ''}`,
-        agent_responses: responses,
+        summary: `${files.length} file operation${files.length !== 1 ? 's' : ''}`,
+        agent_responses: formattedResponses,
         files: uniqueFiles,
-        created_at: fileOps[0]?.timestamp ?? agentResponses[0]?.timestamp ?? new Date().toISOString(),
-      },
-    ];
+        created_at: bucket[0].ts,
+      };
+    });
   }
 
   const activities: FormattedActivity[] = [];

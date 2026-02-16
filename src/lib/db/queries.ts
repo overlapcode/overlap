@@ -386,16 +386,18 @@ export async function getSessions(db: D1Database, options: SessionListOptions = 
     .prepare(
       `SELECT s.*, m.display_name as member_name, r.id as r_id, r.name as r_name, r.display_name as r_display_name,
               COALESCE(
-                (SELECT MAX(timestamp) FROM file_operations WHERE session_id = s.id),
-                (SELECT MAX(timestamp) FROM agent_responses WHERE session_id = s.id),
-                (SELECT MAX(timestamp) FROM prompts WHERE session_id = s.id),
+                MAX(
+                  (SELECT MAX(timestamp) FROM file_operations WHERE session_id = s.id),
+                  (SELECT MAX(timestamp) FROM agent_responses WHERE session_id = s.id),
+                  (SELECT MAX(timestamp) FROM prompts WHERE session_id = s.id)
+                ),
                 s.started_at
               ) as last_activity_at
        FROM sessions s
        JOIN members m ON s.user_id = m.user_id
        LEFT JOIN repos r ON s.repo_id = r.id
        ${whereClause}
-       ORDER BY s.started_at DESC
+       ORDER BY last_activity_at DESC
        LIMIT ? OFFSET ?`
     )
     .bind(...params, limit, offset)
