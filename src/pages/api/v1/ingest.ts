@@ -12,17 +12,11 @@ import { z } from 'zod';
 import { authenticateTracer, errorResponse, successResponse } from '@lib/auth/middleware';
 import {
   getSessionById,
-  createSession,
-  updateSessionOnEnd,
-  createFileOperation,
-  createPrompt,
-  createAgentResponse,
-  incrementSessionEventCount,
+  getRepoByName,
   updateMemberLastActive,
   detectFileOverlaps,
-  reactivateSession,
 } from '@lib/db/queries';
-import type { IngestEvent } from '@lib/db/types';
+import type { IngestEvent, Session, Repo } from '@lib/db/types';
 import { maybeGenerateSummary, generateSessionSummary } from '@lib/summary';
 
 // Zod schema for validation
@@ -99,7 +93,6 @@ export async function POST(context: APIContext) {
     return errorResponse('Invalid JSON payload', 400);
   }
 
-  // Process events
   const results = {
     processed: 0,
     errors: [] as string[],
@@ -110,26 +103,253 @@ export async function POST(context: APIContext) {
     agent_responses_created: 0,
   };
 
-  // Track repos that had file operations for overlap detection
-  const reposWithFileOps = new Set<string>();
-  // Track sessions that need summary generation
-  const sessionsForSummary = new Set<string>();
-  // Track sessions that ended (need final summary)
-  const endedSessions = new Set<string>();
+  // ── Phase 1: Pre-cache unique sessions and repos (few queries) ──────
+  const uniqueSessionIds = [...new Set(payload.events.map((e) => e.session_id))];
+  const uniqueRepoNames = [...new Set(payload.events.map((e) => e.repo_name))];
 
-  // Get encryption key for summary generation
-  const encryptionKey = context.locals.runtime.env.TEAM_ENCRYPTION_KEY;
+  const sessionCache = new Map<string, Session>();
+  const repoCache = new Map<string, Repo | null>();
+
+  // Lookup each unique session (typically 1-3 per batch)
+  for (const id of uniqueSessionIds) {
+    const session = await getSessionById(db, id);
+    if (session) sessionCache.set(id, session);
+  }
+
+  // Lookup each unique repo (typically 1-2 per batch)
+  for (const name of uniqueRepoNames) {
+    repoCache.set(name, await getRepoByName(db, name));
+  }
+
+  // ── Phase 2: Process events, collecting batch statements ────────────
+  const statements: D1PreparedStatement[] = [];
+  const reposWithFileOps = new Set<string>();
+  const sessionsForSummary = new Set<string>();
+  const endedSessions = new Set<string>();
+  const eventCountIncrements = new Map<string, number>();
 
   for (const event of payload.events) {
     try {
-      // Verify the event user_id matches the authenticated member
-      // (tracer sends user_id, we verify it matches the token)
       if (event.user_id !== member.user_id) {
         results.errors.push(`Event user_id ${event.user_id} doesn't match authenticated user ${member.user_id}`);
         continue;
       }
 
-      await processEvent(db, event, results, reposWithFileOps, sessionsForSummary, endedSessions);
+      const repoId = repoCache.get(event.repo_name)?.id ?? null;
+
+      switch (event.event_type) {
+        case 'session_start': {
+          const existing = sessionCache.get(event.session_id);
+          if (existing) {
+            // Reactivate if stale/ended
+            if (existing.status === 'stale' || existing.status === 'ended') {
+              statements.push(
+                db.prepare(`UPDATE sessions SET status = 'active', ended_at = NULL WHERE id = ?`).bind(event.session_id)
+              );
+            }
+            // Backfill null git_branch/model
+            const updates: string[] = [];
+            const values: unknown[] = [];
+            if (!existing.git_branch && event.git_branch) {
+              updates.push('git_branch = ?');
+              values.push(event.git_branch);
+            }
+            if (!existing.model && event.model) {
+              updates.push('model = ?');
+              values.push(event.model);
+            }
+            if (updates.length > 0) {
+              values.push(event.session_id);
+              statements.push(
+                db.prepare(`UPDATE sessions SET ${updates.join(', ')} WHERE id = ?`).bind(...values)
+              );
+            }
+          } else {
+            // Create new session
+            statements.push(
+              db.prepare(
+                `INSERT INTO sessions (id, user_id, repo_id, repo_name, agent_type, agent_version, cwd, git_branch, model, hostname, device_name, is_remote, started_at, status)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active')`
+              ).bind(
+                event.session_id,
+                event.user_id,
+                repoId,
+                event.repo_name,
+                event.agent_type,
+                event.agent_version ?? null,
+                event.cwd ?? null,
+                event.git_branch ?? null,
+                event.model ?? null,
+                event.hostname ?? null,
+                event.device_name ?? null,
+                event.is_remote ? 1 : 0,
+                event.timestamp
+              )
+            );
+            // Mark as cached so subsequent events in this batch skip creation
+            sessionCache.set(event.session_id, { id: event.session_id, status: 'active' } as Session);
+            results.sessions_created++;
+          }
+          break;
+        }
+
+        case 'session_end': {
+          // Ensure session exists
+          if (!sessionCache.has(event.session_id)) {
+            statements.push(
+              db.prepare(
+                `INSERT INTO sessions (id, user_id, repo_id, repo_name, agent_type, started_at, status)
+                 VALUES (?, ?, ?, ?, ?, ?, 'active')`
+              ).bind(event.session_id, event.user_id, repoId, event.repo_name, event.agent_type, event.timestamp)
+            );
+            sessionCache.set(event.session_id, { id: event.session_id, status: 'active' } as Session);
+            results.sessions_created++;
+          }
+
+          statements.push(
+            db.prepare(
+              `UPDATE sessions SET
+                status = 'ended', ended_at = ?,
+                total_cost_usd = COALESCE(?, total_cost_usd),
+                duration_ms = COALESCE(?, duration_ms),
+                num_turns = COALESCE(?, num_turns),
+                total_input_tokens = COALESCE(?, total_input_tokens),
+                total_output_tokens = COALESCE(?, total_output_tokens),
+                cache_creation_tokens = COALESCE(?, cache_creation_tokens),
+                cache_read_tokens = COALESCE(?, cache_read_tokens),
+                result_summary = COALESCE(?, result_summary)
+               WHERE id = ?`
+            ).bind(
+              event.timestamp,
+              event.total_cost_usd ?? null,
+              event.duration_ms ?? null,
+              event.num_turns ?? null,
+              event.total_input_tokens ?? null,
+              event.total_output_tokens ?? null,
+              event.cache_creation_tokens ?? null,
+              event.cache_read_tokens ?? null,
+              event.result_summary ?? null,
+              event.session_id
+            )
+          );
+          results.sessions_ended++;
+          endedSessions.add(event.session_id);
+          break;
+        }
+
+        case 'file_op': {
+          // Ensure session exists
+          if (!sessionCache.has(event.session_id)) {
+            statements.push(
+              db.prepare(
+                `INSERT INTO sessions (id, user_id, repo_id, repo_name, agent_type, started_at, status)
+                 VALUES (?, ?, ?, ?, ?, ?, 'active')`
+              ).bind(event.session_id, event.user_id, repoId, event.repo_name, event.agent_type, event.timestamp)
+            );
+            sessionCache.set(event.session_id, { id: event.session_id, status: 'active' } as Session);
+            results.sessions_created++;
+          }
+
+          statements.push(
+            db.prepare(
+              `INSERT INTO file_operations (session_id, user_id, repo_id, repo_name, agent_type, timestamp, tool_name, file_path, operation, start_line, end_line, function_name, bash_command)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+            ).bind(
+              event.session_id,
+              event.user_id,
+              repoId,
+              event.repo_name,
+              event.agent_type,
+              event.timestamp,
+              event.tool_name ?? null,
+              event.file_path ?? null,
+              event.operation ?? null,
+              event.start_line ?? null,
+              event.end_line ?? null,
+              event.function_name ?? null,
+              event.bash_command ?? null
+            )
+          );
+          results.file_ops_created++;
+          reposWithFileOps.add(event.repo_name);
+          eventCountIncrements.set(event.session_id, (eventCountIncrements.get(event.session_id) ?? 0) + 1);
+          sessionsForSummary.add(event.session_id);
+          break;
+        }
+
+        case 'prompt': {
+          // Ensure session exists
+          if (!sessionCache.has(event.session_id)) {
+            statements.push(
+              db.prepare(
+                `INSERT INTO sessions (id, user_id, repo_id, repo_name, agent_type, started_at, status)
+                 VALUES (?, ?, ?, ?, ?, ?, 'active')`
+              ).bind(event.session_id, event.user_id, repoId, event.repo_name, event.agent_type, event.timestamp)
+            );
+            sessionCache.set(event.session_id, { id: event.session_id, status: 'active' } as Session);
+            results.sessions_created++;
+          }
+
+          statements.push(
+            db.prepare(
+              `INSERT INTO prompts (session_id, user_id, repo_id, repo_name, agent_type, timestamp, prompt_text, turn_number)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+            ).bind(
+              event.session_id,
+              event.user_id,
+              repoId,
+              event.repo_name,
+              event.agent_type,
+              event.timestamp,
+              event.prompt_text ?? null,
+              event.turn_number ?? null
+            )
+          );
+          results.prompts_created++;
+          eventCountIncrements.set(event.session_id, (eventCountIncrements.get(event.session_id) ?? 0) + 1);
+          sessionsForSummary.add(event.session_id);
+          break;
+        }
+
+        case 'agent_response': {
+          // Ensure session exists
+          if (!sessionCache.has(event.session_id)) {
+            statements.push(
+              db.prepare(
+                `INSERT INTO sessions (id, user_id, repo_id, repo_name, agent_type, started_at, status)
+                 VALUES (?, ?, ?, ?, ?, ?, 'active')`
+              ).bind(event.session_id, event.user_id, repoId, event.repo_name, event.agent_type, event.timestamp)
+            );
+            sessionCache.set(event.session_id, { id: event.session_id, status: 'active' } as Session);
+            results.sessions_created++;
+          }
+
+          statements.push(
+            db.prepare(
+              `INSERT INTO agent_responses (session_id, user_id, repo_id, repo_name, agent_type, timestamp, response_text, response_type, turn_number)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+            ).bind(
+              event.session_id,
+              event.user_id,
+              repoId,
+              event.repo_name,
+              event.agent_type,
+              event.timestamp,
+              event.response_text ?? null,
+              event.response_type ?? 'text',
+              event.turn_number ?? null
+            )
+          );
+          results.agent_responses_created++;
+          eventCountIncrements.set(event.session_id, (eventCountIncrements.get(event.session_id) ?? 0) + 1);
+          sessionsForSummary.add(event.session_id);
+          break;
+        }
+
+        default:
+          throw new Error(`Unknown event type: ${(event as IngestEvent).event_type}`);
+      }
+
       results.processed++;
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error';
@@ -137,21 +357,30 @@ export async function POST(context: APIContext) {
     }
   }
 
-  // Update member's last active timestamp
-  await updateMemberLastActive(db, member.user_id);
+  // ── Phase 3: Add event count increments + member active ─────────────
+  for (const [sessionId, count] of eventCountIncrements) {
+    statements.push(
+      db.prepare(`UPDATE sessions SET summary_event_count = summary_event_count + ? WHERE id = ?`).bind(count, sessionId)
+    );
+  }
+  statements.push(
+    db.prepare(`UPDATE members SET last_active_at = datetime('now') WHERE user_id = ?`).bind(member.user_id)
+  );
 
-  // Detect overlaps for repos that had file operations
-  // Use waitUntil to not block the response
+  // ── Phase 4: Execute all statements in one batch round-trip ─────────
+  if (statements.length > 0) {
+    await db.batch(statements);
+  }
+
+  // ── Phase 5: Background post-processing (waitUntil) ─────────────────
+  const encryptionKey = context.locals.runtime.env.TEAM_ENCRYPTION_KEY;
+
   for (const repoName of reposWithFileOps) {
     context.locals.runtime.ctx.waitUntil(detectFileOverlaps(db, repoName));
   }
-
-  // Trigger rolling summary generation for sessions with enough events
   for (const sessionId of sessionsForSummary) {
     context.locals.runtime.ctx.waitUntil(maybeGenerateSummary(db, sessionId, encryptionKey));
   }
-
-  // Generate final summaries for ended sessions
   for (const sessionId of endedSessions) {
     context.locals.runtime.ctx.waitUntil(generateSessionSummary(db, sessionId, encryptionKey));
   }
@@ -159,153 +388,6 @@ export async function POST(context: APIContext) {
   return successResponse(results);
 }
 
-async function processEvent(
-  db: D1Database,
-  event: IngestEvent,
-  results: {
-    sessions_created: number;
-    sessions_ended: number;
-    file_ops_created: number;
-    prompts_created: number;
-    agent_responses_created: number;
-  },
-  reposWithFileOps: Set<string>,
-  sessionsForSummary: Set<string>,
-  endedSessions: Set<string>
-): Promise<void> {
-  switch (event.event_type) {
-    case 'session_start': {
-      // Check if session already exists (idempotency)
-      const existing = await getSessionById(db, event.session_id);
-      if (existing) {
-        // Session exists, reactivate if stale
-        if (existing.status === 'stale' || existing.status === 'ended') {
-          await reactivateSession(db, event.session_id);
-        }
-        // Backfill any null fields the original session_start missed
-        const updates: string[] = [];
-        const values: unknown[] = [];
-        if (!existing.git_branch && event.git_branch) {
-          updates.push('git_branch = ?');
-          values.push(event.git_branch);
-        }
-        if (!existing.model && event.model) {
-          updates.push('model = ?');
-          values.push(event.model);
-        }
-        if (updates.length > 0) {
-          values.push(event.session_id);
-          await db.prepare(`UPDATE sessions SET ${updates.join(', ')} WHERE id = ?`).bind(...values).run();
-        }
-        return;
-      }
-
-      await createSession(db, event);
-      results.sessions_created++;
-      break;
-    }
-
-    case 'session_end': {
-      // Ensure session exists first
-      const session = await getSessionById(db, event.session_id);
-      if (!session) {
-        // Create the session if it doesn't exist (late join scenario)
-        await createSession(db, event);
-        results.sessions_created++;
-      }
-
-      await updateSessionOnEnd(db, event);
-      results.sessions_ended++;
-
-      // Track for final summary generation
-      endedSessions.add(event.session_id);
-      break;
-    }
-
-    case 'file_op': {
-      // Ensure session exists
-      let session = await getSessionById(db, event.session_id);
-      if (!session) {
-        // Create session on first file_op (lazy session creation)
-        await createSession(db, event);
-        results.sessions_created++;
-        session = await getSessionById(db, event.session_id);
-      }
-
-      // Reactivate if session was stale
-      if (session && (session.status === 'stale' || session.status === 'ended')) {
-        await reactivateSession(db, event.session_id);
-      }
-
-      await createFileOperation(db, event);
-      results.file_ops_created++;
-
-      // Track for overlap detection
-      reposWithFileOps.add(event.repo_name);
-
-      // Increment event count for rolling summaries
-      await incrementSessionEventCount(db, event.session_id);
-
-      // Track for summary generation
-      sessionsForSummary.add(event.session_id);
-      break;
-    }
-
-    case 'prompt': {
-      // Ensure session exists
-      let session = await getSessionById(db, event.session_id);
-      if (!session) {
-        // Create session on first prompt (lazy session creation)
-        await createSession(db, event);
-        results.sessions_created++;
-        session = await getSessionById(db, event.session_id);
-      }
-
-      // Reactivate if session was stale
-      if (session && (session.status === 'stale' || session.status === 'ended')) {
-        await reactivateSession(db, event.session_id);
-      }
-
-      await createPrompt(db, event);
-      results.prompts_created++;
-
-      // Increment event count for rolling summaries
-      await incrementSessionEventCount(db, event.session_id);
-
-      // Track for summary generation
-      sessionsForSummary.add(event.session_id);
-      break;
-    }
-
-    case 'agent_response': {
-      // Ensure session exists
-      let session = await getSessionById(db, event.session_id);
-      if (!session) {
-        await createSession(db, event);
-        results.sessions_created++;
-        session = await getSessionById(db, event.session_id);
-      }
-
-      // Reactivate if session was stale
-      if (session && (session.status === 'stale' || session.status === 'ended')) {
-        await reactivateSession(db, event.session_id);
-      }
-
-      await createAgentResponse(db, event);
-      results.agent_responses_created++;
-
-      // Increment event count for rolling summaries
-      await incrementSessionEventCount(db, event.session_id);
-
-      // Track for summary generation
-      sessionsForSummary.add(event.session_id);
-      break;
-    }
-
-    default:
-      throw new Error(`Unknown event type: ${(event as IngestEvent).event_type}`);
-  }
-}
-
 // Type declaration for D1Database (imported from workers-types)
 type D1Database = import('@cloudflare/workers-types').D1Database;
+type D1PreparedStatement = import('@cloudflare/workers-types').D1PreparedStatement;
