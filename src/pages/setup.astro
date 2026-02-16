@@ -298,20 +298,13 @@ import { Header } from '@components/Header';
           team_join_code: string;
           user_token: string;
           user_id: string;
-          web_session_token: string;
         }
       };
 
       // Show tokens in the success section
+      // (Session cookie is set server-side via Set-Cookie header in the response)
       teamTokenInput.value = result.data.team_join_code;
       userTokenInput.value = result.data.user_token;
-
-      // Set session cookie directly (server already created the web session)
-      if (result.data.web_session_token) {
-        const expires = new Date();
-        expires.setDate(expires.getDate() + 30);
-        document.cookie = `overlap_session=${result.data.web_session_token}; path=/; secure; samesite=lax; expires=${expires.toUTCString()}`;
-      }
 
       // Hide form, show success
       setupSection.style.display = 'none';

@@ -88,13 +88,19 @@ export async function POST(context: APIContext) {
 
     await createWebSession(db, sessionId, sessionTokenHash, expiresAt.toISOString(), userId);
 
-    return successResponse({
+    // Set session cookie server-side (HttpOnly — can't be overridden client-side)
+    const response = successResponse({
       team_join_code: teamJoinCode,
       user_id: userId,
       user_token: userToken,
-      web_session_token: webSessionToken,
       message: 'Team created successfully',
     }, 201);
+    const headers = new Headers(response.headers);
+    headers.set(
+      'Set-Cookie',
+      `overlap_session=${webSessionToken}; Path=/; HttpOnly; Secure; SameSite=Lax; Expires=${expiresAt.toUTCString()}`
+    );
+    return new Response(response.body, { status: response.status, headers });
   } catch (error) {
     console.error('Setup error:', error);
     return errorResponse('Failed to create team', 500);

@@ -169,6 +169,15 @@ CREATE INDEX IF NOT EXISTS idx_web_sessions_token ON web_sessions(token_hash);
 CREATE INDEX IF NOT EXISTS idx_web_sessions_expires ON web_sessions(expires_at);
 `;
 
+/**
+ * Migrations for existing databases.
+ * Each runs in a try/catch so it's safe to re-run (idempotent).
+ */
+const MIGRATIONS = [
+  // v1.2.0: Add user_id to web_sessions (auth redesign: token-based login)
+  `ALTER TABLE web_sessions ADD COLUMN user_id TEXT REFERENCES members(user_id)`,
+];
+
 export async function ensureMigrated(db: D1Database): Promise<void> {
   // Always run CREATE TABLE IF NOT EXISTS statements - they're idempotent
   // This ensures new tables are created even for existing deployments
@@ -184,6 +193,19 @@ export async function ensureMigrated(db: D1Database): Promise<void> {
       const msg = error instanceof Error ? error.message : String(error);
       if (!msg.includes('already exists')) {
         console.error('Migration error:', msg, 'Statement:', statement.substring(0, 80));
+      }
+    }
+  }
+
+  // Run ALTER TABLE migrations for existing databases
+  for (const migration of MIGRATIONS) {
+    try {
+      await db.prepare(migration).run();
+    } catch (error) {
+      // Expected to fail if column already exists (fresh installs) — ignore
+      const msg = error instanceof Error ? error.message : String(error);
+      if (!msg.includes('duplicate column') && !msg.includes('already exists')) {
+        console.error('Migration error:', msg);
       }
     }
   }
