@@ -118,6 +118,24 @@ export type Prompt = {
 };
 
 // ============================================================================
+// AGENT RESPONSES
+// Agent text and thinking responses from assistant messages
+// ============================================================================
+export type AgentResponse = {
+  id: number;
+  session_id: string;
+  user_id: string;
+  repo_id: string | null;
+  repo_name: string;
+  agent_type: string;
+  timestamp: string;
+  response_text: string | null;
+  response_type: 'text' | 'thinking';
+  turn_number: number | null;
+  created_at: string;
+};
+
+// ============================================================================
 // OVERLAPS
 // Detected overlaps (file-level, prompt-level, directory-level)
 // ============================================================================
@@ -156,7 +174,7 @@ export type WebSession = {
 // INGEST EVENT TYPES
 // Events sent by the tracer binary (agent-agnostic)
 // ============================================================================
-export type IngestEventType = 'session_start' | 'session_end' | 'file_op' | 'prompt';
+export type IngestEventType = 'session_start' | 'session_end' | 'file_op' | 'prompt' | 'agent_response';
 
 export type IngestEvent = {
   session_id: string;
@@ -188,6 +206,10 @@ export type IngestEvent = {
   prompt_text?: string;
   turn_number?: number;
 
+  // agent_response only
+  response_text?: string;
+  response_type?: 'text' | 'thinking';
+
   // session_end only
   total_cost_usd?: number;
   duration_ms?: number;
@@ -217,6 +239,7 @@ export type SessionDetail = Session & {
   repo: Pick<Repo, 'id' | 'name' | 'display_name'> | null;
   file_operations: FileOperation[];
   prompts: Prompt[];
+  agent_responses: AgentResponse[];
 };
 
 // File activity for file history page

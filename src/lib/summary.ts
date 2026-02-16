@@ -6,7 +6,7 @@
  */
 
 import type { D1Database } from '@cloudflare/workers-types';
-import { getTeamConfig, getSessionPrompts, updateSessionSummary, getSessionById } from '@lib/db/queries';
+import { getTeamConfig, getSessionPrompts, getSessionAgentResponses, updateSessionSummary, getSessionById } from '@lib/db/queries';
 // Types used internally - TeamConfig from queries, FileOperation not needed as we query directly
 import { decrypt } from '@lib/utils/crypto';
 
@@ -18,8 +18,11 @@ Write in active voice, present tense, from a third-person perspective (e.g., "Bu
 Focus on the goal and area of the codebase, not individual steps. Ensure the summary is concise and captures the main intent of the session for another developer to understand what is being worked on.
 Do NOT start with "The user" or "The developer". Start with a verb.
 
-Prompts:
+User prompts:
 {prompts}
+
+Agent responses:
+{responses}
 
 Files touched:
 {files}
@@ -28,15 +31,15 @@ Respond with ONLY the summary text, no quotes or explanation.`;
 
 type SummaryProvider = {
   name: string;
-  generateSummary(prompts: string[], files: string[], apiKey: string, model?: string): Promise<string>;
+  generateSummary(prompts: string[], files: string[], responses: string[], apiKey: string, model?: string): Promise<string>;
 };
 
 // Anthropic provider for summaries
 const anthropicSummaryProvider: SummaryProvider = {
   name: 'anthropic',
 
-  async generateSummary(prompts: string[], files: string[], apiKey: string, model?: string): Promise<string> {
-    const prompt = buildSummaryPrompt(prompts, files);
+  async generateSummary(prompts: string[], files: string[], responses: string[], apiKey: string, model?: string): Promise<string> {
+    const prompt = buildSummaryPrompt(prompts, files, responses);
 
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
@@ -69,8 +72,8 @@ const anthropicSummaryProvider: SummaryProvider = {
 const openaiSummaryProvider: SummaryProvider = {
   name: 'openai',
 
-  async generateSummary(prompts: string[], files: string[], apiKey: string, model?: string): Promise<string> {
-    const prompt = buildSummaryPrompt(prompts, files);
+  async generateSummary(prompts: string[], files: string[], responses: string[], apiKey: string, model?: string): Promise<string> {
+    const prompt = buildSummaryPrompt(prompts, files, responses);
 
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -101,8 +104,8 @@ const openaiSummaryProvider: SummaryProvider = {
 const xaiSummaryProvider: SummaryProvider = {
   name: 'xai',
 
-  async generateSummary(prompts: string[], files: string[], apiKey: string, model?: string): Promise<string> {
-    const prompt = buildSummaryPrompt(prompts, files);
+  async generateSummary(prompts: string[], files: string[], responses: string[], apiKey: string, model?: string): Promise<string> {
+    const prompt = buildSummaryPrompt(prompts, files, responses);
 
     const response = await fetch('https://api.x.ai/v1/chat/completions', {
       method: 'POST',
@@ -133,8 +136,8 @@ const xaiSummaryProvider: SummaryProvider = {
 const googleSummaryProvider: SummaryProvider = {
   name: 'google',
 
-  async generateSummary(prompts: string[], files: string[], apiKey: string, model?: string): Promise<string> {
-    const prompt = buildSummaryPrompt(prompts, files);
+  async generateSummary(prompts: string[], files: string[], responses: string[], apiKey: string, model?: string): Promise<string> {
+    const prompt = buildSummaryPrompt(prompts, files, responses);
     const modelName = model || 'gemini-2.5-flash-lite';
 
     const response = await fetch(
@@ -168,7 +171,7 @@ const providers: Record<string, SummaryProvider> = {
   google: googleSummaryProvider,
 };
 
-function buildSummaryPrompt(prompts: string[], files: string[]): string {
+function buildSummaryPrompt(prompts: string[], files: string[], responses: string[]): string {
   const promptList = prompts
     .slice(0, 10)
     .map((p, i) => `${i + 1}. "${p.slice(0, 200)}"`)
@@ -179,10 +182,15 @@ function buildSummaryPrompt(prompts: string[], files: string[]): string {
     .map((f) => `- ${f}`)
     .join('\n');
 
-  return SUMMARY_PROMPT.replace('{prompts}', promptList || 'No prompts recorded').replace(
-    '{files}',
-    fileList || 'No files touched'
-  );
+  const responseList = responses
+    .slice(0, 5)
+    .map((r, i) => `${i + 1}. ${r.slice(0, 300)}`)
+    .join('\n');
+
+  return SUMMARY_PROMPT
+    .replace('{prompts}', promptList || 'No prompts recorded')
+    .replace('{responses}', responseList || 'No agent responses recorded')
+    .replace('{files}', fileList || 'No files touched');
 }
 
 /**
@@ -213,10 +221,10 @@ export async function generateSessionSummary(
       return;
     }
 
-    // Get session prompts
+    // Get session prompts, file operations, and agent responses
     const prompts = await getSessionPrompts(db, sessionId);
+    const agentResponses = await getSessionAgentResponses(db, sessionId);
 
-    // Get file operations for this session
     const fileOpsResult = await db
       .prepare(
         `SELECT file_path, tool_name, MAX(timestamp) as last_ts FROM file_operations
@@ -227,6 +235,9 @@ export async function generateSessionSummary(
 
     const files = fileOpsResult.results.map((fo) => `${fo.file_path} (${fo.tool_name})`);
     const promptTexts = prompts.map((p) => p.prompt_text).filter((t): t is string => t != null);
+    const responseTexts = agentResponses
+      .filter((ar) => ar.response_type === 'text' && ar.response_text)
+      .map((ar) => ar.response_text!);
 
     // If no LLM configured, use first prompt as summary
     if (!teamConfig.llm_provider || !teamConfig.llm_api_key_encrypted) {
@@ -259,6 +270,7 @@ export async function generateSessionSummary(
     const summary = await provider.generateSummary(
       promptTexts,
       files,
+      responseTexts,
       apiKey,
       teamConfig.llm_model ?? undefined
     );

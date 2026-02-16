@@ -6,6 +6,7 @@ import type {
   Session,
   FileOperation,
   Prompt,
+  AgentResponse,
   Overlap,
   WebSession,
   SessionWithMember,
@@ -216,6 +217,7 @@ export async function updateMemberLastActive(db: D1Database, userId: string): Pr
 export async function deleteMember(db: D1Database, userId: string): Promise<void> {
   // Delete related data first (foreign key constraints)
   await db.batch([
+    db.prepare('DELETE FROM agent_responses WHERE user_id = ?').bind(userId),
     db.prepare('DELETE FROM prompts WHERE user_id = ?').bind(userId),
     db.prepare('DELETE FROM file_operations WHERE user_id = ?').bind(userId),
     db.prepare('DELETE FROM sessions WHERE user_id = ?').bind(userId),
@@ -385,6 +387,7 @@ export async function getSessions(db: D1Database, options: SessionListOptions = 
       `SELECT s.*, m.display_name as member_name, r.id as r_id, r.name as r_name, r.display_name as r_display_name,
               COALESCE(
                 (SELECT MAX(timestamp) FROM file_operations WHERE session_id = s.id),
+                (SELECT MAX(timestamp) FROM agent_responses WHERE session_id = s.id),
                 (SELECT MAX(timestamp) FROM prompts WHERE session_id = s.id),
                 s.started_at
               ) as last_activity_at
@@ -471,6 +474,12 @@ export async function getSessionDetail(db: D1Database, sessionId: string): Promi
     .bind(sessionId)
     .all<Prompt>();
 
+  // Get agent responses
+  const agentResponsesResult = await db
+    .prepare('SELECT * FROM agent_responses WHERE session_id = ? ORDER BY turn_number, timestamp')
+    .bind(sessionId)
+    .all<AgentResponse>();
+
   return {
     id: row.id as string,
     user_id: row.user_id as string,
@@ -512,6 +521,7 @@ export async function getSessionDetail(db: D1Database, sessionId: string): Promi
       : null,
     file_operations: fileOpsResult.results,
     prompts: promptsResult.results,
+    agent_responses: agentResponsesResult.results,
   };
 }
 
@@ -618,6 +628,40 @@ export async function getSessionPrompts(db: D1Database, sessionId: string): Prom
     .prepare('SELECT * FROM prompts WHERE session_id = ? ORDER BY turn_number, timestamp')
     .bind(sessionId)
     .all<Prompt>();
+  return result.results;
+}
+
+// ============================================================================
+// AGENT RESPONSE QUERIES
+// ============================================================================
+
+export async function createAgentResponse(db: D1Database, event: IngestEvent): Promise<void> {
+  const repo = await getRepoByName(db, event.repo_name);
+
+  await db
+    .prepare(
+      `INSERT INTO agent_responses (session_id, user_id, repo_id, repo_name, agent_type, timestamp, response_text, response_type, turn_number)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    )
+    .bind(
+      event.session_id,
+      event.user_id,
+      repo?.id ?? null,
+      event.repo_name,
+      event.agent_type,
+      event.timestamp,
+      event.response_text ?? null,
+      event.response_type ?? 'text',
+      event.turn_number ?? null
+    )
+    .run();
+}
+
+export async function getSessionAgentResponses(db: D1Database, sessionId: string): Promise<AgentResponse[]> {
+  const result = await db
+    .prepare('SELECT * FROM agent_responses WHERE session_id = ? ORDER BY turn_number, timestamp')
+    .bind(sessionId)
+    .all<AgentResponse>();
   return result.results;
 }
 
@@ -950,10 +994,13 @@ export async function markStaleSessions(db: D1Database): Promise<number> {
        AND id NOT IN (
          SELECT DISTINCT session_id FROM file_operations
          WHERE timestamp > datetime('now', '-' || ? || ' hours')
+         UNION
+         SELECT DISTINCT session_id FROM agent_responses
+         WHERE timestamp > datetime('now', '-' || ? || ' hours')
        )
        AND started_at < datetime('now', '-' || ? || ' hours')`
     )
-    .bind(timeout, timeout)
+    .bind(timeout, timeout, timeout)
     .run();
 
   return result.meta.changes ?? 0;

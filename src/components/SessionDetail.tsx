@@ -16,12 +16,18 @@ type SessionInfo = {
   ended_at: string | null;
 };
 
+type AgentResponseItem = {
+  text: string;
+  type: 'text' | 'thinking';
+};
+
 type ActivityItem = {
   id: string;
   session_id: string;
   files: string[];
   semantic_scope: string | null;
   summary: string | null;
+  agent_responses?: AgentResponseItem[];
   created_at: string;
 };
 
@@ -130,11 +136,42 @@ const ActivityRow = memo(function ActivityRow({ activity, session, githubBaseUrl
         )}
       </div>
 
-      {/* Summary */}
+      {/* Summary (user prompt) */}
       {activity.summary && (
         <p className="text-primary" style={{ marginBottom: 'var(--space-sm)', fontSize: '0.875rem' }}>
           {activity.summary}
         </p>
+      )}
+
+      {/* Agent responses */}
+      {activity.agent_responses && activity.agent_responses.length > 0 && (
+        <div style={{ marginBottom: 'var(--space-sm)' }}>
+          {activity.agent_responses.map((resp, i) => (
+            <div
+              key={i}
+              style={{
+                padding: 'var(--space-sm) var(--space-md)',
+                marginTop: 'var(--space-xs)',
+                background: resp.type === 'thinking' ? 'var(--bg-primary)' : 'var(--bg-surface)',
+                borderLeft: resp.type === 'thinking' ? '2px solid var(--text-muted)' : '2px solid var(--accent-blue)',
+                borderRadius: '0 var(--radius-sm) var(--radius-sm) 0',
+                fontSize: '0.8125rem',
+                color: resp.type === 'thinking' ? 'var(--text-muted)' : 'var(--text-secondary)',
+                fontStyle: resp.type === 'thinking' ? 'italic' : 'normal',
+                lineHeight: 1.5,
+                whiteSpace: 'pre-wrap',
+                wordBreak: 'break-word',
+              }}
+            >
+              {resp.type === 'thinking' && (
+                <span style={{ fontSize: '0.6875rem', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: '2px', opacity: 0.7 }}>
+                  Thinking
+                </span>
+              )}
+              {resp.text}
+            </div>
+          ))}
+        </div>
       )}
 
       {/* Files */}

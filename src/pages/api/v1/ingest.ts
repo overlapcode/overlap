@@ -16,6 +16,7 @@ import {
   updateSessionOnEnd,
   createFileOperation,
   createPrompt,
+  createAgentResponse,
   incrementSessionEventCount,
   updateMemberLastActive,
   detectFileOverlaps,
@@ -28,7 +29,7 @@ import { maybeGenerateSummary, generateSessionSummary } from '@lib/summary';
 const IngestEventSchema = z.object({
   session_id: z.string().min(1),
   timestamp: z.string().min(1),
-  event_type: z.enum(['session_start', 'session_end', 'file_op', 'prompt']),
+  event_type: z.enum(['session_start', 'session_end', 'file_op', 'prompt', 'agent_response']),
   user_id: z.string().min(1),
   repo_name: z.string().min(1),
   agent_type: z.string().min(1).default('claude_code'),
@@ -54,6 +55,10 @@ const IngestEventSchema = z.object({
   // prompt only
   prompt_text: z.string().optional(),
   turn_number: z.number().optional(),
+
+  // agent_response only
+  response_text: z.string().optional(),
+  response_type: z.enum(['text', 'thinking']).optional(),
 
   // session_end only
   total_cost_usd: z.number().optional(),
@@ -102,6 +107,7 @@ export async function POST(context: APIContext) {
     sessions_ended: 0,
     file_ops_created: 0,
     prompts_created: 0,
+    agent_responses_created: 0,
   };
 
   // Track repos that had file operations for overlap detection
@@ -161,6 +167,7 @@ async function processEvent(
     sessions_ended: number;
     file_ops_created: number;
     prompts_created: number;
+    agent_responses_created: number;
   },
   reposWithFileOps: Set<string>,
   sessionsForSummary: Set<string>,
@@ -246,6 +253,31 @@ async function processEvent(
 
       await createPrompt(db, event);
       results.prompts_created++;
+
+      // Increment event count for rolling summaries
+      await incrementSessionEventCount(db, event.session_id);
+
+      // Track for summary generation
+      sessionsForSummary.add(event.session_id);
+      break;
+    }
+
+    case 'agent_response': {
+      // Ensure session exists
+      let session = await getSessionById(db, event.session_id);
+      if (!session) {
+        await createSession(db, event);
+        results.sessions_created++;
+        session = await getSessionById(db, event.session_id);
+      }
+
+      // Reactivate if session was stale
+      if (session && (session.status === 'stale' || session.status === 'ended')) {
+        await reactivateSession(db, event.session_id);
+      }
+
+      await createAgentResponse(db, event);
+      results.agent_responses_created++;
 
       // Increment event count for rolling summaries
       await incrementSessionEventCount(db, event.session_id);

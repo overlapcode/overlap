@@ -13,42 +13,57 @@
 import type { APIContext } from 'astro';
 import { authenticateAny, errorResponse, successResponse } from '@lib/auth/middleware';
 import { getSessionDetail } from '@lib/db/queries';
-import type { Prompt, FileOperation } from '@lib/db/types';
+import type { Prompt, FileOperation, AgentResponse } from '@lib/db/types';
+
+type FormattedAgentResponse = {
+  text: string;
+  type: 'text' | 'thinking';
+};
 
 type FormattedActivity = {
   id: string;
   session_id: string;
   semantic_scope: string | null;
   summary: string | null;
+  agent_responses: FormattedAgentResponse[];
   files: string[];
   created_at: string;
 };
 
 /**
- * Build activity items from prompts + file operations.
- * Each prompt becomes an activity. File operations are assigned
- * to the prompt that precedes them in time.
+ * Build activity items from prompts + file operations + agent responses.
+ * Each prompt becomes an activity. File operations and agent responses are
+ * assigned to the prompt that precedes them in time.
  */
 function buildActivities(
   sessionId: string,
   prompts: Prompt[],
-  fileOps: FileOperation[]
+  fileOps: FileOperation[],
+  agentResponses: AgentResponse[]
 ): FormattedActivity[] {
-  if (prompts.length === 0 && fileOps.length === 0) {
+  if (prompts.length === 0 && fileOps.length === 0 && agentResponses.length === 0) {
     return [];
   }
 
   // If no prompts, group file operations into a single activity
   if (prompts.length === 0) {
     const uniqueFiles = [...new Set(fileOps.map((fo) => fo.file_path).filter(Boolean))] as string[];
+    // Include any agent responses
+    const responses = agentResponses
+      .filter((ar) => ar.response_text)
+      .map((ar) => ({
+        text: truncateText(ar.response_text!, 500),
+        type: ar.response_type as 'text' | 'thinking',
+      }));
     return [
       {
         id: `${sessionId}-fileops`,
         session_id: sessionId,
         semantic_scope: null,
         summary: `${fileOps.length} file operation${fileOps.length !== 1 ? 's' : ''}`,
+        agent_responses: responses,
         files: uniqueFiles,
-        created_at: fileOps[0]?.timestamp ?? new Date().toISOString(),
+        created_at: fileOps[0]?.timestamp ?? agentResponses[0]?.timestamp ?? new Date().toISOString(),
       },
     ];
   }
@@ -67,9 +82,24 @@ function buildActivities(
       return afterCurrent && beforeNext;
     });
 
+    // Find agent responses between this prompt and the next
+    const associatedResponses = agentResponses.filter((ar) => {
+      const arTime = ar.timestamp;
+      const afterCurrent = arTime >= prompt.timestamp;
+      const beforeNext = !nextPrompt || arTime < nextPrompt.timestamp;
+      return afterCurrent && beforeNext;
+    });
+
     const uniqueFiles = [
       ...new Set(associatedOps.map((fo) => fo.file_path).filter(Boolean)),
     ] as string[];
+
+    const responses = associatedResponses
+      .filter((ar) => ar.response_text)
+      .map((ar) => ({
+        text: truncateText(ar.response_text!, 500),
+        type: ar.response_type as 'text' | 'thinking',
+      }));
 
     activities.push({
       id: String(prompt.id),
@@ -80,12 +110,18 @@ function buildActivities(
           ? prompt.prompt_text.slice(0, 300) + '...'
           : prompt.prompt_text
         : null,
+      agent_responses: responses,
       files: uniqueFiles,
       created_at: prompt.timestamp,
     });
   }
 
   return activities;
+}
+
+function truncateText(text: string, maxLen: number): string {
+  if (text.length <= maxLen) return text;
+  return text.slice(0, maxLen) + '...';
 }
 
 export async function GET(context: APIContext) {
@@ -108,8 +144,8 @@ export async function GET(context: APIContext) {
       return errorResponse('Session not found', 404);
     }
 
-    // Build activities from prompts + file operations
-    const allActivities = buildActivities(sessionId, detail.prompts, detail.file_operations);
+    // Build activities from prompts + file operations + agent responses
+    const allActivities = buildActivities(sessionId, detail.prompts, detail.file_operations, detail.agent_responses);
 
     // Parse pagination
     const url = new URL(context.request.url);
@@ -150,10 +186,12 @@ export async function GET(context: APIContext) {
       worktree: null,
       status: detail.status,
       started_at: detail.started_at,
-      last_activity_at:
-        detail.file_operations.length > 0
-          ? detail.file_operations[detail.file_operations.length - 1].timestamp
-          : detail.started_at,
+      last_activity_at: [
+        detail.file_operations.at(-1)?.timestamp,
+        detail.agent_responses.at(-1)?.timestamp,
+        detail.prompts.at(-1)?.timestamp,
+        detail.started_at,
+      ].filter(Boolean).sort().pop() ?? detail.started_at,
       ended_at: detail.ended_at,
     };
 

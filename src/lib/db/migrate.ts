@@ -120,6 +120,22 @@ CREATE TABLE IF NOT EXISTS prompts (
     created_at TEXT DEFAULT (datetime('now'))
 );
 
+-- AGENT_RESPONSES
+-- Agent text and thinking responses extracted from assistant messages.
+CREATE TABLE IF NOT EXISTS agent_responses (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_id TEXT NOT NULL REFERENCES sessions(id),
+    user_id TEXT NOT NULL,
+    repo_id TEXT REFERENCES repos(id),
+    repo_name TEXT NOT NULL,
+    agent_type TEXT NOT NULL DEFAULT 'claude_code',
+    timestamp TEXT NOT NULL,
+    response_text TEXT,
+    response_type TEXT DEFAULT 'text',
+    turn_number INTEGER,
+    created_at TEXT DEFAULT (datetime('now'))
+);
+
 -- OVERLAPS
 -- Detected overlaps (file-level, prompt-level, directory-level).
 CREATE TABLE IF NOT EXISTS overlaps (
@@ -161,6 +177,7 @@ CREATE INDEX IF NOT EXISTS idx_file_ops_user_time ON file_operations(user_id, ti
 CREATE INDEX IF NOT EXISTS idx_file_ops_repo_time ON file_operations(repo_name, timestamp DESC);
 CREATE INDEX IF NOT EXISTS idx_prompts_session ON prompts(session_id, turn_number);
 CREATE INDEX IF NOT EXISTS idx_prompts_repo ON prompts(repo_name, timestamp DESC);
+CREATE INDEX IF NOT EXISTS idx_agent_responses_session ON agent_responses(session_id, turn_number, timestamp);
 CREATE INDEX IF NOT EXISTS idx_overlaps_time ON overlaps(detected_at DESC);
 CREATE INDEX IF NOT EXISTS idx_overlaps_repo ON overlaps(repo_name, detected_at DESC);
 CREATE INDEX IF NOT EXISTS idx_members_token ON members(token_hash);
