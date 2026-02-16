@@ -168,7 +168,7 @@ export const ActivityCard = memo(function ActivityCard({ session }: ActivityCard
           <span className="text-muted">·</span>
           <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
             <span className={`status-dot ${status}`} aria-label={`Status: ${status}`} />
-            <span className="text-secondary" style={{ fontSize: '0.75rem' }}>
+            <span style={{ fontSize: '0.75rem', color: `var(--status-${status})` }}>
               {getStatusLabel(status)}
             </span>
           </span>
@@ -185,7 +185,7 @@ export const ActivityCard = memo(function ActivityCard({ session }: ActivityCard
                   padding: '2px 6px',
                   borderRadius: '4px',
                   backgroundColor: 'var(--bg-elevated)',
-                  color: 'var(--accent-orange)',
+                  color: 'var(--text-secondary)',
                   fontFamily: 'var(--font-mono)',
                 }}
               >

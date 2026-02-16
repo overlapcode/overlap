@@ -57,7 +57,7 @@ function SessionHeader({ session }: { session: SessionInfo }) {
         <span className="text-muted">·</span>
         <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
           <span className={`status-dot ${session.status}`} aria-label={`Status: ${session.status}`} />
-          <span className="text-secondary" style={{ fontSize: '0.75rem' }}>
+          <span style={{ fontSize: '0.75rem', color: `var(--status-${session.status})` }}>
             {getStatusLabel(session.status)}
           </span>
         </span>
@@ -70,7 +70,7 @@ function SessionHeader({ session }: { session: SessionInfo }) {
                 padding: '2px 6px',
                 borderRadius: '4px',
                 backgroundColor: 'var(--bg-elevated)',
-                color: 'var(--accent-orange)',
+                color: 'var(--text-secondary)',
                 fontFamily: 'var(--font-mono)',
               }}
             >
