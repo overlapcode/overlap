@@ -30,6 +30,7 @@ function formatSession(session: SessionWithMember) {
         : null,
     branch: session.git_branch,
     worktree: session.cwd || null,
+    agent_type: session.agent_type,
     status: session.status as 'active' | 'stale' | 'ended',
     started_at: session.started_at,
     last_activity_at: session.ended_at || session.started_at,
