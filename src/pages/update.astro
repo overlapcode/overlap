@@ -148,7 +148,6 @@ jobs:
 
     permissions:
       contents: write
-      workflows: write
 
     steps:
       - name: Checkout
@@ -183,6 +182,9 @@ jobs:
       - name: Sync with upstream
         if: steps.check.outputs.has_updates == 'true'
         run: |
+          # Save our workflow files (GITHUB_TOKEN can't push workflow changes)
+          cp -r .github/workflows/ /tmp/workflows-backup/
+
           if git merge upstream/main --no-edit -m "Sync with upstream overlapcode/overlap"; then
             echo "Merge successful"
           else
@@ -190,6 +192,11 @@ jobs:
             git merge --abort || true
             git reset --hard upstream/main
           fi
+
+          # Restore our workflow files so push doesn't touch .github/workflows/
+          cp -r /tmp/workflows-backup/* .github/workflows/
+          git add .github/workflows/
+          git diff --staged --quiet || git commit -m "Preserve fork workflows"
 
       - name: Push changes
         if: steps.check.outputs.has_updates == 'true'
