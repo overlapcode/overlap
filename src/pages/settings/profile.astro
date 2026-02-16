@@ -1,73 +1,69 @@
 ---
 import Layout from '@layouts/Layout.astro';
 import { Header } from '@components/Header';
+import { getSessionData } from '@lib/auth/session';
+
+let sessionData = null;
+if (Astro.locals.runtime?.env?.DB) {
+  sessionData = await getSessionData(Astro.cookies, Astro.locals.runtime.env.DB);
+}
+if (!sessionData) {
+  return Astro.redirect('/');
+}
 ---
 
-<Layout title="Overlap Tracer Setup">
-  <Header userName="Dashboard" client:load />
+<Layout title="My Account">
+  <Header teamName={sessionData.teamName} userName={sessionData.displayName} client:load />
 
   <main class="container" style="padding-top: var(--space-xl); padding-bottom: var(--space-xl);">
     <div style="width: 100%; max-width: 600px; margin: 0 auto;">
       <div style="display: flex; align-items: center; gap: var(--space-md); margin-bottom: var(--space-xl);">
         <a href="/settings" class="text-muted" style="text-decoration: none;">← Back</a>
-        <h1 style="font-size: 1.5rem;">Overlap Tracer Setup</h1>
+        <h1 style="font-size: 1.5rem;">My Account</h1>
       </div>
 
-      <!-- Instance URL Section -->
+      <!-- Profile Info -->
       <div class="card" style="margin-bottom: var(--space-lg);">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-sm);">
-          <label style="font-weight: 500;">Instance URL</label>
-          <button type="button" id="copy-url-btn" style="
-            background: none;
-            border: 1px solid var(--border-default);
-            color: var(--text-secondary);
-            padding: 4px 8px;
-            border-radius: var(--radius-sm);
-            font-size: 0.75rem;
-            cursor: pointer;
-          ">
-            Copy
-          </button>
+        <div style="display: flex; align-items: center; gap: var(--space-md); margin-bottom: var(--space-md);">
+          <div style="
+            width: 40px; height: 40px;
+            border-radius: 50%;
+            background: var(--accent-blue);
+            display: flex; align-items: center; justify-content: center;
+            font-weight: 600; font-size: 1.1rem; color: #fff;
+          ">{sessionData.displayName.charAt(0).toUpperCase()}</div>
+          <div>
+            <div style="font-weight: 500;">{sessionData.displayName}</div>
+            <div class="text-muted" style="font-size: 0.8rem;">{sessionData.role} · {sessionData.teamName}</div>
+          </div>
         </div>
-        <input
-          type="text"
-          id="instance-url"
-          readonly
-          style="
-            width: 100%;
-            padding: var(--space-sm) var(--space-md);
-            background: var(--bg-primary);
-            border: 1px solid var(--border-subtle);
-            border-radius: var(--radius-sm);
-            color: var(--text-primary);
-            font-family: var(--font-mono);
-            font-size: 0.875rem;
-          "
-        />
-        <p class="text-muted" style="font-size: 0.75rem; margin-top: var(--space-xs);">
-          Use this URL when running <code style="background: var(--bg-elevated); padding: 2px 4px; border-radius: 2px;">overlap join</code>
-        </p>
       </div>
 
-      <!-- Installation Instructions -->
-      <div style="background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: var(--space-lg);">
-        <h3 style="font-size: 1rem; margin-bottom: var(--space-lg);">Setting Up the Tracer</h3>
+      <!-- Token Section -->
+      <div class="card" style="margin-bottom: var(--space-lg);">
+        <h3 style="font-size: 0.875rem; font-weight: 500; margin-bottom: var(--space-sm);">Your Token</h3>
+        <p class="text-secondary" style="font-size: 0.8rem; margin-bottom: var(--space-md);">
+          Your token authenticates the tracer CLI and dashboard login. Regenerating creates a new token — the old one stops working immediately.
+        </p>
 
-        <div style="margin-bottom: var(--space-lg);">
-          <p class="text-secondary" style="font-size: 0.875rem; margin-bottom: var(--space-sm);">
-            <strong style="color: var(--text-primary);">1. Install the tracer</strong>
-          </p>
+        <div id="token-display" style="display: none; margin-bottom: var(--space-md);">
           <div style="display: flex; gap: var(--space-sm); align-items: center;">
-            <code id="install-cmd" style="
-              flex: 1;
-              display: block;
-              background: var(--bg-elevated);
-              padding: var(--space-sm) var(--space-md);
-              border-radius: var(--radius-sm);
-              font-size: 0.875rem;
-              overflow-x: auto;
-            ">curl -fsSL https://overlap.sh/install.sh | sh</code>
-            <button type="button" class="copy-btn" data-target="install-cmd" style="
+            <input
+              type="text"
+              id="token-value"
+              readonly
+              style="
+                flex: 1;
+                padding: var(--space-sm) var(--space-md);
+                background: var(--bg-primary);
+                border: 1px solid var(--border-subtle);
+                border-radius: var(--radius-sm);
+                color: var(--text-primary);
+                font-family: var(--font-mono);
+                font-size: 0.8rem;
+              "
+            />
+            <button type="button" id="copy-token-btn" style="
               background: none;
               border: 1px solid var(--border-default);
               color: var(--text-secondary);
@@ -75,7 +71,42 @@ import { Header } from '@components/Header';
               border-radius: var(--radius-sm);
               font-size: 0.75rem;
               cursor: pointer;
-              flex-shrink: 0;
+              white-space: nowrap;
+            ">Copy</button>
+          </div>
+          <p class="text-muted" style="font-size: 0.75rem; margin-top: var(--space-xs);">
+            Save this token now — it won't be shown again. Use it with <code style="background: var(--bg-elevated); padding: 2px 4px; border-radius: 2px;">overlap join</code> to update your tracer.
+          </p>
+        </div>
+
+        <button type="button" id="regen-btn" class="btn btn-secondary" style="font-size: 0.85rem;">
+          Regenerate Token
+        </button>
+        <p id="regen-error" style="font-size: 0.8rem; color: var(--accent-orange); margin-top: var(--space-sm); display: none;"></p>
+      </div>
+
+      <!-- Tracer Setup -->
+      <div style="background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: var(--space-lg);">
+        <h3 style="font-size: 1rem; margin-bottom: var(--space-lg);">Tracer Setup</h3>
+
+        <div style="margin-bottom: var(--space-lg);">
+          <p class="text-secondary" style="font-size: 0.875rem; margin-bottom: var(--space-sm);">
+            <strong style="color: var(--text-primary);">1. Install the tracer</strong>
+          </p>
+          <div style="display: flex; gap: var(--space-sm); align-items: center;">
+            <code id="install-cmd" style="
+              flex: 1; display: block;
+              background: var(--bg-elevated);
+              padding: var(--space-sm) var(--space-md);
+              border-radius: var(--radius-sm);
+              font-size: 0.875rem;
+              overflow-x: auto;
+            ">curl -fsSL https://overlap.dev/install.sh | sh</code>
+            <button type="button" class="copy-btn" data-target="install-cmd" style="
+              background: none; border: 1px solid var(--border-default);
+              color: var(--text-secondary); padding: 4px 8px;
+              border-radius: var(--radius-sm); font-size: 0.75rem;
+              cursor: pointer; flex-shrink: 0;
             ">Copy</button>
           </div>
         </div>
@@ -84,42 +115,55 @@ import { Header } from '@components/Header';
           <p class="text-secondary" style="font-size: 0.875rem; margin-bottom: var(--space-sm);">
             <strong style="color: var(--text-primary);">2. Connect to your team</strong>
           </p>
-          <code style="
-            display: block;
-            background: var(--bg-elevated);
-            padding: var(--space-sm) var(--space-md);
-            border-radius: var(--radius-sm);
-            font-size: 0.875rem;
-          ">overlap join</code>
+          <div style="display: flex; gap: var(--space-sm); align-items: center;">
+            <code id="join-cmd" style="
+              flex: 1; display: block;
+              background: var(--bg-elevated);
+              padding: var(--space-sm) var(--space-md);
+              border-radius: var(--radius-sm);
+              font-size: 0.875rem;
+              overflow-x: auto;
+            ">overlap join</code>
+            <button type="button" class="copy-btn" data-target="join-cmd" style="
+              background: none; border: 1px solid var(--border-default);
+              color: var(--text-secondary); padding: 4px 8px;
+              border-radius: var(--radius-sm); font-size: 0.75rem;
+              cursor: pointer; flex-shrink: 0;
+            ">Copy</button>
+          </div>
           <p class="text-muted" style="font-size: 0.75rem; margin-top: var(--space-xs);">
-            You'll be prompted for the instance URL (above) and your user token (from /join page).
+            You'll need the instance URL and your token from above.
           </p>
         </div>
 
         <div>
           <p class="text-secondary" style="font-size: 0.875rem; margin-bottom: var(--space-sm);">
-            <strong style="color: var(--text-primary);">3. Verify it's working</strong>
+            <strong style="color: var(--text-primary);">Instance URL</strong>
           </p>
-          <code style="
-            display: block;
-            background: var(--bg-elevated);
-            padding: var(--space-sm) var(--space-md);
-            border-radius: var(--radius-sm);
-            font-size: 0.875rem;
-          ">overlap status</code>
+          <div style="display: flex; gap: var(--space-sm); align-items: center;">
+            <input
+              type="text"
+              id="instance-url"
+              readonly
+              style="
+                flex: 1;
+                padding: var(--space-sm) var(--space-md);
+                background: var(--bg-elevated);
+                border: 1px solid var(--border-subtle);
+                border-radius: var(--radius-sm);
+                color: var(--text-primary);
+                font-family: var(--font-mono);
+                font-size: 0.875rem;
+              "
+            />
+            <button type="button" id="copy-url-btn" style="
+              background: none; border: 1px solid var(--border-default);
+              color: var(--text-secondary); padding: 4px 8px;
+              border-radius: var(--radius-sm); font-size: 0.75rem;
+              cursor: pointer; flex-shrink: 0;
+            ">Copy</button>
+          </div>
         </div>
-      </div>
-
-      <!-- New Member Section -->
-      <div class="card" style="margin-top: var(--space-lg);">
-        <h3 style="font-size: 1rem; margin-bottom: var(--space-md);">Adding New Members</h3>
-        <p class="text-secondary" style="font-size: 0.875rem; margin-bottom: var(--space-md);">
-          New team members can join via the <a href="/join" style="color: var(--accent-blue);">/join</a> page using the team join code.
-          They'll receive a personal user token to configure their tracer.
-        </p>
-        <a href="/settings/team" class="btn btn-secondary" style="display: inline-block;">
-          View Join Code →
-        </a>
       </div>
     </div>
   </main>
@@ -127,59 +171,87 @@ import { Header } from '@components/Header';
 
 <script>
   const instanceUrl = document.getElementById('instance-url') as HTMLInputElement;
-  const copyUrlBtn = document.getElementById('copy-url-btn') as HTMLButtonElement;
-
-  // Set instance URL to current origin
   instanceUrl.value = window.location.origin;
 
-  // Copy URL handler
-  copyUrlBtn?.addEventListener('click', async () => {
+  // Regenerate token
+  const regenBtn = document.getElementById('regen-btn') as HTMLButtonElement;
+  const tokenDisplay = document.getElementById('token-display') as HTMLDivElement;
+  const tokenValue = document.getElementById('token-value') as HTMLInputElement;
+  const regenError = document.getElementById('regen-error') as HTMLParagraphElement;
+  const copyTokenBtn = document.getElementById('copy-token-btn') as HTMLButtonElement;
+
+  regenBtn?.addEventListener('click', async () => {
+    if (!confirm('Regenerate your token?\n\nYour current token will stop working immediately. You\'ll need to run "overlap join" again to update the tracer.')) return;
+
+    regenBtn.disabled = true;
+    regenBtn.textContent = 'Regenerating...';
+    regenError.style.display = 'none';
+
     try {
-      await navigator.clipboard.writeText(instanceUrl.value);
-      copyUrlBtn.textContent = 'Copied!';
-      setTimeout(() => {
-        copyUrlBtn.textContent = 'Copy';
-      }, 2000);
-    } catch (err) {
-      instanceUrl.select();
-      document.execCommand('copy');
-      copyUrlBtn.textContent = 'Copied!';
-      setTimeout(() => {
-        copyUrlBtn.textContent = 'Copy';
-      }, 2000);
+      const res = await fetch('/api/v1/me/rotate-token', { method: 'POST' });
+      const result = await res.json() as { data?: { user_token: string }; error?: string };
+
+      if (!res.ok) {
+        throw new Error(result.error || 'Failed to regenerate token');
+      }
+
+      tokenValue.value = result.data?.user_token || '';
+      tokenDisplay.style.display = 'block';
+      regenBtn.textContent = 'Regenerate Token';
+      regenBtn.disabled = false;
+    } catch (error) {
+      regenError.textContent = error instanceof Error ? error.message : 'Failed';
+      regenError.style.display = 'block';
+      regenBtn.textContent = 'Regenerate Token';
+      regenBtn.disabled = false;
     }
   });
 
-  // Copy button handlers for code blocks
+  // Copy token
+  copyTokenBtn?.addEventListener('click', async () => {
+    try {
+      await navigator.clipboard.writeText(tokenValue.value);
+      copyTokenBtn.textContent = 'Copied!';
+      setTimeout(() => { copyTokenBtn.textContent = 'Copy'; }, 2000);
+    } catch {
+      tokenValue.select();
+      document.execCommand('copy');
+      copyTokenBtn.textContent = 'Copied!';
+      setTimeout(() => { copyTokenBtn.textContent = 'Copy'; }, 2000);
+    }
+  });
+
+  // Copy URL
+  document.getElementById('copy-url-btn')?.addEventListener('click', async () => {
+    const btn = document.getElementById('copy-url-btn') as HTMLButtonElement;
+    try {
+      await navigator.clipboard.writeText(instanceUrl.value);
+      btn.textContent = 'Copied!';
+      setTimeout(() => { btn.textContent = 'Copy'; }, 2000);
+    } catch {
+      instanceUrl.select();
+      document.execCommand('copy');
+      btn.textContent = 'Copied!';
+      setTimeout(() => { btn.textContent = 'Copy'; }, 2000);
+    }
+  });
+
+  // Copy code blocks
   document.querySelectorAll('.copy-btn').forEach((btn) => {
     btn.addEventListener('click', async () => {
       const targetId = (btn as HTMLButtonElement).dataset.target;
       if (!targetId) return;
-
-      const codeEl = document.getElementById(targetId);
-      if (!codeEl) return;
-
-      const text = codeEl.textContent || '';
-
+      const el = document.getElementById(targetId);
+      if (!el) return;
+      const text = el.textContent || '';
       try {
         await navigator.clipboard.writeText(text);
-        const originalText = btn.textContent;
+        const orig = btn.textContent;
         btn.textContent = 'Copied!';
-        setTimeout(() => {
-          btn.textContent = originalText;
-        }, 2000);
-      } catch (err) {
-        // Fallback
-        const textarea = document.createElement('textarea');
-        textarea.value = text;
-        document.body.appendChild(textarea);
-        textarea.select();
-        document.execCommand('copy');
-        document.body.removeChild(textarea);
+        setTimeout(() => { btn.textContent = orig; }, 2000);
+      } catch {
         btn.textContent = 'Copied!';
-        setTimeout(() => {
-          btn.textContent = 'Copy';
-        }, 2000);
+        setTimeout(() => { btn.textContent = 'Copy'; }, 2000);
       }
     });
   });
