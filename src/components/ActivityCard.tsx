@@ -147,14 +147,15 @@ export const ActivityCard = memo(function ActivityCard({ session }: ActivityCard
           cursor: 'pointer',
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-sm)', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', fontSize: '0.8125rem', lineHeight: 1 }}>
           <span
             style={{
               transform: expanded ? 'rotate(90deg)' : 'rotate(0deg)',
               transition: 'transform 0.2s ease',
-              display: 'inline-block',
+              display: 'inline-flex',
+              alignItems: 'center',
               color: 'var(--text-muted)',
-              fontSize: '0.625rem',
+              fontSize: '0.5rem',
             }}
           >
             ▶
@@ -166,13 +167,11 @@ export const ActivityCard = memo(function ActivityCard({ session }: ActivityCard
             <span className="text-muted" style={{ fontSize: '0.75rem' }}>(remote)</span>
           )}
           <span className="text-muted">·</span>
-          <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-            <span className={`status-dot ${status}`} aria-label={`Status: ${status}`} />
-            <span style={{ fontSize: '0.75rem', color: `var(--status-${status})` }}>
-              {getStatusLabel(status)}
-            </span>
+          <span className={`status-dot ${status}`} aria-label={`Status: ${status}`} style={{ flexShrink: 0 }} />
+          <span style={{ color: `var(--status-${status})` }}>
+            {getStatusLabel(status)}
           </span>
-          <span className="text-muted" style={{ fontSize: '0.875rem' }}>
+          <span className="text-muted">
             {relativeTime}
           </span>
           {/* v2 badges: agent, model, cost, turns */}
@@ -182,7 +181,7 @@ export const ActivityCard = memo(function ActivityCard({ session }: ActivityCard
               <span
                 style={{
                   fontSize: '0.6875rem',
-                  padding: '2px 6px',
+                  padding: '1px 6px',
                   borderRadius: '4px',
                   backgroundColor: 'var(--bg-elevated)',
                   color: 'var(--text-secondary)',
@@ -199,7 +198,7 @@ export const ActivityCard = memo(function ActivityCard({ session }: ActivityCard
               <span
                 style={{
                   fontSize: '0.6875rem',
-                  padding: '2px 6px',
+                  padding: '1px 6px',
                   borderRadius: '4px',
                   backgroundColor: 'var(--bg-elevated)',
                   color: 'var(--accent-blue)',
@@ -213,7 +212,7 @@ export const ActivityCard = memo(function ActivityCard({ session }: ActivityCard
           {num_turns !== undefined && num_turns > 0 && (
             <>
               <span className="text-muted">·</span>
-              <span className="text-secondary" style={{ fontSize: '0.75rem' }}>
+              <span className="text-secondary">
                 {num_turns} turn{num_turns !== 1 ? 's' : ''}
               </span>
             </>
@@ -224,7 +223,7 @@ export const ActivityCard = memo(function ActivityCard({ session }: ActivityCard
               <span
                 style={{
                   fontSize: '0.6875rem',
-                  padding: '2px 6px',
+                  padding: '1px 6px',
                   borderRadius: '4px',
                   backgroundColor: 'var(--bg-elevated)',
                   color: 'var(--accent-green)',
