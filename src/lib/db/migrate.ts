@@ -103,6 +103,8 @@ CREATE TABLE IF NOT EXISTS file_operations (
     end_line INTEGER,
     function_name TEXT,
     bash_command TEXT,
+    old_string TEXT,
+    new_string TEXT,
     created_at TEXT DEFAULT (datetime('now'))
 );
 
@@ -196,6 +198,9 @@ const MIGRATIONS = [
   `ALTER TABLE web_sessions ADD COLUMN user_id TEXT REFERENCES members(user_id)`,
   // v1.4.3: Add remote_url to repos (for VCS file links)
   `ALTER TABLE repos ADD COLUMN remote_url TEXT`,
+  // v1.5.0: Add old_string/new_string to file_operations (edit content capture)
+  `ALTER TABLE file_operations ADD COLUMN old_string TEXT`,
+  `ALTER TABLE file_operations ADD COLUMN new_string TEXT`,
 ];
 
 export async function ensureMigrated(db: D1Database): Promise<void> {

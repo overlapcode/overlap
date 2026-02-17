@@ -47,6 +47,8 @@ const IngestEventSchema = z.object({
   end_line: z.number().int().optional(),
   function_name: z.string().optional(),
   bash_command: z.string().optional(),
+  old_string: z.string().optional(),
+  new_string: z.string().optional(),
 
   // prompt only
   prompt_text: z.string().optional(),
@@ -269,8 +271,8 @@ export async function POST(context: APIContext) {
 
           statements.push(
             db.prepare(
-              `INSERT INTO file_operations (session_id, user_id, repo_id, repo_name, agent_type, timestamp, tool_name, file_path, operation, start_line, end_line, function_name, bash_command)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+              `INSERT INTO file_operations (session_id, user_id, repo_id, repo_name, agent_type, timestamp, tool_name, file_path, operation, start_line, end_line, function_name, bash_command, old_string, new_string)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
             ).bind(
               event.session_id,
               event.user_id,
@@ -284,7 +286,9 @@ export async function POST(context: APIContext) {
               event.start_line ?? null,
               event.end_line ?? null,
               event.function_name ?? null,
-              event.bash_command ?? null
+              event.bash_command ?? null,
+              event.old_string ?? null,
+              event.new_string ?? null
             )
           );
           results.file_ops_created++;

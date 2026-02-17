@@ -115,6 +115,8 @@ CREATE TABLE IF NOT EXISTS file_operations (
     end_line INTEGER,
     function_name TEXT,
     bash_command TEXT,
+    old_string TEXT,
+    new_string TEXT,
     created_at TEXT DEFAULT (datetime('now'))
 );
 

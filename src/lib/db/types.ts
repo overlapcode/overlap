@@ -98,6 +98,8 @@ export type FileOperation = {
   end_line: number | null;
   function_name: string | null;
   bash_command: string | null;
+  old_string: string | null;
+  new_string: string | null;
   created_at: string;
 };
 
@@ -202,6 +204,8 @@ export type IngestEvent = {
   end_line?: number;
   function_name?: string;
   bash_command?: string;
+  old_string?: string;
+  new_string?: string;
 
   // prompt only
   prompt_text?: string;
