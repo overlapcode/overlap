@@ -51,9 +51,6 @@ jobs:
       - name: Sync with upstream
         if: steps.check.outputs.has_updates == 'true'
         run: |
-          # Preserve deployment-specific config (D1/KV bindings differ per instance)
-          cp wrangler.toml wrangler.toml.local
-
           # Try normal merge first
           if git merge upstream/main --no-edit -m "Sync with upstream overlapcode/overlap"; then
             echo "Merge successful"
@@ -63,16 +60,6 @@ jobs:
             git merge --abort || true
             # Reset to upstream - safe because user data is in Cloudflare D1, not git
             git reset --hard upstream/main
-          fi
-
-          # Restore local wrangler.toml (contains deployment-specific database_id / KV id)
-          cp wrangler.toml.local wrangler.toml
-          rm -f wrangler.toml.local
-
-          # Commit restored config if it differs from upstream
-          if ! git diff --quiet wrangler.toml; then
-            git add wrangler.toml
-            git commit --amend --no-edit
           fi
 
       - name: Push changes
