@@ -160,6 +160,24 @@ CREATE TABLE IF NOT EXISTS overlaps (
     detected_at TEXT DEFAULT (datetime('now'))
 );
 
+-- ACTIVITY_BLOCKS
+-- Goal-level groupings within a session. Requires LLM classification.
+CREATE TABLE IF NOT EXISTS activity_blocks (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_id TEXT NOT NULL REFERENCES sessions(id),
+    user_id TEXT NOT NULL,
+    repo_name TEXT NOT NULL,
+    block_index INTEGER NOT NULL,
+    started_at TEXT NOT NULL,
+    ended_at TEXT,
+    name TEXT,
+    description TEXT,
+    task_type TEXT,
+    confidence REAL,
+    created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now'))
+);
+
 -- WEB_SESSIONS
 -- Browser sessions for authenticated dashboard access.
 CREATE TABLE IF NOT EXISTS web_sessions (
@@ -187,6 +205,7 @@ CREATE INDEX IF NOT EXISTS idx_members_token ON members(token_hash);
 CREATE INDEX IF NOT EXISTS idx_members_last_active ON members(last_active_at DESC);
 CREATE INDEX IF NOT EXISTS idx_web_sessions_token ON web_sessions(token_hash);
 CREATE INDEX IF NOT EXISTS idx_web_sessions_expires ON web_sessions(expires_at);
+CREATE INDEX IF NOT EXISTS idx_activity_blocks_session ON activity_blocks(session_id, block_index);
 `;
 
 /**

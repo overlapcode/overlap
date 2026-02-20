@@ -162,6 +162,26 @@ export type Overlap = {
 };
 
 // ============================================================================
+// ACTIVITY BLOCKS
+// Goal-level groupings within a session (LLM-classified)
+// ============================================================================
+export type ActivityBlock = {
+  id: number;
+  session_id: string;
+  user_id: string;
+  repo_name: string;
+  block_index: number;
+  started_at: string;
+  ended_at: string | null;
+  name: string | null;
+  description: string | null;
+  task_type: string | null;
+  confidence: number | null;
+  created_at: string;
+  updated_at: string;
+};
+
+// ============================================================================
 // WEB SESSIONS
 // Browser sessions for authenticated dashboard access
 // ============================================================================

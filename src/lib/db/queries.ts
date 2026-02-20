@@ -8,6 +8,7 @@ import type {
   Prompt,
   AgentResponse,
   Overlap,
+  ActivityBlock,
   WebSession,
   SessionWithMember,
   SessionDetail,
@@ -1051,4 +1052,52 @@ export async function getWebSessionByTokenHash(db: D1Database, tokenHash: string
 
 export async function deleteExpiredWebSessions(db: D1Database): Promise<void> {
   await db.prepare("DELETE FROM web_sessions WHERE expires_at < datetime('now')").run();
+}
+
+// ============================================================================
+// ACTIVITY BLOCK QUERIES
+// ============================================================================
+
+export async function getActivityBlocks(db: D1Database, sessionId: string): Promise<ActivityBlock[]> {
+  const result = await db
+    .prepare('SELECT * FROM activity_blocks WHERE session_id = ? ORDER BY block_index')
+    .bind(sessionId)
+    .all<ActivityBlock>();
+  return result.results;
+}
+
+export async function getActivityBlocksByUser(
+  db: D1Database,
+  userId: string,
+  options: { limit?: number; days?: number } = {}
+): Promise<ActivityBlock[]> {
+  const { limit = 50, days = 7 } = options;
+  const result = await db
+    .prepare(
+      `SELECT * FROM activity_blocks
+       WHERE user_id = ? AND started_at > datetime('now', '-' || ? || ' days')
+       ORDER BY started_at DESC
+       LIMIT ?`
+    )
+    .bind(userId, days, limit)
+    .all<ActivityBlock>();
+  return result.results;
+}
+
+export async function getActivityBlocksByRepo(
+  db: D1Database,
+  repoName: string,
+  options: { limit?: number; days?: number } = {}
+): Promise<ActivityBlock[]> {
+  const { limit = 50, days = 7 } = options;
+  const result = await db
+    .prepare(
+      `SELECT * FROM activity_blocks
+       WHERE repo_name = ? AND started_at > datetime('now', '-' || ? || ' days')
+       ORDER BY started_at DESC
+       LIMIT ?`
+    )
+    .bind(repoName, days, limit)
+    .all<ActivityBlock>();
+  return result.results;
 }

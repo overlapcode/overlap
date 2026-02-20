@@ -19,6 +19,7 @@ import {
 } from '@lib/db/queries';
 import type { IngestEvent, Session, Repo } from '@lib/db/types';
 import { maybeGenerateSummary, generateSessionSummary } from '@lib/summary';
+import { classifyActivity } from '@lib/activity';
 
 // Zod schema for validation
 const IngestEventSchema = z.object({
@@ -134,6 +135,7 @@ export async function POST(context: APIContext) {
   const sessionsForSummary = new Set<string>();
   const endedSessions = new Set<string>();
   const eventCountIncrements = new Map<string, number>();
+  const promptsForClassification: Array<{ sessionId: string; userId: string; repoName: string; promptText: string; timestamp: string }> = [];
 
   for (const event of payload.events) {
     try {
@@ -329,6 +331,17 @@ export async function POST(context: APIContext) {
           results.prompts_created++;
           eventCountIncrements.set(event.session_id, (eventCountIncrements.get(event.session_id) ?? 0) + 1);
           sessionsForSummary.add(event.session_id);
+
+          // Collect for activity classification
+          if (event.prompt_text) {
+            promptsForClassification.push({
+              sessionId: event.session_id,
+              userId: event.user_id,
+              repoName: event.repo_name,
+              promptText: event.prompt_text,
+              timestamp: event.timestamp,
+            });
+          }
           break;
         }
 
@@ -404,6 +417,11 @@ export async function POST(context: APIContext) {
   }
   for (const sessionId of endedSessions) {
     context.locals.runtime.ctx.waitUntil(generateSessionSummary(db, sessionId, encryptionKey));
+  }
+  for (const p of promptsForClassification) {
+    context.locals.runtime.ctx.waitUntil(
+      classifyActivity(db, p.sessionId, p.userId, p.repoName, p.promptText, p.timestamp, encryptionKey)
+    );
   }
 
   return successResponse(results);
