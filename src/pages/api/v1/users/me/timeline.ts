@@ -61,10 +61,11 @@ export async function GET(context: APIContext) {
     const rawOffset = offsetParam ? parseInt(offsetParam, 10) : 0;
     const offset = Number.isNaN(rawOffset) || rawOffset < 0 ? 0 : rawOffset;
 
-    // Get all sessions (include active, stale, ended)
+    // Get only the authenticated user's sessions (active, stale, ended)
     const result = await getSessions(db, {
       limit,
       offset,
+      userId: authResult.context.member.user_id,
       status: 'all',
     });
 
