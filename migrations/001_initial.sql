@@ -211,3 +211,8 @@ CREATE INDEX IF NOT EXISTS idx_file_ops_active ON file_operations(session_id, fi
 CREATE INDEX IF NOT EXISTS idx_web_sessions_token ON web_sessions(token_hash);
 CREATE INDEX IF NOT EXISTS idx_web_sessions_expires ON web_sessions(expires_at);
 CREATE INDEX IF NOT EXISTS idx_activity_blocks_session ON activity_blocks(session_id, block_index);
+
+-- Dedup indexes: prevent duplicate events during backfill re-sync
+CREATE UNIQUE INDEX IF NOT EXISTS idx_file_ops_dedup ON file_operations(session_id, timestamp, tool_name, file_path);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_prompts_dedup ON prompts(session_id, turn_number) WHERE turn_number IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_agent_responses_dedup ON agent_responses(session_id, turn_number, response_type) WHERE turn_number IS NOT NULL;

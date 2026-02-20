@@ -72,7 +72,7 @@ const IngestEventSchema = z.object({
 });
 
 const IngestPayloadSchema = z.object({
-  events: z.array(IngestEventSchema).min(1).max(100),
+  events: z.array(IngestEventSchema).min(1).max(500),
 });
 
 export async function POST(context: APIContext) {
@@ -273,7 +273,7 @@ export async function POST(context: APIContext) {
 
           statements.push(
             db.prepare(
-              `INSERT INTO file_operations (session_id, user_id, repo_id, repo_name, agent_type, timestamp, tool_name, file_path, operation, start_line, end_line, function_name, bash_command, old_string, new_string)
+              `INSERT OR IGNORE INTO file_operations (session_id, user_id, repo_id, repo_name, agent_type, timestamp, tool_name, file_path, operation, start_line, end_line, function_name, bash_command, old_string, new_string)
                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
             ).bind(
               event.session_id,
@@ -315,7 +315,7 @@ export async function POST(context: APIContext) {
 
           statements.push(
             db.prepare(
-              `INSERT INTO prompts (session_id, user_id, repo_id, repo_name, agent_type, timestamp, prompt_text, turn_number)
+              `INSERT OR IGNORE INTO prompts (session_id, user_id, repo_id, repo_name, agent_type, timestamp, prompt_text, turn_number)
                VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
             ).bind(
               event.session_id,
@@ -360,7 +360,7 @@ export async function POST(context: APIContext) {
 
           statements.push(
             db.prepare(
-              `INSERT INTO agent_responses (session_id, user_id, repo_id, repo_name, agent_type, timestamp, response_text, response_type, turn_number)
+              `INSERT OR IGNORE INTO agent_responses (session_id, user_id, repo_id, repo_name, agent_type, timestamp, response_text, response_type, turn_number)
                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
             ).bind(
               event.session_id,
