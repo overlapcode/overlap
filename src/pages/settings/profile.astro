@@ -93,6 +93,7 @@ if (!sessionData) {
           <p class="text-secondary" style="font-size: 0.875rem; margin-bottom: var(--space-sm);">
             <strong style="color: var(--text-primary);">1. Install the tracer</strong>
           </p>
+          <div style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 2px;">macOS / Linux</div>
           <div style="display: flex; gap: var(--space-sm); align-items: center;">
             <code id="install-cmd" style="
               flex: 1; display: block;
@@ -103,6 +104,23 @@ if (!sessionData) {
               overflow-x: auto;
             ">curl -fsSL https://overlap.dev/install.sh | sh</code>
             <button type="button" class="copy-btn" data-target="install-cmd" style="
+              background: none; border: 1px solid var(--border-default);
+              color: var(--text-secondary); padding: 4px 8px;
+              border-radius: var(--radius-sm); font-size: 0.75rem;
+              cursor: pointer; flex-shrink: 0;
+            ">Copy</button>
+          </div>
+          <div style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 2px; margin-top: var(--space-sm);">Windows (PowerShell)</div>
+          <div style="display: flex; gap: var(--space-sm); align-items: center;">
+            <code id="install-cmd-win" style="
+              flex: 1; display: block;
+              background: var(--bg-elevated);
+              padding: var(--space-sm) var(--space-md);
+              border-radius: var(--radius-sm);
+              font-size: 0.875rem;
+              overflow-x: auto;
+            ">irm https://overlap.dev/install.ps1 | iex</code>
+            <button type="button" class="copy-btn" data-target="install-cmd-win" style="
               background: none; border: 1px solid var(--border-default);
               color: var(--text-secondary); padding: 4px 8px;
               border-radius: var(--radius-sm); font-size: 0.75rem;

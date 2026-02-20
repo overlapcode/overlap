@@ -201,8 +201,14 @@ import { Header } from '@components/Header';
           <ol style="padding-left: var(--space-lg); color: var(--text-secondary); font-size: 0.875rem; line-height: 2.4;">
             <li style="margin-bottom: var(--space-sm);">
               Install the tracer:
-              <span class="cmd-block" data-cmd="curl -fsSL https://overlap.dev/install.sh | sh" style="display: flex; align-items: center; gap: var(--space-sm); background: var(--bg-elevated); padding: 4px 8px; border-radius: 3px; margin-top: 4px; cursor: pointer;" title="Click to copy">
+              <div style="font-size: 0.7rem; color: var(--text-muted); margin-top: 4px;">macOS / Linux</div>
+              <span class="cmd-block" data-cmd="curl -fsSL https://overlap.dev/install.sh | sh" style="display: flex; align-items: center; gap: var(--space-sm); background: var(--bg-elevated); padding: 4px 8px; border-radius: 3px; margin-top: 2px; cursor: pointer;" title="Click to copy">
                 <code style="flex: 1; font-size: 0.8rem;">curl -fsSL https://overlap.dev/install.sh | sh</code>
+                <span class="cmd-copy-icon" style="color: var(--text-muted); font-size: 0.7rem; white-space: nowrap;">Copy</span>
+              </span>
+              <div style="font-size: 0.7rem; color: var(--text-muted); margin-top: 4px;">Windows (PowerShell)</div>
+              <span class="cmd-block" data-cmd="irm https://overlap.dev/install.ps1 | iex" style="display: flex; align-items: center; gap: var(--space-sm); background: var(--bg-elevated); padding: 4px 8px; border-radius: 3px; margin-top: 2px; cursor: pointer;" title="Click to copy">
+                <code style="flex: 1; font-size: 0.8rem;">irm https://overlap.dev/install.ps1 | iex</code>
                 <span class="cmd-copy-icon" style="color: var(--text-muted); font-size: 0.7rem; white-space: nowrap;">Copy</span>
               </span>
             </li>
