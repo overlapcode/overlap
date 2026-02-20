@@ -10,11 +10,20 @@ main = "dist/_worker.js/index.js"
 directory = "dist"
 binding = "ASSETS"
 
-# D1 and KV bindings are NOT declared here.
-# They are provisioned by deploy.json on first deploy and stored in the
-# Cloudflare dashboard by database_id / namespace_id.
-# Declaring them here by name causes auto-deploy to resolve to the wrong
-# resource if the account has multiple Overlap deployments.
+# D1 Database binding
+# database_id is set per-deployment (deploy button auto-provisions, manual deploy requires wrangler d1 create)
+# IMPORTANT: Forks MUST set their own database_id here after first deploy.
+# The sync-upstream workflow preserves this file to avoid overwriting deployment-specific values.
+[[d1_databases]]
+binding = "DB"
+database_name = "overlap-db"
+# database_id = ""
+
+# KV namespace for Astro sessions (@astrojs/cloudflare requires this)
+# Deploy button auto-provisions; for manual deploy: wrangler kv namespace create overlap-session
+[[kv_namespaces]]
+binding = "SESSION"
+# id = ""
 
 # Environment variables
 [vars]
