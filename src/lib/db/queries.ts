@@ -762,7 +762,7 @@ export async function detectFileOverlaps(db: D1Database, repoName: string): Prom
          AND fo1.user_id != fo2.user_id
          AND fo1.operation IN ('create', 'modify')
          AND fo2.operation IN ('create', 'modify')
-         AND abs(julianday(fo1.timestamp) - julianday(fo2.timestamp)) < (2.0/24.0)
+         AND abs(julianday(fo1.timestamp) - julianday(fo2.timestamp)) < (0.5/24.0)
        WHERE fo1.repo_name = ?
        AND fo1.timestamp > datetime('now', '-24 hours')
        AND fo1.id < fo2.id`
@@ -782,7 +782,7 @@ export async function detectFileOverlaps(db: D1Database, repoName: string): Prom
     // Determine overlap scope and severity
     let overlapScope: 'line' | 'function' | 'file' = 'file';
     let severity: 'high' | 'warning' = 'warning';
-    let description = `Both users modified ${r.file_path} within 2 hours`;
+    let description = `Both users modified ${r.file_path} within 30 minutes`;
 
     // Check for line-level overlap (ranges intersect)
     if (startA != null && endA != null && startB != null && endB != null) {
@@ -862,6 +862,57 @@ export async function getActiveSessionsWithRegions(db: D1Database): Promise<Reco
        ORDER BY MAX(fo.timestamp) DESC`
     )
     .all();
+
+  return result.results;
+}
+
+/**
+ * Query file operations from OTHER users' active sessions for real-time overlap detection.
+ * Returns rows grouped by (session, file_path, start_line, end_line, function_name)
+ * so the caller can compute tier (line/function/adjacent/file).
+ */
+export type OverlapFileRow = {
+  display_name: string;
+  session_id: string;
+  user_id: string;
+  repo_name: string;
+  started_at: string;
+  summary: string | null;
+  file_path: string;
+  start_line: number | null;
+  end_line: number | null;
+  function_name: string | null;
+  last_touched_at: string;
+};
+
+export async function queryOverlapsForFile(
+  db: D1Database,
+  repoName: string,
+  filePath: string,
+  excludeUserId: string,
+  excludeSessionId: string,
+): Promise<OverlapFileRow[]> {
+  const result = await db
+    .prepare(
+      `SELECT m.display_name, s.id AS session_id, s.user_id, s.repo_name,
+              s.started_at, s.generated_summary AS summary,
+              fo.file_path, fo.start_line, fo.end_line, fo.function_name,
+              MAX(fo.timestamp) AS last_touched_at
+       FROM file_operations fo
+       JOIN sessions s ON fo.session_id = s.id
+       JOIN members m ON s.user_id = m.user_id
+       WHERE fo.repo_name = ? AND fo.file_path = ?
+         AND fo.operation IN ('create', 'modify')
+         AND s.status = 'active'
+         AND s.user_id != ?
+         AND s.id != ?
+       GROUP BY s.id, m.display_name, s.user_id, s.repo_name, s.started_at,
+                s.generated_summary, fo.file_path, fo.start_line, fo.end_line, fo.function_name
+       ORDER BY MAX(fo.timestamp) DESC
+       LIMIT 50`
+    )
+    .bind(repoName, filePath, excludeUserId, excludeSessionId)
+    .all<OverlapFileRow>();
 
   return result.results;
 }

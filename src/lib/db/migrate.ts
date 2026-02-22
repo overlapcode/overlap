@@ -211,6 +211,9 @@ CREATE INDEX IF NOT EXISTS idx_activity_blocks_session ON activity_blocks(sessio
 CREATE UNIQUE INDEX IF NOT EXISTS idx_file_ops_dedup ON file_operations(session_id, timestamp, tool_name, file_path);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_prompts_dedup ON prompts(session_id, turn_number) WHERE turn_number IS NOT NULL;
 CREATE UNIQUE INDEX IF NOT EXISTS idx_agent_responses_dedup ON agent_responses(session_id, turn_number, response_type) WHERE turn_number IS NOT NULL;
+
+-- Composite index for real-time overlap query (POST /api/v1/overlap-query)
+CREATE INDEX IF NOT EXISTS idx_file_ops_overlap_query ON file_operations(repo_name, file_path, operation, timestamp DESC);
 `;
 
 /**
@@ -229,6 +232,8 @@ const MIGRATIONS = [
   `CREATE UNIQUE INDEX IF NOT EXISTS idx_file_ops_dedup ON file_operations(session_id, timestamp, tool_name, file_path)`,
   `CREATE UNIQUE INDEX IF NOT EXISTS idx_prompts_dedup ON prompts(session_id, turn_number) WHERE turn_number IS NOT NULL`,
   `CREATE UNIQUE INDEX IF NOT EXISTS idx_agent_responses_dedup ON agent_responses(session_id, turn_number, response_type) WHERE turn_number IS NOT NULL`,
+  // v1.7.0: Composite index for real-time overlap query
+  `CREATE INDEX IF NOT EXISTS idx_file_ops_overlap_query ON file_operations(repo_name, file_path, operation, timestamp DESC)`,
 ];
 
 export async function ensureMigrated(db: D1Database): Promise<void> {

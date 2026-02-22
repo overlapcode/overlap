@@ -14,8 +14,6 @@ import {
   getSessionById,
   getRepoByName,
   getTeamConfig,
-  updateMemberLastActive,
-  detectFileOverlaps,
 } from '@lib/db/queries';
 import type { IngestEvent, Session, Repo } from '@lib/db/types';
 import { maybeGenerateSummary, generateSessionSummary } from '@lib/summary';
@@ -131,7 +129,6 @@ export async function POST(context: APIContext) {
 
   // ── Phase 2: Process events, collecting batch statements ────────────
   const statements: D1PreparedStatement[] = [];
-  const reposWithFileOps = new Set<string>();
   const sessionsForSummary = new Set<string>();
   const endedSessions = new Set<string>();
   const eventCountIncrements = new Map<string, number>();
@@ -294,7 +291,6 @@ export async function POST(context: APIContext) {
             )
           );
           results.file_ops_created++;
-          reposWithFileOps.add(event.repo_name);
           eventCountIncrements.set(event.session_id, (eventCountIncrements.get(event.session_id) ?? 0) + 1);
           sessionsForSummary.add(event.session_id);
           break;
@@ -409,9 +405,6 @@ export async function POST(context: APIContext) {
   // ── Phase 5: Background post-processing (waitUntil) ─────────────────
   const encryptionKey = context.locals.runtime.env.TEAM_ENCRYPTION_KEY;
 
-  for (const repoName of reposWithFileOps) {
-    context.locals.runtime.ctx.waitUntil(detectFileOverlaps(db, repoName));
-  }
   for (const sessionId of sessionsForSummary) {
     context.locals.runtime.ctx.waitUntil(maybeGenerateSummary(db, sessionId, encryptionKey));
   }
