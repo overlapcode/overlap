@@ -883,6 +883,7 @@ export type OverlapFileRow = {
   end_line: number | null;
   function_name: string | null;
   last_touched_at: string;
+  git_branch: string | null;
 };
 
 export async function queryOverlapsForFile(
@@ -897,7 +898,8 @@ export async function queryOverlapsForFile(
       `SELECT m.display_name, s.id AS session_id, s.user_id, s.repo_name,
               s.started_at, s.generated_summary AS summary,
               fo.file_path, fo.start_line, fo.end_line, fo.function_name,
-              MAX(fo.timestamp) AS last_touched_at
+              MAX(fo.timestamp) AS last_touched_at,
+              s.git_branch
        FROM file_operations fo
        JOIN sessions s ON fo.session_id = s.id
        JOIN members m ON s.user_id = m.user_id
@@ -907,7 +909,8 @@ export async function queryOverlapsForFile(
          AND s.user_id != ?
          AND s.id != ?
        GROUP BY s.id, m.display_name, s.user_id, s.repo_name, s.started_at,
-                s.generated_summary, fo.file_path, fo.start_line, fo.end_line, fo.function_name
+                s.generated_summary, fo.file_path, fo.start_line, fo.end_line, fo.function_name,
+                s.git_branch
        ORDER BY MAX(fo.timestamp) DESC
        LIMIT 50`
     )
@@ -915,6 +918,70 @@ export async function queryOverlapsForFile(
     .all<OverlapFileRow>();
 
   return result.results;
+}
+
+/**
+ * For each (session_id, file_path) pair, fetch the latest edit's old_string/new_string
+ * and whether a git push occurred after it.
+ */
+export type LatestEditRow = {
+  session_id: string;
+  file_path: string;
+  old_string: string | null;
+  new_string: string | null;
+  edit_timestamp: string;
+  has_push_after_edit: number;
+};
+
+export async function getLatestEditsForSessions(
+  db: D1Database,
+  sessionFilePairs: Array<{ sessionId: string; filePath: string }>,
+): Promise<LatestEditRow[]> {
+  if (sessionFilePairs.length === 0) return [];
+
+  const results: LatestEditRow[] = [];
+
+  for (const { sessionId, filePath } of sessionFilePairs) {
+    // Get the most recent modify/create op with old_string or new_string
+    const edit = await db
+      .prepare(
+        `SELECT old_string, new_string, timestamp AS edit_timestamp
+         FROM file_operations
+         WHERE session_id = ? AND file_path = ?
+           AND operation IN ('create', 'modify')
+           AND (old_string IS NOT NULL OR new_string IS NOT NULL)
+         ORDER BY timestamp DESC
+         LIMIT 1`
+      )
+      .bind(sessionId, filePath)
+      .first<{ old_string: string | null; new_string: string | null; edit_timestamp: string }>();
+
+    if (!edit) continue;
+
+    // Check for git push after this edit
+    const pushCheck = await db
+      .prepare(
+        `SELECT EXISTS(
+           SELECT 1 FROM file_operations
+           WHERE session_id = ? AND tool_name = 'Bash'
+             AND bash_command LIKE '%git push%'
+             AND timestamp > ?
+         ) AS has_push`
+      )
+      .bind(sessionId, edit.edit_timestamp)
+      .first<{ has_push: number }>();
+
+    results.push({
+      session_id: sessionId,
+      file_path: filePath,
+      old_string: edit.old_string,
+      new_string: edit.new_string,
+      edit_timestamp: edit.edit_timestamp,
+      has_push_after_edit: pushCheck?.has_push ?? 0,
+    });
+  }
+
+  return results;
 }
 
 // ============================================================================
