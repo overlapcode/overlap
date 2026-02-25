@@ -208,7 +208,7 @@ export async function POST(context: APIContext) {
   if (hasHardOverlap) {
     const hardOverlaps = overlaps.filter((o) => o.tier === 'line' || o.tier === 'function');
     context.locals.runtime.ctx.waitUntil(
-      logHardOverlaps(db, hardOverlaps, member.user_id, member.display_name, query.session_id, sessionUserMap)
+      logHardOverlaps(db, hardOverlaps, member.user_id, member.display_name, query.session_id, sessionUserMap, guidance)
     );
   }
 
@@ -266,6 +266,7 @@ async function logHardOverlaps(
   currentDisplayName: string,
   currentSessionId: string,
   sessionUserMap: Map<string, string>,
+  guidance: string,
 ): Promise<void> {
   for (const o of hardOverlaps) {
     try {
@@ -300,7 +301,7 @@ async function logHardOverlaps(
         user_id_b: otherUserId,
         session_id_a: currentSessionId,
         session_id_b: o.session_id,
-        description: `Real-time overlap detected: ${currentDisplayName} editing ${o.file_path} (${o.tier} overlap with ${o.display_name})`,
+        description: guidance,
       });
     } catch {
       // Non-critical — don't let logging failures affect anything

@@ -14,6 +14,7 @@ import type {
   SessionDetail,
   TeamStats,
   OverlapWithMembers,
+  OverlapDetail,
   IngestEvent,
 } from './types';
 
@@ -739,6 +740,51 @@ export async function getOverlaps(
 
   const result = await db.prepare(query).bind(...params).all<OverlapWithMembers>();
   return result.results;
+}
+
+export async function getOverlapDetail(db: D1Database, overlapId: number): Promise<OverlapDetail | null> {
+  const overlap = await db
+    .prepare(
+      `SELECT o.*, ma.display_name as member_a_name, mb.display_name as member_b_name
+       FROM overlaps o
+       JOIN members ma ON o.user_id_a = ma.user_id
+       JOIN members mb ON o.user_id_b = mb.user_id
+       WHERE o.id = ?`
+    )
+    .bind(overlapId)
+    .first<OverlapWithMembers>();
+
+  if (!overlap) return null;
+
+  const editsA = overlap.session_id_a && overlap.file_path
+    ? (await db
+        .prepare(
+          `SELECT * FROM file_operations
+           WHERE session_id = ? AND file_path = ?
+           AND operation IN ('create', 'modify')
+           ORDER BY timestamp ASC`
+        )
+        .bind(overlap.session_id_a, overlap.file_path)
+        .all<FileOperation>()).results
+    : [];
+
+  const editsB = overlap.session_id_b && overlap.file_path
+    ? (await db
+        .prepare(
+          `SELECT * FROM file_operations
+           WHERE session_id = ? AND file_path = ?
+           AND operation IN ('create', 'modify')
+           ORDER BY timestamp ASC`
+        )
+        .bind(overlap.session_id_b, overlap.file_path)
+        .all<FileOperation>()).results
+    : [];
+
+  const firstTimestampA = editsA[0]?.timestamp;
+  const firstTimestampB = editsB[0]?.timestamp;
+  const firstUser = (!firstTimestampA || (firstTimestampB && firstTimestampB < firstTimestampA)) ? 'b' : 'a';
+
+  return { ...overlap, edits_a: editsA, edits_b: editsB, first_user: firstUser };
 }
 
 /**

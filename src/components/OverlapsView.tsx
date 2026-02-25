@@ -122,11 +122,16 @@ export function OverlapsView() {
             const color = getSeverityColor(overlap.severity);
 
             return (
-              <div
+              <a
                 key={overlap.id}
+                href={`/overlap/${overlap.id}`}
+                style={{ textDecoration: 'none', color: 'inherit', display: 'block' }}
+              >
+              <div
                 className="card"
                 style={{
                   borderLeft: `3px solid ${color}`,
+                  cursor: 'pointer',
                 }}
               >
                 <div style={{ display: 'flex', alignItems: 'flex-start', gap: 'var(--space-md)' }}>
@@ -203,6 +208,7 @@ export function OverlapsView() {
                   </div>
                 </div>
               </div>
+              </a>
             );
           })}
         </div>

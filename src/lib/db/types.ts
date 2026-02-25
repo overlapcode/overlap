@@ -320,3 +320,10 @@ export type OverlapWithMembers = Overlap & {
   member_a_name: string;
   member_b_name: string;
 };
+
+// Overlap detail with both users' file operations for comparison
+export type OverlapDetail = OverlapWithMembers & {
+  edits_a: FileOperation[];
+  edits_b: FileOperation[];
+  first_user: 'a' | 'b';
+};
