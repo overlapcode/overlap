@@ -78,7 +78,7 @@ function buildActivities(
       const formattedResponses = responses
         .filter((r) => (r.data as AgentResponse).response_text)
         .map((r) => ({
-          text: truncateText((r.data as AgentResponse).response_text!, 500),
+          text: (r.data as AgentResponse).response_text!,
           type: (r.data as AgentResponse).response_type as 'text' | 'thinking',
         }));
 
@@ -123,7 +123,7 @@ function buildActivities(
     const responses = associatedResponses
       .filter((ar) => ar.response_text)
       .map((ar) => ({
-        text: truncateText(ar.response_text!, 500),
+        text: ar.response_text!,
         type: ar.response_type as 'text' | 'thinking',
       }));
 
@@ -131,11 +131,7 @@ function buildActivities(
       id: String(prompt.id),
       session_id: sessionId,
       semantic_scope: null,
-      summary: prompt.prompt_text
-        ? prompt.prompt_text.length > 300
-          ? prompt.prompt_text.slice(0, 300) + '...'
-          : prompt.prompt_text
-        : null,
+      summary: prompt.prompt_text || null,
       agent_responses: responses,
       files: uniqueFiles,
       created_at: prompt.timestamp,
@@ -143,11 +139,6 @@ function buildActivities(
   }
 
   return activities;
-}
-
-function truncateText(text: string, maxLen: number): string {
-  if (text.length <= maxLen) return text;
-  return text.slice(0, maxLen) + '...';
 }
 
 export async function GET(context: APIContext) {
