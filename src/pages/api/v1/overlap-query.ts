@@ -199,7 +199,7 @@ export async function POST(context: APIContext) {
   });
 
   const hasHardOverlap = overlaps.some((o) => o.tier === 'line' || o.tier === 'function');
-  const decision: OverlapDecision = hasHardOverlap ? 'block' : 'warn';
+  const decision = hasHardOverlap ? 'block' as const : 'warn' as const;
 
   // Generate guidance note
   const guidance = buildGuidance(overlaps, hasHardOverlap);
@@ -208,7 +208,7 @@ export async function POST(context: APIContext) {
   if (hasHardOverlap) {
     const hardOverlaps = overlaps.filter((o) => o.tier === 'line' || o.tier === 'function');
     context.locals.runtime.ctx.waitUntil(
-      logHardOverlaps(db, hardOverlaps, member.user_id, member.display_name, query.session_id, sessionUserMap, guidance)
+      logHardOverlaps(db, hardOverlaps, member.user_id, member.display_name, query.session_id, sessionUserMap, guidance, decision)
     );
   }
 
@@ -267,6 +267,7 @@ async function logHardOverlaps(
   currentSessionId: string,
   sessionUserMap: Map<string, string>,
   guidance: string,
+  decision: 'block' | 'warn',
 ): Promise<void> {
   for (const o of hardOverlaps) {
     try {
@@ -302,6 +303,7 @@ async function logHardOverlaps(
         session_id_a: currentSessionId,
         session_id_b: o.session_id,
         description: guidance,
+        decision,
       });
     } catch {
       // Non-critical — don't let logging failures affect anything

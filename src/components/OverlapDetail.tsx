@@ -32,6 +32,7 @@ type OverlapData = {
   session_id_a: string | null;
   session_id_b: string | null;
   description: string | null;
+  decision: 'block' | 'warn' | null;
   detected_at: string;
   member_a_name: string;
   member_b_name: string;
@@ -56,6 +57,11 @@ const SCOPE_LABELS: Record<string, string> = {
 const USER_COLORS = {
   a: 'var(--accent-orange)',
   b: 'var(--accent-blue)',
+};
+
+const DECISION_DISPLAY: Record<string, { label: string; color: string; description: string }> = {
+  block: { label: 'BLOCKED', color: '#d95757', description: 'The overlapping user was blocked from editing this region' },
+  warn: { label: 'WARNED', color: 'var(--accent-orange)', description: 'The overlapping user was warned about this conflict' },
 };
 
 function CodeBlock({ label, code, borderColor }: { label: string; code: string; borderColor: string }) {
@@ -91,38 +97,16 @@ function CodeBlock({ label, code, borderColor }: { label: string; code: string; 
   );
 }
 
-function EditCard({ edit, userName, userColor, isFirst }: {
-  edit: FileOp;
-  userName: string;
-  userColor: string;
-  isFirst: boolean;
-}) {
+function EditCard({ edit }: { edit: FileOp }) {
   return (
     <div style={{
       padding: 'var(--space-md)',
       borderBottom: '1px solid var(--border-subtle)',
-      borderLeft: `3px solid ${userColor}`,
     }}>
-      {/* Header: user + time + badge */}
+      {/* Header: time + tool */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-sm)', marginBottom: 'var(--space-sm)', flexWrap: 'wrap' }}>
-        <span style={{ fontWeight: 600, fontSize: '0.875rem', color: userColor }}>
-          {userName}
-        </span>
         <span className="text-muted" style={{ fontSize: '0.75rem' }}>
           {formatRelativeTime(edit.timestamp)}
-        </span>
-        <span style={{
-          fontSize: '0.6875rem',
-          padding: '1px 6px',
-          borderRadius: '4px',
-          backgroundColor: isFirst ? 'var(--bg-primary)' : 'var(--bg-primary)',
-          border: `1px solid ${isFirst ? 'var(--accent-green)' : 'var(--accent-orange)'}`,
-          color: isFirst ? 'var(--accent-green)' : 'var(--accent-orange)',
-          fontFamily: 'var(--font-mono)',
-          textTransform: 'uppercase',
-          letterSpacing: '0.05em',
-        }}>
-          {isFirst ? 'first edit' : 'overlapping'}
         </span>
         {edit.tool_name && (
           <span style={{
@@ -168,9 +152,70 @@ function EditCard({ edit, userName, userColor, isFirst }: {
   );
 }
 
+function UserEditsSection({ edits, userName, userColor, isFirst, sessionId }: {
+  edits: FileOp[];
+  userName: string;
+  userColor: string;
+  isFirst: boolean;
+  sessionId: string | null;
+}) {
+  return (
+    <div style={{ marginBottom: 'var(--space-lg)' }}>
+      {/* Section header */}
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 'var(--space-sm)',
+        marginBottom: 'var(--space-sm)',
+        paddingLeft: 'var(--space-sm)',
+        flexWrap: 'wrap',
+      }}>
+        <span style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: userColor, display: 'inline-block', flexShrink: 0 }} />
+        {sessionId ? (
+          <a href={`/session/${sessionId}`} className="footer-link" style={{ fontWeight: 600, fontSize: '1rem' }}>
+            {userName}
+          </a>
+        ) : (
+          <strong style={{ fontSize: '1rem' }}>{userName}</strong>
+        )}
+        <span style={{
+          fontSize: '0.6875rem',
+          padding: '1px 6px',
+          borderRadius: '4px',
+          backgroundColor: 'var(--bg-primary)',
+          border: `1px solid ${isFirst ? 'var(--accent-green)' : 'var(--accent-orange)'}`,
+          color: isFirst ? 'var(--accent-green)' : 'var(--accent-orange)',
+          fontFamily: 'var(--font-mono)',
+          textTransform: 'uppercase',
+          letterSpacing: '0.05em',
+        }}>
+          {isFirst ? 'edited first' : 'overlapping'}
+        </span>
+        <span className="text-muted" style={{ fontSize: '0.75rem' }}>
+          {edits.length} {edits.length === 1 ? 'edit' : 'edits'}
+        </span>
+      </div>
+
+      {/* Edits */}
+      <div className="card" style={{ padding: 0, overflow: 'hidden', borderLeft: `3px solid ${userColor}` }}>
+        {edits.length > 0 ? (
+          edits.map((edit) => (
+            <EditCard key={edit.id} edit={edit} />
+          ))
+        ) : (
+          <div style={{ padding: 'var(--space-lg)', textAlign: 'center' }}>
+            <p className="text-muted" style={{ fontStyle: 'italic', margin: 0 }}>
+              No edit content recorded
+            </p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function OverlapHeader({ data }: { data: OverlapData }) {
   const color = SEVERITY_COLORS[data.severity] ?? 'var(--accent-blue)';
-  const firstIsA = data.first_user === 'a';
 
   return (
     <div className="card" style={{ marginBottom: 'var(--space-lg)' }}>
@@ -210,45 +255,8 @@ function OverlapHeader({ data }: { data: OverlapData }) {
         </div>
       )}
 
-      {/* Users: who came first */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-md)', fontSize: '0.875rem', flexWrap: 'wrap' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-xs)' }}>
-          <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: USER_COLORS.a, display: 'inline-block' }} />
-          {data.session_id_a ? (
-            <a href={`/session/${data.session_id_a}`} className="footer-link" style={{ fontWeight: 600 }}>
-              {data.member_a_name}
-            </a>
-          ) : (
-            <strong>{data.member_a_name}</strong>
-          )}
-          {firstIsA && (
-            <span style={{ fontSize: '0.6875rem', color: 'var(--accent-green)', fontFamily: 'var(--font-mono)' }}>
-              (first)
-            </span>
-          )}
-        </div>
-
-        <span className="text-muted">vs</span>
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-xs)' }}>
-          <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: USER_COLORS.b, display: 'inline-block' }} />
-          {data.session_id_b ? (
-            <a href={`/session/${data.session_id_b}`} className="footer-link" style={{ fontWeight: 600 }}>
-              {data.member_b_name}
-            </a>
-          ) : (
-            <strong>{data.member_b_name}</strong>
-          )}
-          {!firstIsA && (
-            <span style={{ fontSize: '0.6875rem', color: 'var(--accent-green)', fontFamily: 'var(--font-mono)' }}>
-              (first)
-            </span>
-          )}
-        </div>
-      </div>
-
       {/* Repo */}
-      <div className="text-muted" style={{ fontSize: '0.75rem', marginTop: 'var(--space-sm)', fontFamily: 'var(--font-mono)' }}>
+      <div className="text-muted" style={{ fontSize: '0.75rem', fontFamily: 'var(--font-mono)' }}>
         {data.repo_name}
       </div>
     </div>
@@ -304,72 +312,79 @@ export function OverlapDetail({ overlapId }: { overlapId: string }) {
 
   if (!data) return null;
 
-  // Merge and sort all edits chronologically
-  const mergedEdits = [
-    ...data.edits_a.map((e) => ({ edit: e, user: 'a' as const })),
-    ...data.edits_b.map((e) => ({ edit: e, user: 'b' as const })),
-  ].sort((a, b) => a.edit.timestamp.localeCompare(b.edit.timestamp));
+  const firstIsA = data.first_user === 'a';
+  const decisionInfo = data.decision ? DECISION_DISPLAY[data.decision] : null;
 
   return (
     <div>
       <OverlapHeader data={data} />
 
-      {/* Guidance */}
-      {data.description && (
+      {/* Decision + Guidance */}
+      {(decisionInfo || data.description) && (
         <div className="card" style={{
           marginBottom: 'var(--space-lg)',
-          borderLeft: '3px solid var(--accent-orange)',
+          borderLeft: `3px solid ${decisionInfo?.color ?? 'var(--accent-orange)'}`,
           padding: 'var(--space-md)',
         }}>
-          <span style={{
-            fontSize: '0.6875rem',
-            fontWeight: 600,
-            color: 'var(--accent-orange)',
-            textTransform: 'uppercase',
-            letterSpacing: '0.05em',
-            display: 'block',
-            marginBottom: 'var(--space-xs)',
-          }}>
-            Guidance sent to overlapping user
-          </span>
-          <p style={{ margin: 0, fontSize: '0.875rem', color: 'var(--text-secondary)', whiteSpace: 'pre-wrap' }}>
-            {data.description}
-          </p>
+          {decisionInfo && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-sm)', marginBottom: data.description ? 'var(--space-sm)' : 0 }}>
+              <span style={{
+                fontSize: '0.6875rem',
+                padding: '2px 8px',
+                borderRadius: '4px',
+                backgroundColor: 'var(--bg-primary)',
+                border: `1px solid ${decisionInfo.color}`,
+                color: decisionInfo.color,
+                fontFamily: 'var(--font-mono)',
+                fontWeight: 700,
+                textTransform: 'uppercase',
+                letterSpacing: '0.05em',
+              }}>
+                {decisionInfo.label}
+              </span>
+              <span className="text-muted" style={{ fontSize: '0.75rem' }}>
+                {decisionInfo.description}
+              </span>
+            </div>
+          )}
+          {data.description && (
+            <>
+              <span style={{
+                fontSize: '0.6875rem',
+                fontWeight: 600,
+                color: 'var(--text-muted)',
+                textTransform: 'uppercase',
+                letterSpacing: '0.05em',
+                display: 'block',
+                marginBottom: 'var(--space-xs)',
+              }}>
+                Guidance sent to overlapping user
+              </span>
+              <p style={{ margin: 0, fontSize: '0.875rem', color: 'var(--text-secondary)', whiteSpace: 'pre-wrap' }}>
+                {data.description}
+              </p>
+            </>
+          )}
         </div>
       )}
 
-      {/* Edit count */}
-      <div style={{
-        fontSize: '0.75rem',
-        color: 'var(--text-muted)',
-        textTransform: 'uppercase' as const,
-        letterSpacing: '0.05em',
-        marginBottom: 'var(--space-sm)',
-        paddingLeft: 'var(--space-sm)',
-      }}>
-        {mergedEdits.length} {mergedEdits.length === 1 ? 'edit' : 'edits'}
-      </div>
+      {/* User A's edits (first user shown first) */}
+      <UserEditsSection
+        edits={firstIsA ? data.edits_a : data.edits_b}
+        userName={firstIsA ? data.member_a_name : data.member_b_name}
+        userColor={firstIsA ? USER_COLORS.a : USER_COLORS.b}
+        isFirst={true}
+        sessionId={firstIsA ? data.session_id_a : data.session_id_b}
+      />
 
-      {/* Timeline */}
-      <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-        {mergedEdits.length > 0 ? (
-          mergedEdits.map(({ edit, user }, i) => (
-            <EditCard
-              key={edit.id}
-              edit={edit}
-              userName={user === 'a' ? data.member_a_name : data.member_b_name}
-              userColor={USER_COLORS[user]}
-              isFirst={i === 0}
-            />
-          ))
-        ) : (
-          <div style={{ padding: 'var(--space-xl)', textAlign: 'center' }}>
-            <p className="text-muted" style={{ fontStyle: 'italic' }}>
-              No edit content recorded for this overlap
-            </p>
-          </div>
-        )}
-      </div>
+      {/* User B's edits (overlapping user) */}
+      <UserEditsSection
+        edits={firstIsA ? data.edits_b : data.edits_a}
+        userName={firstIsA ? data.member_b_name : data.member_a_name}
+        userColor={firstIsA ? USER_COLORS.b : USER_COLORS.a}
+        isFirst={false}
+        sessionId={firstIsA ? data.session_id_b : data.session_id_a}
+      />
     </div>
   );
 }

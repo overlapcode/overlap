@@ -18,6 +18,8 @@ type Overlap = {
   session_id_a: string | null;
   session_id_b: string | null;
   description: string | null;
+  decision: 'block' | 'warn' | null;
+  public_id: string | null;
   detected_at: string;
   member_a_name: string;
   member_b_name: string;
@@ -34,6 +36,11 @@ const SCOPE_LABELS: Record<string, string> = {
   function: 'Function overlap',
   file: 'File overlap',
   directory: 'Directory overlap',
+};
+
+const DECISION_STYLES: Record<string, { label: string; color: string }> = {
+  block: { label: 'BLOCKED', color: '#d95757' },
+  warn: { label: 'WARNED', color: 'var(--accent-orange)' },
 };
 
 function getSeverityColor(severity: string): string {
@@ -120,23 +127,20 @@ export function OverlapsView() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-md)' }}>
           {overlaps.map((overlap) => {
             const color = getSeverityColor(overlap.severity);
+            const decisionStyle = overlap.decision ? DECISION_STYLES[overlap.decision] : null;
+            const href = overlap.public_id ? `/overlap/${overlap.public_id}` : null;
 
-            return (
-              <a
-                key={overlap.id}
-                href={`/overlap/${overlap.id}`}
-                style={{ textDecoration: 'none', color: 'inherit', display: 'block' }}
-              >
+            const card = (
               <div
                 className="card"
                 style={{
                   borderLeft: `3px solid ${color}`,
-                  cursor: 'pointer',
+                  cursor: href ? 'pointer' : 'default',
                 }}
               >
                 <div style={{ display: 'flex', alignItems: 'flex-start', gap: 'var(--space-md)' }}>
                   <div style={{ flex: 1 }}>
-                    {/* Title row: scope label + severity badge + time */}
+                    {/* Title row: scope label + severity + decision + time */}
                     <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-sm)', marginBottom: 'var(--space-xs)', flexWrap: 'wrap' }}>
                       <span style={{ fontWeight: 600 }}>{getScopeLabel(overlap)}</span>
                       <span style={{
@@ -152,6 +156,21 @@ export function OverlapsView() {
                       }}>
                         {overlap.severity}
                       </span>
+                      {decisionStyle && (
+                        <span style={{
+                          fontSize: '0.6875rem',
+                          padding: '1px 6px',
+                          borderRadius: '4px',
+                          backgroundColor: 'var(--bg-primary)',
+                          border: `1px solid ${decisionStyle.color}`,
+                          color: decisionStyle.color,
+                          fontFamily: 'var(--font-mono)',
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.05em',
+                        }}>
+                          {decisionStyle.label}
+                        </span>
+                      )}
                       <span className="text-muted" style={{ fontSize: '0.75rem' }}>
                         {formatRelativeTime(overlap.detected_at)}
                       </span>
@@ -175,41 +194,58 @@ export function OverlapsView() {
                       </div>
                     )}
 
-                    {/* Users involved + session links */}
+                    {/* Users involved */}
                     <div className="text-secondary" style={{ fontSize: '0.875rem', marginBottom: 'var(--space-xs)' }}>
-                      {overlap.session_id_a ? (
-                        <a href={`/session/${overlap.session_id_a}`} className="footer-link" style={{ fontWeight: 600 }}>
-                          {overlap.member_a_name}
-                        </a>
-                      ) : (
-                        <strong>{overlap.member_a_name}</strong>
-                      )}
+                      <strong>{overlap.member_a_name}</strong>
                       <span> and </span>
-                      {overlap.session_id_b ? (
-                        <a href={`/session/${overlap.session_id_b}`} className="footer-link" style={{ fontWeight: 600 }}>
-                          {overlap.member_b_name}
-                        </a>
-                      ) : (
-                        <strong>{overlap.member_b_name}</strong>
-                      )}
+                      <strong>{overlap.member_b_name}</strong>
                     </div>
-
-                    {/* Description */}
-                    {overlap.description && (
-                      <p className="text-muted" style={{ fontSize: '0.875rem', margin: 0 }}>
-                        {overlap.description}
-                      </p>
-                    )}
 
                     {/* Repo */}
                     <div className="text-muted" style={{ fontSize: '0.75rem', marginTop: 'var(--space-sm)', fontFamily: 'var(--font-mono)' }}>
                       {overlap.repo_name}
                     </div>
                   </div>
+
+                  {/* Arrow indicator */}
+                  {href && (
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      color: 'var(--text-muted)',
+                      fontSize: '1.25rem',
+                      flexShrink: 0,
+                      paddingTop: 'var(--space-xs)',
+                    }}>
+                      →
+                    </div>
+                  )}
                 </div>
+
+                {/* View details footer */}
+                {href && (
+                  <div style={{
+                    marginTop: 'var(--space-sm)',
+                    paddingTop: 'var(--space-sm)',
+                    borderTop: '1px solid var(--border-subtle)',
+                    fontSize: '0.75rem',
+                    color: 'var(--accent-blue)',
+                  }}>
+                    View details →
+                  </div>
+                )}
               </div>
-              </a>
             );
+
+            if (href) {
+              return (
+                <a key={overlap.id} href={href} className="card-link">
+                  {card}
+                </a>
+              );
+            }
+
+            return <div key={overlap.id}>{card}</div>;
           })}
         </div>
       )}

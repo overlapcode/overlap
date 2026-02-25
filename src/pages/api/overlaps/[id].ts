@@ -1,6 +1,7 @@
 /**
  * GET /api/overlaps/:id - Overlap detail with file operations from both users
  *
+ * :id is a UUID public_id, not an integer.
  * Auth: Web session
  */
 
@@ -16,17 +17,12 @@ export async function GET(context: APIContext) {
     return errorResponse('Overlap ID required', 400);
   }
 
-  const overlapId = parseInt(id, 10);
-  if (isNaN(overlapId)) {
-    return errorResponse('Invalid overlap ID', 400);
-  }
-
   const authResult = await authenticateWebSession(context.request, db);
   if (!authResult.success) {
     return errorResponse(authResult.error, authResult.status);
   }
 
-  const detail = await getOverlapDetail(db, overlapId);
+  const detail = await getOverlapDetail(db, id);
   if (!detail) {
     return errorResponse('Overlap not found', 404);
   }

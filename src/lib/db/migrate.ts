@@ -157,6 +157,8 @@ CREATE TABLE IF NOT EXISTS overlaps (
     session_id_a TEXT,
     session_id_b TEXT,
     description TEXT,
+    decision TEXT DEFAULT 'warn',
+    public_id TEXT,
     detected_at TEXT DEFAULT (datetime('now'))
 );
 
@@ -234,6 +236,10 @@ const MIGRATIONS = [
   `CREATE UNIQUE INDEX IF NOT EXISTS idx_agent_responses_dedup ON agent_responses(session_id, turn_number, response_type) WHERE turn_number IS NOT NULL`,
   // v1.7.0: Composite index for real-time overlap query
   `CREATE INDEX IF NOT EXISTS idx_file_ops_overlap_query ON file_operations(repo_name, file_path, operation, timestamp DESC)`,
+  // v1.8.0: Overlap decision (block/warn) and UUID public IDs
+  `ALTER TABLE overlaps ADD COLUMN decision TEXT DEFAULT 'warn'`,
+  `ALTER TABLE overlaps ADD COLUMN public_id TEXT`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS idx_overlaps_public_id ON overlaps(public_id) WHERE public_id IS NOT NULL`,
 ];
 
 export async function ensureMigrated(db: D1Database): Promise<void> {

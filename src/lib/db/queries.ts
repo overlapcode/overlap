@@ -690,11 +690,12 @@ export async function getSessionAgentResponses(db: D1Database, sessionId: string
 // OVERLAP QUERIES
 // ============================================================================
 
-export async function createOverlap(db: D1Database, overlap: Omit<Overlap, 'id' | 'detected_at'>): Promise<void> {
+export async function createOverlap(db: D1Database, overlap: Omit<Overlap, 'id' | 'detected_at' | 'public_id'>): Promise<void> {
+  const publicId = crypto.randomUUID();
   await db
     .prepare(
-      `INSERT INTO overlaps (type, severity, overlap_scope, file_path, directory_path, start_line, end_line, function_name, repo_name, user_id_a, user_id_b, session_id_a, session_id_b, description)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      `INSERT INTO overlaps (type, severity, overlap_scope, file_path, directory_path, start_line, end_line, function_name, repo_name, user_id_a, user_id_b, session_id_a, session_id_b, description, decision, public_id)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
     .bind(
       overlap.type,
@@ -710,7 +711,9 @@ export async function createOverlap(db: D1Database, overlap: Omit<Overlap, 'id' 
       overlap.user_id_b,
       overlap.session_id_a ?? null,
       overlap.session_id_b ?? null,
-      overlap.description ?? null
+      overlap.description ?? null,
+      overlap.decision ?? 'warn',
+      publicId
     )
     .run();
 }
@@ -742,19 +745,44 @@ export async function getOverlaps(
   return result.results;
 }
 
-export async function getOverlapDetail(db: D1Database, overlapId: number): Promise<OverlapDetail | null> {
+/**
+ * Build SQL WHERE clause to scope file_operations to the overlapping region.
+ * - line: only edits whose line range intersects the overlap's line range
+ * - function: only edits on the same function
+ * - file/directory: all edits (no additional filter)
+ */
+function buildScopeFilter(overlap: OverlapWithMembers): { where: string; params: unknown[] } {
+  if (overlap.overlap_scope === 'line' && overlap.start_line != null && overlap.end_line != null) {
+    return {
+      where: 'AND start_line <= ? AND end_line >= ?',
+      params: [overlap.end_line, overlap.start_line],
+    };
+  }
+  if (overlap.overlap_scope === 'function' && overlap.function_name) {
+    return {
+      where: 'AND function_name = ?',
+      params: [overlap.function_name],
+    };
+  }
+  return { where: '', params: [] };
+}
+
+export async function getOverlapDetail(db: D1Database, publicId: string): Promise<OverlapDetail | null> {
   const overlap = await db
     .prepare(
       `SELECT o.*, ma.display_name as member_a_name, mb.display_name as member_b_name
        FROM overlaps o
        JOIN members ma ON o.user_id_a = ma.user_id
        JOIN members mb ON o.user_id_b = mb.user_id
-       WHERE o.id = ?`
+       WHERE o.public_id = ?`
     )
-    .bind(overlapId)
+    .bind(publicId)
     .first<OverlapWithMembers>();
 
   if (!overlap) return null;
+
+  // Build scoped query based on overlap_scope
+  const scopeFilter = buildScopeFilter(overlap);
 
   const editsA = overlap.session_id_a && overlap.file_path
     ? (await db
@@ -762,9 +790,10 @@ export async function getOverlapDetail(db: D1Database, overlapId: number): Promi
           `SELECT * FROM file_operations
            WHERE session_id = ? AND file_path = ?
            AND operation IN ('create', 'modify')
+           ${scopeFilter.where}
            ORDER BY timestamp ASC`
         )
-        .bind(overlap.session_id_a, overlap.file_path)
+        .bind(overlap.session_id_a, overlap.file_path, ...scopeFilter.params)
         .all<FileOperation>()).results
     : [];
 
@@ -774,9 +803,10 @@ export async function getOverlapDetail(db: D1Database, overlapId: number): Promi
           `SELECT * FROM file_operations
            WHERE session_id = ? AND file_path = ?
            AND operation IN ('create', 'modify')
+           ${scopeFilter.where}
            ORDER BY timestamp ASC`
         )
-        .bind(overlap.session_id_b, overlap.file_path)
+        .bind(overlap.session_id_b, overlap.file_path, ...scopeFilter.params)
         .all<FileOperation>()).results
     : [];
 
@@ -873,6 +903,7 @@ export async function detectFileOverlaps(db: D1Database, repoName: string): Prom
         session_id_a: r.session_a as string,
         session_id_b: r.session_b as string,
         description,
+        decision: overlapScope === 'file' ? 'warn' : 'block',
       });
     }
   }

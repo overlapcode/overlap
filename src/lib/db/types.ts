@@ -158,6 +158,8 @@ export type Overlap = {
   session_id_a: string | null;
   session_id_b: string | null;
   description: string | null;
+  decision: 'block' | 'warn' | null;
+  public_id: string | null;
   detected_at: string;
 };
 
