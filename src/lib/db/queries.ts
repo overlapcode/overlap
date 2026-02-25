@@ -767,16 +767,18 @@ function buildScopeFilter(overlap: OverlapWithMembers): { where: string; params:
   return { where: '', params: [] };
 }
 
-export async function getOverlapDetail(db: D1Database, publicId: string): Promise<OverlapDetail | null> {
+export async function getOverlapDetail(db: D1Database, idOrPublicId: string): Promise<OverlapDetail | null> {
+  // Support both UUID public_id and legacy integer id
+  const isIntegerId = /^\d+$/.test(idOrPublicId);
   const overlap = await db
     .prepare(
       `SELECT o.*, ma.display_name as member_a_name, mb.display_name as member_b_name
        FROM overlaps o
        JOIN members ma ON o.user_id_a = ma.user_id
        JOIN members mb ON o.user_id_b = mb.user_id
-       WHERE o.public_id = ?`
+       WHERE ${isIntegerId ? 'o.id = ?' : 'o.public_id = ?'}`
     )
-    .bind(publicId)
+    .bind(isIntegerId ? parseInt(idOrPublicId, 10) : idOrPublicId)
     .first<OverlapWithMembers>();
 
   if (!overlap) return null;

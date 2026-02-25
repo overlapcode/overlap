@@ -1,7 +1,7 @@
 /**
  * GET /api/overlaps/:id - Overlap detail with file operations from both users
  *
- * :id is a UUID public_id, not an integer.
+ * :id can be a UUID public_id or a legacy integer id.
  * Auth: Web session
  */
 
