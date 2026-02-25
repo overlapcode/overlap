@@ -48,6 +48,36 @@ type SessionDetailProps = {
 };
 
 const PAGE_SIZE = 20;
+const PROMPT_TRUNCATE = 300;
+const RESPONSE_TRUNCATE = 500;
+
+function ExpandableText({ text, limit, style }: { text: string; limit: number; style?: React.CSSProperties }) {
+  const [expanded, setExpanded] = useState(false);
+  const needsTruncation = text.length > limit;
+
+  return (
+    <span style={style}>
+      {expanded || !needsTruncation ? text : text.slice(0, limit) + '...'}
+      {needsTruncation && (
+        <button
+          onClick={() => setExpanded(!expanded)}
+          style={{
+            background: 'none',
+            border: 'none',
+            color: 'var(--accent-blue)',
+            cursor: 'pointer',
+            fontSize: 'inherit',
+            fontFamily: 'inherit',
+            padding: '0 0 0 4px',
+            textDecoration: 'none',
+          }}
+        >
+          {expanded ? 'show less' : 'read more'}
+        </button>
+      )}
+    </span>
+  );
+}
 
 function SessionHeader({ session }: { session: SessionInfo }) {
   const relativeTime = useRelativeTime(session.last_activity_at);
@@ -177,7 +207,7 @@ const ActivityRow = memo(function ActivityRow({ activity, session, githubBaseUrl
             {session.user.name}
           </span>
           <p className="text-primary" style={{ margin: 0, fontSize: '0.875rem' }}>
-            {activity.summary}
+            <ExpandableText text={activity.summary} limit={PROMPT_TRUNCATE} />
           </p>
         </div>
       )}
@@ -240,7 +270,7 @@ const ActivityRow = memo(function ActivityRow({ activity, session, githubBaseUrl
               }}>
                 {resp.type === 'thinking' ? `${agentLabel} thinking` : agentLabel}
               </span>
-              {resp.text}
+              <ExpandableText text={resp.text} limit={RESPONSE_TRUNCATE} />
             </div>
           ))}
         </div>
