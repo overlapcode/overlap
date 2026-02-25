@@ -12,8 +12,8 @@
 
 import type { APIContext } from 'astro';
 import { authenticateAny, errorResponse, successResponse } from '@lib/auth/middleware';
-import { getSessionDetail } from '@lib/db/queries';
-import type { Prompt, FileOperation, AgentResponse } from '@lib/db/types';
+import { getSessionDetail, getActivityBlocks } from '@lib/db/queries';
+import type { Prompt, FileOperation, AgentResponse, ActivityBlock } from '@lib/db/types';
 
 type FormattedAgentResponse = {
   text: string;
@@ -28,7 +28,27 @@ type FormattedActivity = {
   agent_responses: FormattedAgentResponse[];
   files: string[];
   created_at: string;
+  block_index: number | null;
 };
+
+type FormattedBlock = {
+  block_index: number;
+  name: string | null;
+  description: string | null;
+  task_type: string | null;
+  started_at: string;
+  ended_at: string | null;
+  confidence: number | null;
+};
+
+function findBlockIndex(timestamp: string, blocks: ActivityBlock[]): number | null {
+  for (const block of blocks) {
+    if (timestamp >= block.started_at && (!block.ended_at || timestamp <= block.ended_at)) {
+      return block.block_index;
+    }
+  }
+  return null;
+}
 
 /**
  * Build activity items from prompts + file operations + agent responses.
@@ -39,7 +59,8 @@ function buildActivities(
   sessionId: string,
   prompts: Prompt[],
   fileOps: FileOperation[],
-  agentResponses: AgentResponse[]
+  agentResponses: AgentResponse[],
+  blocks: ActivityBlock[]
 ): FormattedActivity[] {
   if (prompts.length === 0 && fileOps.length === 0 && agentResponses.length === 0) {
     return [];
@@ -90,6 +111,7 @@ function buildActivities(
         agent_responses: formattedResponses,
         files: uniqueFiles,
         created_at: bucket[0].ts,
+        block_index: findBlockIndex(bucket[0].ts, blocks),
       };
     });
   }
@@ -135,6 +157,7 @@ function buildActivities(
       agent_responses: responses,
       files: uniqueFiles,
       created_at: prompt.timestamp,
+      block_index: findBlockIndex(prompt.timestamp, blocks),
     });
   }
 
@@ -161,8 +184,10 @@ export async function GET(context: APIContext) {
       return errorResponse('Session not found', 404);
     }
 
+    const blocks = await getActivityBlocks(db, sessionId);
+
     // Build activities from prompts + file operations + agent responses (newest first)
-    const allActivities = buildActivities(sessionId, detail.prompts, detail.file_operations, detail.agent_responses).reverse();
+    const allActivities = buildActivities(sessionId, detail.prompts, detail.file_operations, detail.agent_responses, blocks).reverse();
 
     // Parse pagination
     const url = new URL(context.request.url);
@@ -213,9 +238,20 @@ export async function GET(context: APIContext) {
       ended_at: detail.ended_at,
     };
 
+    const formattedBlocks: FormattedBlock[] = blocks.map((b) => ({
+      block_index: b.block_index,
+      name: b.name,
+      description: b.description,
+      task_type: b.task_type,
+      started_at: b.started_at,
+      ended_at: b.ended_at,
+      confidence: b.confidence,
+    }));
+
     return successResponse({
       session,
       activities: paginated,
+      activity_blocks: formattedBlocks,
       total,
       hasMore: offset + paginated.length < total,
     });

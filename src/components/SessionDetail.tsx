@@ -30,6 +30,17 @@ type ActivityItem = {
   summary: string | null;
   agent_responses?: AgentResponseItem[];
   created_at: string;
+  block_index: number | null;
+};
+
+type ActivityBlockInfo = {
+  block_index: number;
+  name: string | null;
+  description: string | null;
+  task_type: string | null;
+  started_at: string;
+  ended_at: string | null;
+  confidence: number | null;
 };
 
 type SessionDetailProps = {
@@ -238,9 +249,75 @@ const ActivityRow = memo(function ActivityRow({ activity, session, githubBaseUrl
   );
 });
 
+const TASK_TYPE_COLORS: Record<string, string> = {
+  feature: 'var(--accent-orange)',
+  bugfix: 'var(--accent-orange)',
+  refactor: 'var(--accent-blue)',
+  debug: 'var(--accent-orange)',
+  test: 'var(--accent-green)',
+  docs: 'var(--accent-green)',
+  config: 'var(--text-muted)',
+  exploration: 'var(--accent-blue)',
+  review: 'var(--accent-blue)',
+  migration: 'var(--accent-orange)',
+  deploy: 'var(--accent-green)',
+};
+
+function BlockHeader({ block }: { block: ActivityBlockInfo }) {
+  const color = TASK_TYPE_COLORS[block.task_type ?? ''] ?? 'var(--text-muted)';
+
+  return (
+    <div style={{
+      padding: 'var(--space-sm) var(--space-md)',
+      backgroundColor: 'var(--bg-elevated)',
+      borderBottom: '1px solid var(--border-subtle)',
+      display: 'flex',
+      alignItems: 'baseline',
+      gap: 'var(--space-sm)',
+      flexWrap: 'wrap',
+    }}>
+      <span style={{
+        fontSize: '0.8125rem',
+        fontWeight: 600,
+        color: 'var(--text-primary)',
+      }}>
+        {block.name ?? `Block ${block.block_index + 1}`}
+      </span>
+
+      {block.task_type && (
+        <span style={{
+          fontSize: '0.6875rem',
+          padding: '1px 6px',
+          borderRadius: '4px',
+          backgroundColor: 'var(--bg-primary)',
+          border: `1px solid ${color}`,
+          color: color,
+          fontFamily: 'var(--font-mono)',
+          textTransform: 'uppercase',
+          letterSpacing: '0.05em',
+        }}>
+          {block.task_type}
+        </span>
+      )}
+
+      {block.description && (
+        <span style={{
+          fontSize: '0.75rem',
+          color: 'var(--text-muted)',
+          flex: '1 1 100%',
+          marginTop: '2px',
+        }}>
+          {block.description}
+        </span>
+      )}
+    </div>
+  );
+}
+
 export function SessionDetail({ sessionId }: SessionDetailProps) {
   const [session, setSession] = useState<SessionInfo | null>(null);
   const [activities, setActivities] = useState<ActivityItem[]>([]);
+  const [activityBlocks, setActivityBlocks] = useState<ActivityBlockInfo[]>([]);
   const [total, setTotal] = useState(0);
   const [hasMore, setHasMore] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -274,12 +351,14 @@ export function SessionDetail({ sessionId }: SessionDetailProps) {
         data: {
           session: SessionInfo;
           activities: ActivityItem[];
+          activity_blocks?: ActivityBlockInfo[];
           total: number;
           hasMore: boolean;
         };
       };
 
       setSession(json.data.session);
+      setActivityBlocks(json.data.activity_blocks ?? []);
       if (append) {
         setActivities((prev) => [...prev, ...json.data.activities]);
       } else {
@@ -361,9 +440,23 @@ export function SessionDetail({ sessionId }: SessionDetailProps) {
       {/* Activity list */}
       <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
         {activities.length > 0 ? (
-          activities.map((act) => (
-            <ActivityRow key={act.id} activity={act} session={session} githubBaseUrl={githubBaseUrl} />
-          ))
+          (() => {
+            const blockMap = new Map(activityBlocks.map((b) => [b.block_index, b]));
+            let lastBlockIndex: number | null | undefined = undefined;
+
+            return activities.map((act) => {
+              const showHeader = act.block_index !== lastBlockIndex && act.block_index !== null;
+              const block = showHeader ? blockMap.get(act.block_index!) : null;
+              lastBlockIndex = act.block_index;
+
+              return (
+                <div key={act.id}>
+                  {block && <BlockHeader block={block} />}
+                  <ActivityRow activity={act} session={session} githubBaseUrl={githubBaseUrl} />
+                </div>
+              );
+            });
+          })()
         ) : (
           <div style={{ padding: 'var(--space-xl)', textAlign: 'center' }}>
             <p className="text-muted" style={{ fontStyle: 'italic' }}>
