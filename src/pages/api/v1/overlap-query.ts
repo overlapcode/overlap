@@ -198,14 +198,18 @@ export async function POST(context: APIContext) {
     };
   });
 
-  const hasHardOverlap = overlaps.some((o) => o.tier === 'line' || o.tier === 'function');
-  const decision = hasHardOverlap ? 'block' as const : 'warn' as const;
+  // Only unpushed hard overlaps warrant a block — pushed changes just need a pull
+  const hasUnpushedHardOverlap = overlaps.some(
+    (o) => (o.tier === 'line' || o.tier === 'function') && !o.is_pushed
+  );
+  const decision = hasUnpushedHardOverlap ? 'block' as const : 'warn' as const;
 
   // Generate guidance note
-  const guidance = buildGuidance(overlaps, hasHardOverlap);
+  const hasAnyHardOverlap = overlaps.some((o) => o.tier === 'line' || o.tier === 'function');
+  const guidance = buildGuidance(overlaps, hasAnyHardOverlap);
 
   // Side-effect: log hard overlaps to the overlaps table (deduped, via waitUntil)
-  if (hasHardOverlap) {
+  if (hasAnyHardOverlap) {
     const hardOverlaps = overlaps.filter((o) => o.tier === 'line' || o.tier === 'function');
     context.locals.runtime.ctx.waitUntil(
       logHardOverlaps(db, hardOverlaps, member.user_id, member.display_name, query.session_id, sessionUserMap, guidance, decision)
