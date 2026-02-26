@@ -47,7 +47,7 @@ export function Header({ teamName, userName }: HeaderProps) {
         {teamName && (
           <>
             <span className="text-muted">/</span>
-            <span className="text-secondary">{teamName}</span>
+            <a href="/" className="text-secondary" style={{ textDecoration: 'none' }}>{teamName}</a>
           </>
         )}
       </div>
@@ -55,9 +55,9 @@ export function Header({ teamName, userName }: HeaderProps) {
       {/* User info */}
       {userName && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-md)' }}>
-          <span className="text-secondary" style={{ fontSize: '0.875rem' }}>
+          <a href="/" className="text-secondary" style={{ fontSize: '0.875rem', textDecoration: 'none' }}>
             {userName}
-          </span>
+          </a>
           <a
             href="/stats"
             className="btn btn-secondary"
