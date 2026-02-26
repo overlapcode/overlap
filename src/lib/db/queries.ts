@@ -746,27 +746,37 @@ export async function getOverlaps(
 }
 
 /**
- * Build SQL WHERE clause to scope file_operations to the overlapping region.
- * - line: only edits whose line range intersects the overlap's line range
- * - function: only edits on the same function
- * - file/directory: all edits (no additional filter)
+ * Fetch edits for a user's session on a file, with optional scope filtering.
+ * Tries strict scope filter first; falls back to all edits with diff content
+ * if the strict filter returns nothing (line numbers are often null).
  */
-function buildScopeFilter(overlap: OverlapWithMembers): { where: string; params: unknown[] } {
+async function fetchScopedEdits(
+  db: D1Database,
+  sessionId: string,
+  filePath: string,
+  overlap: OverlapWithMembers,
+): Promise<FileOperation[]> {
+  const baseQuery = `SELECT * FROM file_operations
+     WHERE session_id = ? AND file_path = ?
+     AND operation IN ('create', 'modify')`;
+
+  // Try strict scope filter first (line range or function name)
   if (overlap.overlap_scope === 'line' && overlap.start_line != null && overlap.end_line != null) {
-    // Include edits whose line range intersects OR that have diff content but no line info
-    return {
-      where: 'AND ((start_line <= ? AND end_line >= ?) OR (start_line IS NULL AND (old_string IS NOT NULL OR new_string IS NOT NULL)))',
-      params: [overlap.end_line, overlap.start_line],
-    };
+    const strict = (await db.prepare(
+      `${baseQuery} AND start_line <= ? AND end_line >= ? ORDER BY timestamp ASC`
+    ).bind(sessionId, filePath, overlap.end_line, overlap.start_line).all<FileOperation>()).results;
+    if (strict.length > 0) return strict;
+  } else if (overlap.overlap_scope === 'function' && overlap.function_name) {
+    const strict = (await db.prepare(
+      `${baseQuery} AND function_name = ? ORDER BY timestamp ASC`
+    ).bind(sessionId, filePath, overlap.function_name).all<FileOperation>()).results;
+    if (strict.length > 0) return strict;
   }
-  if (overlap.overlap_scope === 'function' && overlap.function_name) {
-    // Include edits matching the function OR that have diff content but no function info
-    return {
-      where: 'AND (function_name = ? OR (function_name IS NULL AND (old_string IS NOT NULL OR new_string IS NOT NULL)))',
-      params: [overlap.function_name],
-    };
-  }
-  return { where: '', params: [] };
+
+  // Fallback: all edits on this file that have actual diff content
+  return (await db.prepare(
+    `${baseQuery} AND (old_string IS NOT NULL OR new_string IS NOT NULL) ORDER BY timestamp ASC`
+  ).bind(sessionId, filePath).all<FileOperation>()).results;
 }
 
 export async function getOverlapDetail(db: D1Database, idOrPublicId: string): Promise<OverlapDetail | null> {
@@ -785,33 +795,12 @@ export async function getOverlapDetail(db: D1Database, idOrPublicId: string): Pr
 
   if (!overlap) return null;
 
-  // Build scoped query based on overlap_scope
-  const scopeFilter = buildScopeFilter(overlap);
-
   const editsA = overlap.session_id_a && overlap.file_path
-    ? (await db
-        .prepare(
-          `SELECT * FROM file_operations
-           WHERE session_id = ? AND file_path = ?
-           AND operation IN ('create', 'modify')
-           ${scopeFilter.where}
-           ORDER BY timestamp ASC`
-        )
-        .bind(overlap.session_id_a, overlap.file_path, ...scopeFilter.params)
-        .all<FileOperation>()).results
+    ? await fetchScopedEdits(db, overlap.session_id_a, overlap.file_path, overlap)
     : [];
 
   const editsB = overlap.session_id_b && overlap.file_path
-    ? (await db
-        .prepare(
-          `SELECT * FROM file_operations
-           WHERE session_id = ? AND file_path = ?
-           AND operation IN ('create', 'modify')
-           ${scopeFilter.where}
-           ORDER BY timestamp ASC`
-        )
-        .bind(overlap.session_id_b, overlap.file_path, ...scopeFilter.params)
-        .all<FileOperation>()).results
+    ? await fetchScopedEdits(db, overlap.session_id_b, overlap.file_path, overlap)
     : [];
 
   const firstTimestampA = editsA[0]?.timestamp;
