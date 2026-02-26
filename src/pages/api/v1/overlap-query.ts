@@ -288,7 +288,7 @@ async function logHardOverlaps(
         `SELECT id FROM overlaps
          WHERE type = 'file' AND file_path = ? AND repo_name = ? AND overlap_scope = ?
            AND ((user_id_a = ? AND user_id_b = ?) OR (user_id_a = ? AND user_id_b = ?))
-           AND detected_at > datetime('now', '-24 hours')
+           AND datetime(detected_at) > datetime('now', '-24 hours')
          LIMIT 1`
       ).bind(
         o.file_path, o.repo_name, o.tier,

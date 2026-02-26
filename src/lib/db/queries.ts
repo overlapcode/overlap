@@ -595,7 +595,7 @@ export async function getFileActivity(
        JOIN members m ON fo.user_id = m.user_id
        JOIN sessions s ON fo.session_id = s.id
        WHERE fo.file_path = ? AND fo.repo_name = ?
-       AND fo.timestamp > datetime('now', '-' || ? || ' days')
+       AND datetime(fo.timestamp) > datetime('now', '-' || ? || ' days')
        ORDER BY fo.timestamp DESC
        LIMIT ?`
     )
@@ -607,7 +607,7 @@ export async function getFileActivity(
       `SELECT COUNT(DISTINCT session_id) as sessions_count, COUNT(DISTINCT user_id) as users_count
        FROM file_operations
        WHERE file_path = ? AND repo_name = ?
-       AND timestamp > datetime('now', '-' || ? || ' days')`
+       AND datetime(timestamp) > datetime('now', '-' || ? || ' days')`
     )
     .bind(filePath, repoName, days)
     .first<{ sessions_count: number; users_count: number }>();
@@ -729,7 +729,7 @@ export async function getOverlaps(
     FROM overlaps o
     JOIN members ma ON o.user_id_a = ma.user_id
     JOIN members mb ON o.user_id_b = mb.user_id
-    WHERE o.detected_at > datetime('now', '-' || ? || ' days')
+    WHERE datetime(o.detected_at) > datetime('now', '-' || ? || ' days')
   `;
   const params: unknown[] = [days];
 
@@ -833,7 +833,7 @@ export async function detectFileOverlaps(db: D1Database, repoName: string): Prom
          AND fo2.operation IN ('create', 'modify')
          AND abs(julianday(fo1.timestamp) - julianday(fo2.timestamp)) < (0.5/24.0)
        WHERE fo1.repo_name = ?
-       AND fo1.timestamp > datetime('now', '-24 hours')
+       AND datetime(fo1.timestamp) > datetime('now', '-24 hours')
        AND fo1.id < fo2.id`
     )
     .bind(repoName)
@@ -875,7 +875,7 @@ export async function detectFileOverlaps(db: D1Database, repoName: string): Prom
         `SELECT id FROM overlaps
          WHERE type = 'file' AND file_path = ? AND repo_name = ? AND overlap_scope = ?
          AND ((user_id_a = ? AND user_id_b = ?) OR (user_id_a = ? AND user_id_b = ?))
-         AND detected_at > datetime('now', '-24 hours')`
+         AND datetime(detected_at) > datetime('now', '-24 hours')`
       )
       .bind(r.file_path, r.repo_name, overlapScope, r.user_a, r.user_b, r.user_b, r.user_a)
       .first();
@@ -976,7 +976,7 @@ export async function queryOverlapsForFile(
        JOIN members m ON s.user_id = m.user_id
        WHERE fo.repo_name = ? AND fo.file_path = ?
          AND fo.operation IN ('create', 'modify')
-         AND fo.timestamp > datetime('now', '-' || ? || ' hours')
+         AND datetime(fo.timestamp) > datetime('now', '-' || ? || ' hours')
          AND s.status = 'active'
          AND s.user_id != ?
          AND s.id != ?
@@ -1198,7 +1198,8 @@ export async function markStaleSessions(db: D1Database): Promise<number> {
   const config = await getTeamConfig(db);
   const timeout = config?.stale_timeout_hours ?? 8;
 
-  // Get the most recent file operation timestamp for each active session
+  // datetime() normalizes ISO timestamps (with T separator) to SQLite format (space separator)
+  // so that comparisons with datetime('now') work correctly.
   const result = await db
     .prepare(
       `UPDATE sessions
@@ -1206,15 +1207,15 @@ export async function markStaleSessions(db: D1Database): Promise<number> {
        WHERE status = 'active'
        AND id NOT IN (
          SELECT DISTINCT session_id FROM file_operations
-         WHERE timestamp > datetime('now', '-' || ? || ' hours')
+         WHERE datetime(timestamp) > datetime('now', '-' || ? || ' hours')
          UNION
          SELECT DISTINCT session_id FROM agent_responses
-         WHERE timestamp > datetime('now', '-' || ? || ' hours')
+         WHERE datetime(timestamp) > datetime('now', '-' || ? || ' hours')
          UNION
          SELECT DISTINCT session_id FROM prompts
-         WHERE timestamp > datetime('now', '-' || ? || ' hours')
+         WHERE datetime(timestamp) > datetime('now', '-' || ? || ' hours')
        )
-       AND started_at < datetime('now', '-' || ? || ' hours')`
+       AND datetime(started_at) < datetime('now', '-' || ? || ' hours')`
     )
     .bind(timeout, timeout, timeout, timeout)
     .run();
@@ -1235,13 +1236,13 @@ export async function createWebSession(db: D1Database, id: string, tokenHash: st
 
 export async function getWebSessionByTokenHash(db: D1Database, tokenHash: string): Promise<WebSession | null> {
   return db
-    .prepare("SELECT * FROM web_sessions WHERE token_hash = ? AND expires_at > datetime('now')")
+    .prepare("SELECT * FROM web_sessions WHERE token_hash = ? AND datetime(expires_at) > datetime('now')")
     .bind(tokenHash)
     .first<WebSession>();
 }
 
 export async function deleteExpiredWebSessions(db: D1Database): Promise<void> {
-  await db.prepare("DELETE FROM web_sessions WHERE expires_at < datetime('now')").run();
+  await db.prepare("DELETE FROM web_sessions WHERE datetime(expires_at) < datetime('now')").run();
 }
 
 // ============================================================================
@@ -1265,7 +1266,7 @@ export async function getActivityBlocksByUser(
   const result = await db
     .prepare(
       `SELECT * FROM activity_blocks
-       WHERE user_id = ? AND started_at > datetime('now', '-' || ? || ' days')
+       WHERE user_id = ? AND datetime(started_at) > datetime('now', '-' || ? || ' days')
        ORDER BY started_at DESC
        LIMIT ?`
     )
@@ -1283,7 +1284,7 @@ export async function getActivityBlocksByRepo(
   const result = await db
     .prepare(
       `SELECT * FROM activity_blocks
-       WHERE repo_name = ? AND started_at > datetime('now', '-' || ? || ' days')
+       WHERE repo_name = ? AND datetime(started_at) > datetime('now', '-' || ? || ' days')
        ORDER BY started_at DESC
        LIMIT ?`
     )

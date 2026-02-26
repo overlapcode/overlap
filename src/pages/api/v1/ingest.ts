@@ -266,6 +266,19 @@ export async function POST(context: APIContext) {
             );
             sessionCache.set(event.session_id, { id: event.session_id, status: 'active' } as Session);
             results.sessions_created++;
+          } else {
+            // Reactivate stale session if event is recent
+            const cached = sessionCache.get(event.session_id)!;
+            if (cached.status === 'stale') {
+              const eventAge = Date.now() - new Date(event.timestamp).getTime();
+              const staleMs = (teamConfig?.stale_timeout_hours ?? 8) * 60 * 60 * 1000;
+              if (eventAge < staleMs) {
+                statements.push(
+                  db.prepare(`UPDATE sessions SET status = 'active', ended_at = NULL WHERE id = ?`).bind(event.session_id)
+                );
+                cached.status = 'active' as Session['status'];
+              }
+            }
           }
 
           statements.push(
@@ -307,6 +320,19 @@ export async function POST(context: APIContext) {
             );
             sessionCache.set(event.session_id, { id: event.session_id, status: 'active' } as Session);
             results.sessions_created++;
+          } else {
+            // Reactivate stale session if event is recent
+            const cached = sessionCache.get(event.session_id)!;
+            if (cached.status === 'stale') {
+              const eventAge = Date.now() - new Date(event.timestamp).getTime();
+              const staleMs = (teamConfig?.stale_timeout_hours ?? 8) * 60 * 60 * 1000;
+              if (eventAge < staleMs) {
+                statements.push(
+                  db.prepare(`UPDATE sessions SET status = 'active', ended_at = NULL WHERE id = ?`).bind(event.session_id)
+                );
+                cached.status = 'active' as Session['status'];
+              }
+            }
           }
 
           statements.push(
@@ -352,6 +378,19 @@ export async function POST(context: APIContext) {
             );
             sessionCache.set(event.session_id, { id: event.session_id, status: 'active' } as Session);
             results.sessions_created++;
+          } else {
+            // Reactivate stale session if event is recent
+            const cached = sessionCache.get(event.session_id)!;
+            if (cached.status === 'stale') {
+              const eventAge = Date.now() - new Date(event.timestamp).getTime();
+              const staleMs = (teamConfig?.stale_timeout_hours ?? 8) * 60 * 60 * 1000;
+              if (eventAge < staleMs) {
+                statements.push(
+                  db.prepare(`UPDATE sessions SET status = 'active', ended_at = NULL WHERE id = ?`).bind(event.session_id)
+                );
+                cached.status = 'active' as Session['status'];
+              }
+            }
           }
 
           statements.push(
