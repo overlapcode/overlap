@@ -962,6 +962,7 @@ export async function queryOverlapsForFile(
   filePath: string,
   excludeUserId: string,
   excludeSessionId: string,
+  staleHours: number = 8,
 ): Promise<OverlapFileRow[]> {
   const result = await db
     .prepare(
@@ -975,7 +976,7 @@ export async function queryOverlapsForFile(
        JOIN members m ON s.user_id = m.user_id
        WHERE fo.repo_name = ? AND fo.file_path = ?
          AND fo.operation IN ('create', 'modify')
-         AND fo.timestamp > datetime('now', '-24 hours')
+         AND fo.timestamp > datetime('now', '-' || ? || ' hours')
          AND s.status = 'active'
          AND s.user_id != ?
          AND s.id != ?
@@ -985,7 +986,7 @@ export async function queryOverlapsForFile(
        ORDER BY MAX(fo.timestamp) DESC
        LIMIT 50`
     )
-    .bind(repoName, filePath, excludeUserId, excludeSessionId)
+    .bind(repoName, filePath, staleHours, excludeUserId, excludeSessionId)
     .all<OverlapFileRow>();
 
   return result.results;

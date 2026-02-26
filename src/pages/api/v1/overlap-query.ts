@@ -12,7 +12,7 @@
 import type { APIContext } from 'astro';
 import { z } from 'zod';
 import { authenticateTracer, errorResponse, successResponse } from '@lib/auth/middleware';
-import { queryOverlapsForFile, getLatestEditsForSessions, createOverlap } from '@lib/db/queries';
+import { queryOverlapsForFile, getLatestEditsForSessions, createOverlap, getTeamConfig } from '@lib/db/queries';
 
 const OverlapQuerySchema = z.object({
   repo_name: z.string().min(1),
@@ -120,6 +120,10 @@ export async function POST(context: APIContext) {
     return errorResponse('Invalid JSON payload', 400);
   }
 
+  // Use team's stale timeout as recency window for overlap detection
+  const config = await getTeamConfig(db);
+  const staleHours = config?.stale_timeout_hours ?? 8;
+
   // Query file operations from other users' active sessions
   const rows = await queryOverlapsForFile(
     db,
@@ -127,6 +131,7 @@ export async function POST(context: APIContext) {
     query.file_path,
     member.user_id,
     query.session_id,
+    staleHours,
   );
 
   if (rows.length === 0) {
@@ -233,11 +238,11 @@ function buildGuidance(overlaps: OverlapResult[], hasHardOverlap: boolean): stri
 
       if (o.is_pushed) {
         lines.push(
-          `${o.display_name} has already edited ${region} and pushed${branch}. Pull their changes before editing to avoid merge conflicts.`
+          `${o.display_name} edited ${region} and pushed${branch}. Check git origin for their changes — if you already pulled and this edit overwrites their work, decide whether to proceed or pull first.`
         );
       } else {
         lines.push(
-          `${o.display_name} is editing ${region}${branch} (changes not yet pushed). Coordinate before modifying this region to avoid duplicated work.`
+          `${o.display_name} is actively editing ${region}${branch} (changes not yet pushed). Coordinate before modifying this region to avoid duplicated work.`
         );
       }
 
