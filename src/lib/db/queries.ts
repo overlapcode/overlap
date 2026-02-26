@@ -773,9 +773,16 @@ async function fetchScopedEdits(
     if (strict.length > 0) return strict;
   }
 
-  // Fallback: all edits on this file that have actual diff content
+  // Fallback depends on scope:
+  // - file-scoped: all edits are relevant (the overlap IS about the whole file)
+  // - line/function-scoped: only the most recent edit with diff content (likely the trigger)
+  if (overlap.overlap_scope === 'file') {
+    return (await db.prepare(
+      `${baseQuery} AND (old_string IS NOT NULL OR new_string IS NOT NULL) ORDER BY timestamp ASC`
+    ).bind(sessionId, filePath).all<FileOperation>()).results;
+  }
   return (await db.prepare(
-    `${baseQuery} AND (old_string IS NOT NULL OR new_string IS NOT NULL) ORDER BY timestamp ASC`
+    `${baseQuery} AND (old_string IS NOT NULL OR new_string IS NOT NULL) ORDER BY timestamp DESC LIMIT 1`
   ).bind(sessionId, filePath).all<FileOperation>()).results;
 }
 
