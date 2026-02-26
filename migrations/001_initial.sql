@@ -157,7 +157,7 @@ CREATE TABLE IF NOT EXISTS overlaps (
     session_id_a TEXT,
     session_id_b TEXT,
     description TEXT,
-    decision TEXT DEFAULT 'warn',
+    decision TEXT,
     public_id TEXT,
     detected_at TEXT DEFAULT (datetime('now'))
 );

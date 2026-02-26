@@ -157,7 +157,7 @@ CREATE TABLE IF NOT EXISTS overlaps (
     session_id_a TEXT,
     session_id_b TEXT,
     description TEXT,
-    decision TEXT DEFAULT 'warn',
+    decision TEXT,
     public_id TEXT,
     detected_at TEXT DEFAULT (datetime('now'))
 );
@@ -237,9 +237,11 @@ const MIGRATIONS = [
   // v1.7.0: Composite index for real-time overlap query
   `CREATE INDEX IF NOT EXISTS idx_file_ops_overlap_query ON file_operations(repo_name, file_path, operation, timestamp DESC)`,
   // v1.8.0: Overlap decision (block/warn) and UUID public IDs
-  `ALTER TABLE overlaps ADD COLUMN decision TEXT DEFAULT 'warn'`,
+  `ALTER TABLE overlaps ADD COLUMN decision TEXT`,
   `ALTER TABLE overlaps ADD COLUMN public_id TEXT`,
   `CREATE UNIQUE INDEX IF NOT EXISTS idx_overlaps_public_id ON overlaps(public_id) WHERE public_id IS NOT NULL`,
+  // v1.8.1: Clear false 'warn' defaults on pre-existing overlaps (decision was never actually recorded)
+  `UPDATE overlaps SET decision = NULL WHERE public_id IS NULL`,
 ];
 
 export async function ensureMigrated(db: D1Database): Promise<void> {
