@@ -753,14 +753,16 @@ export async function getOverlaps(
  */
 function buildScopeFilter(overlap: OverlapWithMembers): { where: string; params: unknown[] } {
   if (overlap.overlap_scope === 'line' && overlap.start_line != null && overlap.end_line != null) {
+    // Include edits whose line range intersects OR that have diff content but no line info
     return {
-      where: 'AND start_line <= ? AND end_line >= ?',
+      where: 'AND ((start_line <= ? AND end_line >= ?) OR (start_line IS NULL AND (old_string IS NOT NULL OR new_string IS NOT NULL)))',
       params: [overlap.end_line, overlap.start_line],
     };
   }
   if (overlap.overlap_scope === 'function' && overlap.function_name) {
+    // Include edits matching the function OR that have diff content but no function info
     return {
-      where: 'AND function_name = ?',
+      where: 'AND (function_name = ? OR (function_name IS NULL AND (old_string IS NOT NULL OR new_string IS NOT NULL)))',
       params: [overlap.function_name],
     };
   }
