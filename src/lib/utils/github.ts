@@ -107,11 +107,18 @@ export function getFileUrl(
   filePath: string,
   githubBaseUrl: string | null,
   branch: string | null,
-  worktree: string | null
+  worktree: string | null,
+  repoName?: string | null
 ): string | null {
   if (!githubBaseUrl) return null;
   const effectiveBranch = branch || 'main';
-  const relativePath = getRelativeFilePath(filePath, worktree);
+  let relativePath = getRelativeFilePath(filePath, worktree);
+  // If still absolute after worktree stripping, try repo-name heuristic
+  if (relativePath.startsWith('/') && repoName) {
+    relativePath = stripRepoRoot(relativePath, repoName);
+  }
+  // If path is still absolute, we can't map it to a repo path — skip link
+  if (relativePath.startsWith('/')) return null;
   const encodedPath = relativePath.split('/').map(encodeURIComponent).join('/');
   return `${githubBaseUrl}/blob/${encodeBranchForUrl(effectiveBranch)}/${encodedPath}`;
 }

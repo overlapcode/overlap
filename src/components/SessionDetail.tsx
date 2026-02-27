@@ -216,7 +216,7 @@ const ActivityRow = memo(function ActivityRow({ activity, session, githubBaseUrl
       {activity.files && activity.files.length > 0 && (
         <div className="files-list" style={{ marginBottom: 'var(--space-sm)' }}>
           {activity.files.map((file, i) => {
-            const url = getFileUrl(file, githubBaseUrl, session.branch, session.worktree);
+            const url = getFileUrl(file, githubBaseUrl, session.branch, session.worktree, session.repo?.name);
             const fileName = file.split('/').pop();
             const key = `${i}:${file}`;
             return url ? (

@@ -258,7 +258,7 @@ export const ActivityCard = memo(function ActivityCard({ session }: ActivityCard
           {activity.files && activity.files.length > 0 && (
             <div className="files-list">
               {activity.files.slice(0, 5).map((file, i) => {
-                const url = getFileUrl(file, githubBaseUrl, branch, worktree);
+                const url = getFileUrl(file, githubBaseUrl, branch, worktree, repo?.name);
                 const fileName = file.split('/').pop();
                 const key = `${i}:${file}`;
                 return url ? (

@@ -275,4 +275,18 @@ export async function ensureMigrated(db: D1Database): Promise<void> {
       }
     }
   }
+
+  // Backfill public_id on overlaps that don't have one (crypto.randomUUID not available in SQL)
+  try {
+    const rows = await db.prepare(`SELECT id FROM overlaps WHERE public_id IS NULL`).all<{ id: number }>();
+    if (rows.results.length > 0) {
+      const stmts = rows.results.map((row) =>
+        db.prepare(`UPDATE overlaps SET public_id = ? WHERE id = ?`).bind(crypto.randomUUID(), row.id)
+      );
+      await db.batch(stmts);
+      console.log(`Backfilled public_id on ${rows.results.length} overlaps`);
+    }
+  } catch (error) {
+    console.error('public_id backfill error:', error instanceof Error ? error.message : String(error));
+  }
 }
