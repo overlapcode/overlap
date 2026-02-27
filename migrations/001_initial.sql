@@ -1,32 +1,29 @@
 -- ============================================================================
--- OVERLAP DATABASE SCHEMA v1.0.0
--- JSONL Tracer Architecture
+-- OVERLAP DATABASE SCHEMA
+-- Current as of v1.7.3
 -- ============================================================================
 --
--- This is the initial schema for Overlap v1.0.0, which uses a tracer binary
--- to parse coding agent session files and sync to the server.
+-- This file mirrors the SCHEMA constant in src/lib/db/migrate.ts.
+-- The auto-migration runs on every deploy, so this file is optional —
+-- but useful for manual setup: wrangler d1 execute overlap-db --file=migrations/001_initial.sql
 --
--- Run with: wrangler d1 execute overlap-db --file=migrations/001_initial.sql
+-- IMPORTANT: Keep this file in sync with the SCHEMA constant in migrate.ts.
 -- ============================================================================
 
--- ============================================================================
 -- SCHEMA_VERSION
--- Tracks database schema version for future migrations.
--- ============================================================================
+-- Tracks database schema version for migrations.
 CREATE TABLE IF NOT EXISTS schema_version (
     version INTEGER PRIMARY KEY,
     applied_at TEXT DEFAULT (datetime('now'))
 );
 INSERT OR IGNORE INTO schema_version (version) VALUES (1);
 
--- ============================================================================
 -- TEAM_CONFIG
 -- Single row (id=1). Stores team-level settings configured during /setup.
--- ============================================================================
 CREATE TABLE IF NOT EXISTS team_config (
     id INTEGER PRIMARY KEY CHECK (id = 1),
     team_name TEXT NOT NULL,
-    password_hash TEXT NOT NULL,
+    password_hash TEXT DEFAULT '',
     team_join_code TEXT NOT NULL,
     stale_timeout_hours INTEGER DEFAULT 8,
     llm_provider TEXT,
@@ -35,22 +32,19 @@ CREATE TABLE IF NOT EXISTS team_config (
     created_at TEXT DEFAULT (datetime('now'))
 );
 
--- ============================================================================
 -- REPOS
 -- Repositories registered by admin. Tracer only syncs registered repos.
--- ============================================================================
 CREATE TABLE IF NOT EXISTS repos (
     id TEXT PRIMARY KEY,
     name TEXT NOT NULL UNIQUE,
     display_name TEXT,
     description TEXT,
+    remote_url TEXT,
     created_at TEXT DEFAULT (datetime('now'))
 );
 
--- ============================================================================
 -- MEMBERS
 -- Team members. Each gets a unique token for the tracer binary.
--- ============================================================================
 CREATE TABLE IF NOT EXISTS members (
     user_id TEXT PRIMARY KEY,
     display_name TEXT NOT NULL,
@@ -62,10 +56,8 @@ CREATE TABLE IF NOT EXISTS members (
     updated_at TEXT DEFAULT (datetime('now'))
 );
 
--- ============================================================================
 -- SESSIONS
--- Coding agent sessions from JSONL ingestion.
--- ============================================================================
+-- Coding agent sessions. Created on first ingest, updated throughout.
 CREATE TABLE IF NOT EXISTS sessions (
     id TEXT PRIMARY KEY,
     user_id TEXT NOT NULL REFERENCES members(user_id),
@@ -96,10 +88,8 @@ CREATE TABLE IF NOT EXISTS sessions (
     updated_at TEXT DEFAULT (datetime('now'))
 );
 
--- ============================================================================
 -- FILE_OPERATIONS
 -- File operations extracted from tool_use messages.
--- ============================================================================
 CREATE TABLE IF NOT EXISTS file_operations (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     session_id TEXT NOT NULL REFERENCES sessions(id),
@@ -120,10 +110,8 @@ CREATE TABLE IF NOT EXISTS file_operations (
     created_at TEXT DEFAULT (datetime('now'))
 );
 
--- ============================================================================
 -- PROMPTS
 -- User prompts extracted from user messages.
--- ============================================================================
 CREATE TABLE IF NOT EXISTS prompts (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     session_id TEXT NOT NULL REFERENCES sessions(id),
@@ -137,10 +125,24 @@ CREATE TABLE IF NOT EXISTS prompts (
     created_at TEXT DEFAULT (datetime('now'))
 );
 
--- ============================================================================
+-- AGENT_RESPONSES
+-- Agent text and thinking responses extracted from assistant messages.
+CREATE TABLE IF NOT EXISTS agent_responses (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_id TEXT NOT NULL REFERENCES sessions(id),
+    user_id TEXT NOT NULL,
+    repo_id TEXT REFERENCES repos(id),
+    repo_name TEXT NOT NULL,
+    agent_type TEXT NOT NULL DEFAULT 'claude_code',
+    timestamp TEXT NOT NULL,
+    response_text TEXT,
+    response_type TEXT DEFAULT 'text',
+    turn_number INTEGER,
+    created_at TEXT DEFAULT (datetime('now'))
+);
+
 -- OVERLAPS
 -- Detected overlaps (file-level, prompt-level, directory-level).
--- ============================================================================
 CREATE TABLE IF NOT EXISTS overlaps (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     type TEXT NOT NULL,
@@ -162,10 +164,8 @@ CREATE TABLE IF NOT EXISTS overlaps (
     detected_at TEXT DEFAULT (datetime('now'))
 );
 
--- ============================================================================
 -- ACTIVITY_BLOCKS
 -- Goal-level groupings within a session. Requires LLM classification.
--- ============================================================================
 CREATE TABLE IF NOT EXISTS activity_blocks (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     session_id TEXT NOT NULL REFERENCES sessions(id),
@@ -182,20 +182,17 @@ CREATE TABLE IF NOT EXISTS activity_blocks (
     updated_at TEXT DEFAULT (datetime('now'))
 );
 
--- ============================================================================
 -- WEB_SESSIONS
 -- Browser sessions for authenticated dashboard access.
--- ============================================================================
 CREATE TABLE IF NOT EXISTS web_sessions (
     id TEXT PRIMARY KEY,
     token_hash TEXT UNIQUE NOT NULL,
+    user_id TEXT REFERENCES members(user_id),
     expires_at TEXT NOT NULL,
     created_at TEXT DEFAULT (datetime('now'))
 );
 
--- ============================================================================
 -- INDEXES
--- ============================================================================
 CREATE INDEX IF NOT EXISTS idx_sessions_status ON sessions(status);
 CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user_id, started_at DESC);
 CREATE INDEX IF NOT EXISTS idx_sessions_repo ON sessions(repo_name, started_at DESC);
@@ -205,11 +202,11 @@ CREATE INDEX IF NOT EXISTS idx_file_ops_user_time ON file_operations(user_id, ti
 CREATE INDEX IF NOT EXISTS idx_file_ops_repo_time ON file_operations(repo_name, timestamp DESC);
 CREATE INDEX IF NOT EXISTS idx_prompts_session ON prompts(session_id, turn_number);
 CREATE INDEX IF NOT EXISTS idx_prompts_repo ON prompts(repo_name, timestamp DESC);
+CREATE INDEX IF NOT EXISTS idx_agent_responses_session ON agent_responses(session_id, turn_number, timestamp);
 CREATE INDEX IF NOT EXISTS idx_overlaps_time ON overlaps(detected_at DESC);
 CREATE INDEX IF NOT EXISTS idx_overlaps_repo ON overlaps(repo_name, detected_at DESC);
 CREATE INDEX IF NOT EXISTS idx_members_token ON members(token_hash);
 CREATE INDEX IF NOT EXISTS idx_members_last_active ON members(last_active_at DESC);
-CREATE INDEX IF NOT EXISTS idx_file_ops_active ON file_operations(session_id, file_path, timestamp DESC);
 CREATE INDEX IF NOT EXISTS idx_web_sessions_token ON web_sessions(token_hash);
 CREATE INDEX IF NOT EXISTS idx_web_sessions_expires ON web_sessions(expires_at);
 CREATE INDEX IF NOT EXISTS idx_activity_blocks_session ON activity_blocks(session_id, block_index);
@@ -218,3 +215,9 @@ CREATE INDEX IF NOT EXISTS idx_activity_blocks_session ON activity_blocks(sessio
 CREATE UNIQUE INDEX IF NOT EXISTS idx_file_ops_dedup ON file_operations(session_id, timestamp, tool_name, file_path);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_prompts_dedup ON prompts(session_id, turn_number) WHERE turn_number IS NOT NULL;
 CREATE UNIQUE INDEX IF NOT EXISTS idx_agent_responses_dedup ON agent_responses(session_id, turn_number, response_type) WHERE turn_number IS NOT NULL;
+
+-- Composite index for real-time overlap query (POST /api/v1/overlap-query)
+CREATE INDEX IF NOT EXISTS idx_file_ops_overlap_query ON file_operations(repo_name, file_path, operation, timestamp DESC);
+
+-- Unique index on overlap public_id for UUID lookups
+CREATE UNIQUE INDEX IF NOT EXISTS idx_overlaps_public_id ON overlaps(public_id) WHERE public_id IS NOT NULL;

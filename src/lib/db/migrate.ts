@@ -216,6 +216,9 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_agent_responses_dedup ON agent_responses(s
 
 -- Composite index for real-time overlap query (POST /api/v1/overlap-query)
 CREATE INDEX IF NOT EXISTS idx_file_ops_overlap_query ON file_operations(repo_name, file_path, operation, timestamp DESC);
+
+-- Unique index on overlap public_id for UUID lookups
+CREATE UNIQUE INDEX IF NOT EXISTS idx_overlaps_public_id ON overlaps(public_id) WHERE public_id IS NOT NULL;
 `;
 
 /**
