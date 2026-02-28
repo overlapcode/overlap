@@ -7,14 +7,14 @@
  ╚═════╝   ╚═══╝  ╚══════╝╚═╝  ╚═╝╚══════╝╚═╝  ╚═╝╚═╝
 ```
 
-> See where your team's heads are at.
+> Stop your coding agents from writing conflicting code.
 
-Overlap is a **JSONL tracer + self-hosted dashboard** that tracks what you and your team are working on across Claude Code sessions, detects overlapping work, and displays a real-time timeline of team activity.
+Overlap is a **JSONL tracer + self-hosted dashboard** that prevents coding agents from stepping on each other. It detects when two agents are about to edit the same code, blocks conflicts before they ship, and gives your team real-time visibility into agent activity.
 
 ## Features
 
-- **Real-time Activity Feed** - See what everyone's working on as it happens
-- **Real-Time Coordination** - Your agent warns you before editing the same function a teammate is working on
+- **Conflict Prevention** - Automatically blocks agents from editing code a teammate's agent is already working on
+- **Real-Time Coordination** - Detects collisions at the file, function, and line level before they become merge conflicts
 - **Smart Overlap Detection** - Line-level and function-level matching catches conflicts early
 - **Full History Backfill** - Sync all your historical sessions on first join
 - **LLM-Powered Summaries** - AI summarizes what you're doing (BYOK)
