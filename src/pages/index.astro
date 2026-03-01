@@ -31,7 +31,7 @@ if (Astro.locals.runtime?.env?.DB) {
 
     // Heartbeat to Overlap Cloud (once daily, non-blocking)
     try {
-      await maybeHeartbeat(db);
+      await maybeHeartbeat(db, Astro.url.origin);
     } catch { /* non-fatal */ }
   }
 

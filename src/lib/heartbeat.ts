@@ -20,7 +20,7 @@ async function hashString(input: string): Promise<string> {
   return hashArray.map(b => b.toString(16).padStart(2, '0')).join('').slice(0, 16);
 }
 
-export async function maybeHeartbeat(db: D1Database): Promise<void> {
+export async function maybeHeartbeat(db: D1Database, instanceUrl: string): Promise<void> {
   if (Date.now() - lastHeartbeat < HEARTBEAT_INTERVAL_MS) return;
   lastHeartbeat = Date.now();
 
@@ -39,8 +39,8 @@ export async function maybeHeartbeat(db: D1Database): Promise<void> {
     FROM overlaps
   `).first<{ total: number; warns: number; blocks: number }>();
 
-  // Stable anonymous instance ID
-  const instanceHash = await hashString(`${config.team_name}:${config.team_join_code}`);
+  // Stable anonymous instance ID — must match tracer's hash (which hashes instance_url)
+  const instanceHash = await hashString(instanceUrl);
 
   await fetch(HEARTBEAT_URL, {
     method: 'POST',
