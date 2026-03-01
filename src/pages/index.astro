@@ -7,6 +7,7 @@ import { Timeline } from '@components/Timeline';
 import { getSessionData } from '@lib/auth/session';
 import { getTeamConfig, markStaleSessions, deleteExpiredWebSessions } from '@lib/db/queries';
 import { ensureMigrated } from '@lib/db/migrate';
+import { maybeHeartbeat } from '@lib/heartbeat';
 
 // Get session data from cookie
 let sessionData = null;
@@ -26,6 +27,11 @@ if (Astro.locals.runtime?.env?.DB) {
     try {
       await markStaleSessions(db);
       await deleteExpiredWebSessions(db);
+    } catch { /* non-fatal */ }
+
+    // Heartbeat to Overlap Cloud (once daily, non-blocking)
+    try {
+      await maybeHeartbeat(db);
     } catch { /* non-fatal */ }
   }
 
