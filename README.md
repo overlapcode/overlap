@@ -19,7 +19,7 @@ Overlap is a **JSONL tracer + self-hosted dashboard** that prevents coding agent
 - **Full History Backfill** - Sync all your historical sessions on first join
 - **LLM-Powered Summaries** - AI summarizes what you're doing (BYOK)
 - **Personal History** - Searchable timeline of all your sessions
-- **Self-Hosted & Private** - Your data stays on your infrastructure
+- **Self-Hosted & Private** - All session data stays on your infrastructure; anonymous telemetry pings overlap.dev for version checks
 - **Zero Platform Cost** - Deploy to Cloudflare free tier
 
 ## How It Works

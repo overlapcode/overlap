@@ -20,7 +20,7 @@ Overlap is a **JSONL tracer + self-hosted Cloudflare service** that:
 | Backend | Cloudflare Pages Functions |
 | Database | Cloudflare D1 (SQLite) |
 | Real-time | Server-Sent Events (SSE) |
-| Tracer | Standalone binary (Go/Rust) |
+| Tracer | Compiled Bun binary (TypeScript) |
 | LLM Providers | Anthropic, OpenAI, xAI, Google + heuristic fallback |
 
 ### How It Works
@@ -185,8 +185,7 @@ export function ActivityCard({ session, member, onSelect }: ActivityCardProps) {
 ```
 
 Styling approach:
-- Use Tailwind CSS for utility classes
-- Custom CSS in `src/styles/` for complex components
+- Custom CSS with CSS variables in `src/styles/` for all components
 - Follow Claude Code color palette from spec
 
 ### SSE Patterns
