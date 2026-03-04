@@ -33,7 +33,7 @@ Overlap is a **JSONL tracer + self-hosted dashboard** that prevents coding agent
                                │
                                ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│                   CLOUDFLARE PAGES                               │
+│                  CLOUDFLARE WORKERS                               │
 │   Dashboard + API endpoints + SSE streaming                      │
 └──────────────────────────────┬──────────────────────────────────┘
                                │
@@ -73,7 +73,7 @@ curl -fsSL https://overlap.dev/install.sh | sh
 
 ```bash
 # Join and backfill your full history
-overlap join https://your-team.pages.dev
+overlap join https://your-team.workers.dev
 
 # Start the background sync daemon
 overlap start
@@ -96,11 +96,12 @@ Share your Overlap URL with team members. They can:
 | Command | Description |
 |---------|-------------|
 | `overlap join <url>` | Join a team and backfill history |
+| `overlap login` | Open dashboard in browser |
 | `overlap start` | Start background sync daemon |
 | `overlap stop` | Stop the daemon |
 | `overlap status` | Show sync status |
-| `overlap sync` | Manual sync trigger |
-| `overlap config` | View/edit configuration |
+| `overlap update` | Update to the latest version |
+| `overlap backfill` | Re-sync all sessions |
 
 ## Manual Deploy
 
@@ -125,10 +126,10 @@ Configure an LLM provider for better activity summaries:
 | Provider | Models | Cost |
 |----------|--------|------|
 | Heuristic | Path-based | Free |
-| Anthropic | Claude Haiku 3.5, Sonnet 4 | $-$$ |
-| OpenAI | GPT-4o, GPT-4o Mini | $-$$ |
-| Google | Gemini 2.0 Flash | $ |
-| xAI | Grok 2 | $$ |
+| Anthropic | Claude Haiku 4.5 | $ |
+| OpenAI | GPT-5 Nano | $ |
+| Google | Gemini 2.5 Flash Lite | $ |
+| xAI | Grok 4 Fast | $ |
 
 Configure in Dashboard → Settings → LLM.
 
@@ -189,7 +190,7 @@ brew upgrade overlapdev/tap/overlap
 
 ### Check Version
 
-Visit `https://your-instance.pages.dev/api/v1/version`
+Visit `https://your-instance.workers.dev/api/v1/version`
 
 ## License
 
