@@ -34,7 +34,7 @@ export async function GET(context: APIContext) {
     const insights = await getInsights(db, scope, userId, periodType ?? undefined);
 
     // Auto-expire stuck "generating" insights (waitUntil may have been killed)
-    const STUCK_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
+    const STUCK_TIMEOUT_MS = 10 * 60 * 1000; // 10 minutes — larger models need more time
     const now = Date.now();
     for (const insight of insights) {
       if (insight.status === 'generating' && insight.created_at) {

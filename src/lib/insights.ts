@@ -393,7 +393,7 @@ export async function generateSessionFacets(
   periodEnd: string,
   teamConfig: TeamConfig,
   encryptionKey: string,
-  _modelOverride?: string,
+  modelOverride?: string,
 ): Promise<{ generated: number; total: number }> {
   const sessions = await getSessionsWithoutFacets(db, userId, periodStart, periodEnd);
   if (sessions.length === 0) {
@@ -416,9 +416,7 @@ export async function generateSessionFacets(
   }
 
   const apiKey = await decrypt(teamConfig.llm_api_key_encrypted, encryptionKey);
-  // Always use the fast default model for facet extraction — structured metadata
-  // doesn't need a large model, and using Sonnet/GPT-4o here causes timeouts.
-  const model = '';
+  const model = modelOverride || teamConfig.llm_model || '';
 
   let generated = 0;
   const totalBatches = Math.ceil(contexts.length / SESSIONS_PER_LLM_BATCH);
