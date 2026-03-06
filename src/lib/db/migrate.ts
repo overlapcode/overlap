@@ -242,9 +242,6 @@ CREATE INDEX IF NOT EXISTS idx_insights_user ON insights(user_id, period_type, p
 CREATE INDEX IF NOT EXISTS idx_insights_scope ON insights(scope, period_type, period_start DESC);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_insights_dedup ON insights(scope, COALESCE(user_id, '__team__'), period_type, period_start);
 
--- SESSION_FACETS
--- Per-session LLM analysis (Layer 1 of two-layer insight generation).
--- Each session is analyzed individually; facets are aggregated for period insights.
 CREATE TABLE IF NOT EXISTS session_facets (
     id TEXT PRIMARY KEY,
     session_id TEXT NOT NULL REFERENCES sessions(id),
