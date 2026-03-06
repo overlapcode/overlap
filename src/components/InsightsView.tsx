@@ -115,7 +115,7 @@ function getInsightSessionCount(insight: { content: string | null } | null): num
 
 export function InsightsView() {
   const [scope, setScope] = useState<InsightScope>('user');
-  const [periodType, setPeriodType] = useState<InsightPeriodType>('month');
+  const [periodType, setPeriodType] = useState<InsightPeriodType>('week');
   const [insights, setInsights] = useState<Insight[]>([]);
   const [available, setAvailable] = useState<PeriodInfo[]>([]);
   const [selectedPeriod, setSelectedPeriod] = useState<string | null>(null);
@@ -128,6 +128,7 @@ export function InsightsView() {
   const [llmProvider, setLlmProvider] = useState<string | null>(null);
   const [selectedModel, setSelectedModel] = useState<string>('');
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const hasLoadedRef = useRef(false);
 
   // Clean up polling on unmount
   useEffect(() => {
@@ -135,7 +136,7 @@ export function InsightsView() {
   }, []);
 
   const fetchInsights = useCallback(async () => {
-    setLoading(true);
+    if (!hasLoadedRef.current) setLoading(true);
     setError(null);
     try {
       const resp = await fetchWithTimeout(
@@ -154,6 +155,7 @@ export function InsightsView() {
       setError(err instanceof Error ? err.message : 'Failed to load insights');
     } finally {
       setLoading(false);
+      hasLoadedRef.current = true;
     }
   }, [scope, periodType]);
 
