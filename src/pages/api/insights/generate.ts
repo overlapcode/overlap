@@ -175,16 +175,18 @@ export async function POST(context: APIContext) {
           );
           log('narrative:done');
         } catch (llmError) {
-          log('narrative:error', llmError instanceof Error ? llmError.message : String(llmError));
+          const errMsg = llmError instanceof Error ? llmError.message : String(llmError);
+          log('narrative:error', errMsg);
           console.error('LLM insight synthesis error:', llmError);
           synthesis = {
-            summary: `${aggregated.stats.total_sessions} sessions during ${periodLabel}.`,
+            summary: `${aggregated.stats.total_sessions} sessions during ${periodLabel}. (LLM analysis failed)`,
             highlights: [`${aggregated.stats.total_sessions} sessions`, `${aggregated.stats.total_files_touched} files touched`],
             project_areas: [],
             friction_analysis: [],
             accomplishments: [],
-            narrative: 'LLM analysis unavailable. Configure an LLM provider in settings for richer insights.',
-            recommendations: [{ title: 'Configure LLM', description: 'Set up an LLM provider for AI-generated insights.' }],
+            narrative: 'LLM analysis unavailable — the report shows stats only. Check your API key in Settings.',
+            recommendations: [{ title: 'LLM Error', description: errMsg }],
+            llm_error: errMsg,
           };
         }
 

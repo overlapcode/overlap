@@ -111,7 +111,10 @@ const providers: Record<string, LLMProvider> = {
         headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
         body: JSON.stringify({ model: model || 'claude-haiku-4-5', max_tokens: maxTokens, messages: [{ role: 'user', content: prompt }] }),
       });
-      if (!resp.ok) throw new Error(`Anthropic API error: ${resp.status}`);
+      if (!resp.ok) {
+        const body = await resp.text().catch(() => '');
+        throw new Error(`Anthropic API error ${resp.status}: ${body.slice(0, 300)}`);
+      }
       const data = (await resp.json()) as { content: Array<{ type: string; text?: string }> };
       return data.content.find((c) => c.type === 'text')?.text?.trim() || '{}';
     },
@@ -123,7 +126,10 @@ const providers: Record<string, LLMProvider> = {
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
         body: JSON.stringify({ model: model || 'gpt-4o-mini', max_tokens: maxTokens, messages: [{ role: 'user', content: prompt }] }),
       });
-      if (!resp.ok) throw new Error(`OpenAI API error: ${resp.status}`);
+      if (!resp.ok) {
+        const body = await resp.text().catch(() => '');
+        throw new Error(`OpenAI API error ${resp.status}: ${body.slice(0, 300)}`);
+      }
       const data = (await resp.json()) as { choices: Array<{ message: { content: string } }> };
       return data.choices[0]?.message?.content?.trim() || '{}';
     },
@@ -135,7 +141,10 @@ const providers: Record<string, LLMProvider> = {
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
         body: JSON.stringify({ model: model || 'grok-4-fast-non-reasoning', max_tokens: maxTokens, messages: [{ role: 'user', content: prompt }] }),
       });
-      if (!resp.ok) throw new Error(`xAI API error: ${resp.status}`);
+      if (!resp.ok) {
+        const body = await resp.text().catch(() => '');
+        throw new Error(`xAI API error ${resp.status}: ${body.slice(0, 300)}`);
+      }
       const data = (await resp.json()) as { choices: Array<{ message: { content: string } }> };
       return data.choices[0]?.message?.content?.trim() || '{}';
     },
@@ -148,7 +157,10 @@ const providers: Record<string, LLMProvider> = {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { maxOutputTokens: maxTokens } }),
       });
-      if (!resp.ok) throw new Error(`Google API error: ${resp.status}`);
+      if (!resp.ok) {
+        const body = await resp.text().catch(() => '');
+        throw new Error(`Google API error ${resp.status}: ${body.slice(0, 300)}`);
+      }
       const data = (await resp.json()) as { candidates: Array<{ content: { parts: Array<{ text: string }> } }> };
       return data.candidates[0]?.content?.parts[0]?.text?.trim() || '{}';
     },
