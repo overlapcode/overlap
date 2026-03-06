@@ -11,6 +11,12 @@ type SessionInfo = {
   branch: string | null;
   worktree: string | null;
   agent_type?: string;
+  model?: string | null;
+  total_cost_usd?: number | null;
+  num_turns?: number;
+  duration_ms?: number | null;
+  generated_summary?: string | null;
+  result_summary?: string | null;
   status: 'active' | 'stale' | 'ended';
   started_at: string;
   last_activity_at: string;
@@ -79,15 +85,44 @@ function ExpandableText({ text, limit, style }: { text: string; limit: number; s
   );
 }
 
+function getModelLabel(model: string | null | undefined): string | null {
+  if (!model) return null;
+  const lower = model.toLowerCase();
+  if (lower.includes('opus')) return 'Opus';
+  if (lower.includes('sonnet')) return 'Sonnet';
+  if (lower.includes('haiku')) return 'Haiku';
+  if (lower.includes('gpt-4')) return 'GPT-4';
+  if (lower.includes('gpt-3')) return 'GPT-3.5';
+  if (lower.includes('claude')) return 'Claude';
+  return model.split('-')[0];
+}
+
+function getModelColor(model: string | null | undefined): string {
+  if (!model) return 'var(--accent-blue)';
+  const lower = model.toLowerCase();
+  if (lower.includes('sonnet')) return 'var(--accent-green)';
+  if (lower.includes('opus')) return 'var(--accent-blue)';
+  if (lower.includes('haiku')) return 'var(--accent-gold)';
+  return 'var(--accent-blue)';
+}
+
+function formatCost(cost: number | null | undefined): string | null {
+  if (cost === null || cost === undefined || cost === 0) return null;
+  if (cost < 0.01) return '<$0.01';
+  return `$${cost.toFixed(2)}`;
+}
+
 function SessionHeader({ session }: { session: SessionInfo }) {
   const relativeTime = useRelativeTime(session.last_activity_at);
   const githubBaseUrl = parseGitHubUrl(session.repo?.remote_url ?? null) ?? deriveGitHubUrl(session.repo?.name);
   const branchUrl = getBranchUrl(githubBaseUrl, session.branch);
   const agentLabel = getAgentLabel(session.agent_type);
+  const modelLabel = getModelLabel(session.model);
+  const costLabel = formatCost(session.total_cost_usd);
 
   return (
     <div className="card" style={{ marginBottom: 'var(--space-lg)' }}>
-      {/* User + Device + Status + Agent */}
+      {/* User + Device + Status + Agent + Model + Turns + Cost */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-sm)', flexWrap: 'wrap', marginBottom: 'var(--space-md)' }}>
         <span style={{ fontWeight: 600, fontSize: '1.125rem' }}>{session.user.name}</span>
         <span className="text-muted">·</span>
@@ -116,6 +151,48 @@ function SessionHeader({ session }: { session: SessionInfo }) {
               }}
             >
               {agentLabel}
+            </span>
+          </>
+        )}
+        {modelLabel && (
+          <>
+            <span className="text-muted">·</span>
+            <span
+              style={{
+                fontSize: '0.6875rem',
+                padding: '2px 6px',
+                borderRadius: '4px',
+                backgroundColor: 'var(--bg-elevated)',
+                color: getModelColor(session.model),
+                fontFamily: 'var(--font-mono)',
+              }}
+            >
+              {modelLabel}
+            </span>
+          </>
+        )}
+        {session.num_turns != null && session.num_turns > 0 && (
+          <>
+            <span className="text-muted">·</span>
+            <span className="text-secondary" style={{ fontSize: '0.8125rem' }}>
+              {session.num_turns} turn{session.num_turns !== 1 ? 's' : ''}
+            </span>
+          </>
+        )}
+        {costLabel && (
+          <>
+            <span className="text-muted">·</span>
+            <span
+              style={{
+                fontSize: '0.6875rem',
+                padding: '2px 6px',
+                borderRadius: '4px',
+                backgroundColor: 'var(--bg-elevated)',
+                color: 'var(--accent-green)',
+                fontFamily: 'var(--font-mono)',
+              }}
+            >
+              {costLabel}
             </span>
           </>
         )}
@@ -227,11 +304,12 @@ const ActivityRow = memo(function ActivityRow({ activity, session, githubBaseUrl
                 rel="noopener noreferrer"
                 className="file-tag file-tag-link"
                 title={getRelativeFilePath(file, session.worktree)}
+                data-tooltip={getRelativeFilePath(file, session.worktree)}
               >
                 {fileName}
               </a>
             ) : (
-              <span key={key} className="file-tag" title={file}>
+              <span key={key} className="file-tag" title={file} data-tooltip={file}>
                 {fileName}
               </span>
             );

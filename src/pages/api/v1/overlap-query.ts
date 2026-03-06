@@ -224,6 +224,18 @@ export async function POST(context: APIContext) {
   return successResponse({ decision, overlaps, guidance });
 }
 
+/** Format a relative time string for server-side use (no React hooks). */
+function formatRelativeTimeSimple(isoDate: string): string {
+  const diffMs = Date.now() - new Date(isoDate).getTime();
+  const minutes = Math.floor(diffMs / 60000);
+  if (minutes < 1) return 'just now';
+  if (minutes < 60) return `${minutes} min ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  return `${days}d ago`;
+}
+
 /**
  * Build a guidance note based on overlap data.
  */
@@ -246,6 +258,13 @@ function buildGuidance(overlaps: OverlapResult[], hasHardOverlap: boolean): stri
         );
       }
 
+      if (o.summary) {
+        lines.push(`They are working on: ${o.summary}`);
+      }
+      if (o.started_at) {
+        lines.push(`Session started ${formatRelativeTimeSimple(o.started_at)}.`);
+      }
+
       if (o.latest_edit) {
         const old = o.latest_edit.old_string ? `"${o.latest_edit.old_string}"` : '(new content)';
         const nw = o.latest_edit.new_string ? `"${o.latest_edit.new_string}"` : '(deleted)';
@@ -259,6 +278,9 @@ function buildGuidance(overlaps: OverlapResult[], hasHardOverlap: boolean): stri
     lines.push(
       `${first.display_name} is working in the same file${branch}. Be aware of their changes near ${regionDesc(first)}.`
     );
+    if (first.summary) {
+      lines.push(`Their current task: ${first.summary}`);
+    }
   }
 
   return lines.join('\n');

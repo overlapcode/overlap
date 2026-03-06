@@ -4,7 +4,7 @@
  */
 
 import type { D1Database } from '@cloudflare/workers-types';
-import { getTeamConfig } from './db/queries';
+import { getTeamConfig, estimateCostFromTokens } from './db/queries';
 import { VERSION } from './version';
 
 const HEARTBEAT_URL = 'https://overlap.dev/api/v1/heartbeat';
@@ -39,6 +39,36 @@ export async function maybeHeartbeat(db: D1Database, instanceUrl: string): Promi
     FROM overlaps
   `).first<{ total: number; warns: number; blocks: number }>();
 
+  // Estimated savings from overlaps (all-time)
+  const savingsRows = await db.prepare(`
+    SELECT
+      o.decision,
+      sa.total_cost_usd as cost_a, sa.total_input_tokens as input_a, sa.total_output_tokens as output_a,
+      sa.cache_creation_tokens as cache_create_a, sa.cache_read_tokens as cache_read_a, sa.model as model_a,
+      sb.total_cost_usd as cost_b, sb.total_input_tokens as input_b, sb.total_output_tokens as output_b,
+      sb.cache_creation_tokens as cache_create_b, sb.cache_read_tokens as cache_read_b, sb.model as model_b
+    FROM overlaps o
+    LEFT JOIN sessions sa ON o.session_id_a = sa.id
+    LEFT JOIN sessions sb ON o.session_id_b = sb.id
+  `).all();
+
+  let estimatedSavings = 0;
+  for (const row of savingsRows.results as Record<string, unknown>[]) {
+    const rawCostA = row.cost_a as number | null;
+    const costA = (rawCostA != null && rawCostA > 0) ? rawCostA : estimateCostFromTokens(
+      row.model_a as string | null, row.input_a as number | null, row.output_a as number | null,
+      row.cache_create_a as number | null, row.cache_read_a as number | null,
+    );
+    const rawCostB = row.cost_b as number | null;
+    const costB = (rawCostB != null && rawCostB > 0) ? rawCostB : estimateCostFromTokens(
+      row.model_b as string | null, row.input_b as number | null, row.output_b as number | null,
+      row.cache_create_b as number | null, row.cache_read_b as number | null,
+    );
+    const maxCost = Math.max(costA, costB);
+    if (row.decision === 'block') estimatedSavings += maxCost;
+    else if (row.decision === 'warn') estimatedSavings += maxCost * 0.5;
+  }
+
   // Stable anonymous instance ID — must match tracer's hash (which hashes instance_url)
   const instanceHash = await hashString(instanceUrl);
 
@@ -53,6 +83,7 @@ export async function maybeHeartbeat(db: D1Database, instanceUrl: string): Promi
       total_overlaps: overlapStats?.total ?? 0,
       total_warns: overlapStats?.warns ?? 0,
       total_blocks: overlapStats?.blocks ?? 0,
+      estimated_savings_usd: Math.round(estimatedSavings * 100) / 100,
     }),
     signal: AbortSignal.timeout(3000),
   });

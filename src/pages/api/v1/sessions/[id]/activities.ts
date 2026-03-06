@@ -236,6 +236,12 @@ export async function GET(context: APIContext) {
         detail.started_at,
       ].filter(Boolean).sort().pop() ?? detail.started_at,
       ended_at: detail.ended_at,
+      model: detail.model ?? null,
+      total_cost_usd: detail.total_cost_usd ?? null,
+      num_turns: detail.num_turns ?? 0,
+      duration_ms: detail.duration_ms ?? null,
+      generated_summary: detail.generated_summary ?? null,
+      result_summary: detail.result_summary ?? null,
     };
 
     const formattedBlocks: FormattedBlock[] = blocks.map((b) => ({

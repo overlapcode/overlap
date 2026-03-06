@@ -95,6 +95,18 @@ function getModelLabel(model: string | null | undefined): string | null {
   return model.split('-')[0];
 }
 
+/**
+ * Get model-specific badge color
+ */
+function getModelColor(model: string | null | undefined): string {
+  if (!model) return 'var(--accent-blue)';
+  const lower = model.toLowerCase();
+  if (lower.includes('sonnet')) return 'var(--accent-green)';
+  if (lower.includes('opus')) return 'var(--accent-blue)';
+  if (lower.includes('haiku')) return 'var(--accent-gold)';
+  return 'var(--accent-blue)';
+}
+
 export const ActivityCard = memo(function ActivityCard({ session }: ActivityCardProps) {
   const { user, device, repo, branch, worktree, status, last_activity_at, activity, model, total_cost_usd, num_turns, agent_type } = session;
   const relativeTime = useRelativeTime(last_activity_at || session.started_at);
@@ -201,7 +213,7 @@ export const ActivityCard = memo(function ActivityCard({ session }: ActivityCard
                   padding: '1px 6px',
                   borderRadius: '4px',
                   backgroundColor: 'var(--bg-elevated)',
-                  color: 'var(--accent-blue)',
+                  color: getModelColor(model),
                   fontFamily: 'var(--font-mono)',
                 }}
               >
@@ -269,12 +281,13 @@ export const ActivityCard = memo(function ActivityCard({ session }: ActivityCard
                     rel="noopener noreferrer"
                     className="file-tag file-tag-link"
                     title={getRelativeFilePath(file, worktree)}
+                    data-tooltip={getRelativeFilePath(file, worktree)}
                     onClick={(e) => e.stopPropagation()}
                   >
                     {fileName}
                   </a>
                 ) : (
-                  <span key={key} className="file-tag" title={file}>
+                  <span key={key} className="file-tag" title={file} data-tooltip={file}>
                     {fileName}
                   </span>
                 );

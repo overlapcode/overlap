@@ -133,6 +133,7 @@ export async function POST(context: APIContext) {
   const endedSessions = new Set<string>();
   const eventCountIncrements = new Map<string, number>();
   const promptsForClassification: Array<{ sessionId: string; userId: string; repoName: string; promptText: string; timestamp: string }> = [];
+  const sessionTokenUpdates = new Map<string, { input: number; output: number; cacheCreate: number; cacheRead: number }>();
 
   for (const event of payload.events) {
     try {
@@ -419,6 +420,18 @@ export async function POST(context: APIContext) {
           throw new Error(`Unknown event type: ${(event as IngestEvent).event_type}`);
       }
 
+      // Track highest token totals per session (tracer sends running totals on every event)
+      if (event.total_input_tokens != null || event.total_output_tokens != null ||
+          event.cache_creation_tokens != null || event.cache_read_tokens != null) {
+        const prev = sessionTokenUpdates.get(event.session_id);
+        sessionTokenUpdates.set(event.session_id, {
+          input: Math.max(prev?.input ?? 0, event.total_input_tokens ?? 0),
+          output: Math.max(prev?.output ?? 0, event.total_output_tokens ?? 0),
+          cacheCreate: Math.max(prev?.cacheCreate ?? 0, event.cache_creation_tokens ?? 0),
+          cacheRead: Math.max(prev?.cacheRead ?? 0, event.cache_read_tokens ?? 0),
+        });
+      }
+
       results.processed++;
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error';
@@ -426,10 +439,23 @@ export async function POST(context: APIContext) {
     }
   }
 
-  // ── Phase 3: Add event count increments + member active ─────────────
+  // ── Phase 3: Add event count increments, token totals, + member active ──
   for (const [sessionId, count] of eventCountIncrements) {
     statements.push(
       db.prepare(`UPDATE sessions SET summary_event_count = summary_event_count + ? WHERE id = ?`).bind(count, sessionId)
+    );
+  }
+  // Flush per-session token totals (one update per session, using MAX to keep highest)
+  for (const [sessionId, tokens] of sessionTokenUpdates) {
+    statements.push(
+      db.prepare(
+        `UPDATE sessions SET
+          total_input_tokens = MAX(COALESCE(total_input_tokens, 0), ?),
+          total_output_tokens = MAX(COALESCE(total_output_tokens, 0), ?),
+          cache_creation_tokens = MAX(COALESCE(cache_creation_tokens, 0), ?),
+          cache_read_tokens = MAX(COALESCE(cache_read_tokens, 0), ?)
+        WHERE id = ?`
+      ).bind(tokens.input, tokens.output, tokens.cacheCreate, tokens.cacheRead, sessionId)
     );
   }
   statements.push(

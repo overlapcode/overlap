@@ -315,6 +315,12 @@ export type TeamStats = {
     session_count: number;
     user_count: number;
   }>;
+  savings: {
+    estimated_savings_usd: number;
+    overlap_count: number;
+    block_count: number;
+    warn_count: number;
+  };
 };
 
 // Overlap with member names for display

@@ -19,6 +19,7 @@
   --accent-orange: #d97757;
   --accent-blue: #6a9bcc;
   --accent-green: #788c5d;
+  --accent-gold: #c4a35a;
 
   /* Status colors */
   --status-active: #d97757;
@@ -248,4 +249,40 @@ a:hover {
 .footer-link:hover {
   color: var(--accent-blue);
   text-decoration: underline;
+}
+
+/* File path tooltip (replaces unreliable native title) */
+.file-tag[data-tooltip],
+.file-tag-link[data-tooltip] {
+  position: relative;
+}
+
+.file-tag[data-tooltip]:hover::before,
+.file-tag-link[data-tooltip]:hover::before {
+  content: attr(data-tooltip);
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 4px 8px;
+  background-color: var(--bg-elevated);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-size: 0.6875rem;
+  font-family: var(--font-mono);
+  white-space: nowrap;
+  z-index: 10;
+  pointer-events: none;
+}
+
+/* @pierre/diffs theme overrides */
+:root {
+  --diffs-dark-bg: var(--bg-surface);
+  --diffs-dark: var(--text-primary);
+  --diffs-dark-addition-color: var(--accent-green);
+  --diffs-dark-deletion-color: var(--accent-orange);
+  --diffs-font-family: var(--font-mono);
+  --diffs-font-size: 13px;
+  --diffs-line-height: 20px;
 }

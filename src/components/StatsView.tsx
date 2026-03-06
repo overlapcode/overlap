@@ -30,6 +30,12 @@ type TeamStats = {
     session_count: number;
     user_count: number;
   }>;
+  savings: {
+    estimated_savings_usd: number;
+    overlap_count: number;
+    block_count: number;
+    warn_count: number;
+  };
 };
 
 function formatDuration(ms: number): string {
@@ -43,6 +49,15 @@ function formatDuration(ms: number): string {
 function formatCost(cost: number): string {
   if (cost < 0.01) return '<$0.01';
   return `$${cost.toFixed(2)}`;
+}
+
+function getModelColor(model: string | null | undefined): string {
+  if (!model) return 'var(--accent-blue)';
+  const lower = model.toLowerCase();
+  if (lower.includes('sonnet')) return 'var(--accent-green)';
+  if (lower.includes('opus')) return 'var(--accent-blue)';
+  if (lower.includes('haiku')) return 'var(--accent-gold)';
+  return 'var(--accent-blue)';
 }
 
 export function StatsView() {
@@ -149,58 +164,69 @@ export function StatsView() {
           <div className="text-muted" style={{ fontSize: '0.75rem', marginBottom: 'var(--space-xs)' }}>Files Touched</div>
           <div style={{ fontSize: '2rem', fontWeight: 600 }}>{stats.total_files}</div>
         </div>
-      </div>
-
-      {/* By member */}
-      <div className="card" style={{ marginBottom: 'var(--space-lg)' }}>
-        <h2 style={{ fontSize: '1rem', marginBottom: 'var(--space-md)' }}>By Member</h2>
-        {stats.by_member.length === 0 ? (
-          <p className="text-muted">No sessions in this period</p>
-        ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-sm)' }}>
-            {stats.by_member.map((m) => (
-              <a key={m.user_id} href={`/?userId=${encodeURIComponent(m.user_id)}`} style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-md)', textDecoration: 'none', color: 'inherit' }}>
-                <div style={{ flex: 1 }}>
-                  <span style={{ fontWeight: 500 }} className="footer-link">{m.display_name}</span>
-                </div>
-                <span className="text-secondary" style={{ fontSize: '0.875rem' }}>{m.session_count} sessions</span>
-                <span style={{ fontSize: '0.875rem', color: 'var(--accent-green)', fontFamily: 'var(--font-mono)' }}>
-                  {formatCost(m.total_cost)}
-                </span>
-              </a>
-            ))}
+        <div className="card" style={{ textAlign: 'center' }}>
+          <div className="text-muted" style={{ fontSize: '0.75rem', marginBottom: 'var(--space-xs)' }}>Est. Savings</div>
+          <div style={{ fontSize: '2rem', fontWeight: 600, color: 'var(--accent-orange)' }}>
+            {stats.savings.estimated_savings_usd < 0.01 ? '$0.00' : `$${stats.savings.estimated_savings_usd.toFixed(2)}`}
           </div>
-        )}
-      </div>
-
-      {/* By repo */}
-      <div className="card" style={{ marginBottom: 'var(--space-lg)' }}>
-        <h2 style={{ fontSize: '1rem', marginBottom: 'var(--space-md)' }}>By Repository</h2>
-        {stats.by_repo.length === 0 ? (
-          <p className="text-muted">No sessions in this period</p>
-        ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-sm)' }}>
-            {stats.by_repo.map((r) => (
-              <div key={r.repo_name} style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-md)' }}>
-                <div style={{ flex: 1, fontFamily: 'var(--font-mono)' }}>
-                  {r.repo_id ? (
-                    <a href={`/repo/${r.repo_id}`} className="footer-link">{r.repo_name}</a>
-                  ) : (
-                    <span>{r.repo_name}</span>
-                  )}
-                </div>
-                <span className="text-secondary" style={{ fontSize: '0.875rem' }}>{r.session_count} sessions</span>
-                <span style={{ fontSize: '0.875rem', color: 'var(--accent-green)', fontFamily: 'var(--font-mono)' }}>
-                  {formatCost(r.total_cost)}
-                </span>
-              </div>
-            ))}
+          <div className="text-muted" style={{ fontSize: '0.625rem', marginTop: '2px' }}>
+            {stats.savings.block_count} blocked · {stats.savings.warn_count} warned
           </div>
-        )}
+        </div>
       </div>
 
-      {/* By model */}
-      <div className="card" style={{ marginBottom: 'var(--space-lg)' }}>
+      {/* By member + By repo (side-by-side) */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: 'var(--space-lg)', marginBottom: 'var(--space-lg)' }}>
+        <div className="card">
+          <h2 style={{ fontSize: '1rem', marginBottom: 'var(--space-md)' }}>By Member</h2>
+          {stats.by_member.length === 0 ? (
+            <p className="text-muted">No sessions in this period</p>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-sm)' }}>
+              {stats.by_member.map((m) => (
+                <a key={m.user_id} href={`/?userId=${encodeURIComponent(m.user_id)}`} style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-md)', textDecoration: 'none', color: 'inherit' }}>
+                  <div style={{ flex: 1 }}>
+                    <span style={{ fontWeight: 500 }} className="footer-link">{m.display_name}</span>
+                  </div>
+                  <span className="text-secondary" style={{ fontSize: '0.875rem' }}>{m.session_count} sessions</span>
+                  <span style={{ fontSize: '0.875rem', color: 'var(--accent-green)', fontFamily: 'var(--font-mono)' }}>
+                    {formatCost(m.total_cost)}
+                  </span>
+                </a>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="card">
+          <h2 style={{ fontSize: '1rem', marginBottom: 'var(--space-md)' }}>By Repository</h2>
+          {stats.by_repo.length === 0 ? (
+            <p className="text-muted">No sessions in this period</p>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-sm)' }}>
+              {stats.by_repo.map((r) => (
+                <div key={r.repo_name} style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-md)' }}>
+                  <div style={{ flex: 1, fontFamily: 'var(--font-mono)' }}>
+                    {r.repo_id ? (
+                      <a href={`/repo/${r.repo_id}`} className="footer-link">{r.repo_name}</a>
+                    ) : (
+                      <span>{r.repo_name}</span>
+                    )}
+                  </div>
+                  <span className="text-secondary" style={{ fontSize: '0.875rem' }}>{r.session_count} sessions</span>
+                  <span style={{ fontSize: '0.875rem', color: 'var(--accent-green)', fontFamily: 'var(--font-mono)' }}>
+                    {formatCost(r.total_cost)}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Model usage + Hottest files (side-by-side) */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: 'var(--space-lg)' }}>
+      <div className="card">
         <h2 style={{ fontSize: '1rem', marginBottom: 'var(--space-md)' }}>Model Usage</h2>
         {stats.by_model.length === 0 ? (
           <p className="text-muted">No sessions in this period</p>
@@ -215,7 +241,7 @@ export function StatsView() {
                       padding: '2px 8px',
                       borderRadius: '4px',
                       backgroundColor: 'var(--bg-elevated)',
-                      color: 'var(--accent-blue)',
+                      color: getModelColor(m.model),
                       fontFamily: 'var(--font-mono)',
                     }}
                   >
@@ -232,7 +258,6 @@ export function StatsView() {
         )}
       </div>
 
-      {/* Hottest files */}
       <div className="card">
         <h2 style={{ fontSize: '1rem', marginBottom: 'var(--space-md)' }}>Hottest Files</h2>
         {stats.hottest_files.length === 0 ? (
@@ -261,6 +286,7 @@ export function StatsView() {
             })}
           </div>
         )}
+      </div>
       </div>
     </div>
   );

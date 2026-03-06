@@ -1064,6 +1064,39 @@ export async function getLatestEditsForSessions(
 }
 
 // ============================================================================
+// COST ESTIMATION
+// ============================================================================
+
+// Anthropic pricing per 1M tokens (USD)
+const TOKEN_PRICING: Record<string, { input: number; output: number; cacheWrite: number; cacheRead: number }> = {
+  'claude-opus-4-6':          { input: 15,  output: 75,  cacheWrite: 18.75, cacheRead: 1.5  },
+  'claude-opus-4-20250514':   { input: 15,  output: 75,  cacheWrite: 18.75, cacheRead: 1.5  },
+  'claude-sonnet-4-6':        { input: 3,   output: 15,  cacheWrite: 3.75,  cacheRead: 0.3  },
+  'claude-sonnet-4-20250514': { input: 3,   output: 15,  cacheWrite: 3.75,  cacheRead: 0.3  },
+  'claude-haiku-4-5':         { input: 0.8, output: 4,   cacheWrite: 1.0,   cacheRead: 0.08 },
+};
+// Default to Sonnet pricing when model is unknown
+const DEFAULT_PRICING = TOKEN_PRICING['claude-sonnet-4-6'];
+
+/** Estimate session cost from token counts when total_cost_usd is null/zero. */
+export function estimateCostFromTokens(
+  model: string | null,
+  inputTokens: number | null,
+  outputTokens: number | null,
+  cacheCreationTokens: number | null,
+  cacheReadTokens: number | null,
+): number {
+  if (!inputTokens && !outputTokens) return 0;
+  const pricing = (model && TOKEN_PRICING[model]) || DEFAULT_PRICING;
+  const cost =
+    ((inputTokens ?? 0) / 1_000_000) * pricing.input +
+    ((outputTokens ?? 0) / 1_000_000) * pricing.output +
+    ((cacheCreationTokens ?? 0) / 1_000_000) * pricing.cacheWrite +
+    ((cacheReadTokens ?? 0) / 1_000_000) * pricing.cacheRead;
+  return cost;
+}
+
+// ============================================================================
 // STATS QUERIES
 // ============================================================================
 
@@ -1073,19 +1106,22 @@ export async function getTeamStats(
 ): Promise<TeamStats> {
   const { startDate, endDate } = options;
 
-  // Build separate date filters: one for sessions-only queries, one for JOIN queries
+  // Build separate date filters: for sessions-only, JOIN, and overlap queries
   let sessionDateFilter = '';
   let joinDateFilter = '';
+  let overlapDateFilter = '';
   const params: unknown[] = [];
 
   if (startDate) {
     sessionDateFilter += ' AND started_at >= ?';
     joinDateFilter += ' AND s.started_at >= ?';
+    overlapDateFilter += " AND datetime(o.detected_at) >= datetime(?)";
     params.push(startDate);
   }
   if (endDate) {
     sessionDateFilter += ' AND started_at <= ?';
     joinDateFilter += ' AND s.started_at <= ?';
+    overlapDateFilter += " AND datetime(o.detected_at) <= datetime(?)";
     params.push(endDate + 'T23:59:59');
   }
 
@@ -1166,6 +1202,47 @@ export async function getTeamStats(
     .bind(...params)
     .all();
 
+  // Estimated savings from overlap detection
+  const savingsResult = await db
+    .prepare(
+      `SELECT
+        o.decision,
+        sa.total_cost_usd as cost_a, sa.total_input_tokens as input_a, sa.total_output_tokens as output_a,
+        sa.cache_creation_tokens as cache_create_a, sa.cache_read_tokens as cache_read_a, sa.model as model_a,
+        sb.total_cost_usd as cost_b, sb.total_input_tokens as input_b, sb.total_output_tokens as output_b,
+        sb.cache_creation_tokens as cache_create_b, sb.cache_read_tokens as cache_read_b, sb.model as model_b
+      FROM overlaps o
+      LEFT JOIN sessions sa ON o.session_id_a = sa.id
+      LEFT JOIN sessions sb ON o.session_id_b = sb.id
+      WHERE 1=1 ${overlapDateFilter}`
+    )
+    .bind(...params)
+    .all();
+
+  let estimatedSavings = 0;
+  let blockCount = 0;
+  let warnCount = 0;
+  for (const row of savingsResult.results as Record<string, unknown>[]) {
+    const rawCostA = row.cost_a as number | null;
+    const costA = (rawCostA != null && rawCostA > 0) ? rawCostA : estimateCostFromTokens(
+      row.model_a as string | null, row.input_a as number | null, row.output_a as number | null,
+      row.cache_create_a as number | null, row.cache_read_a as number | null,
+    );
+    const rawCostB = row.cost_b as number | null;
+    const costB = (rawCostB != null && rawCostB > 0) ? rawCostB : estimateCostFromTokens(
+      row.model_b as string | null, row.input_b as number | null, row.output_b as number | null,
+      row.cache_create_b as number | null, row.cache_read_b as number | null,
+    );
+    const maxCost = Math.max(costA, costB);
+    if (row.decision === 'block') {
+      estimatedSavings += maxCost;
+      blockCount++;
+    } else if (row.decision === 'warn') {
+      estimatedSavings += maxCost * 0.5;
+      warnCount++;
+    }
+  }
+
   return {
     total_sessions: basicStats?.total_sessions ?? 0,
     total_cost_usd: basicStats?.total_cost_usd ?? 0,
@@ -1194,6 +1271,12 @@ export async function getTeamStats(
       session_count: r.session_count as number,
       user_count: r.user_count as number,
     })),
+    savings: {
+      estimated_savings_usd: estimatedSavings,
+      overlap_count: savingsResult.results.length,
+      block_count: blockCount,
+      warn_count: warnCount,
+    },
   };
 }
 

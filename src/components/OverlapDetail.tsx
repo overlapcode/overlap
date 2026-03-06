@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { MultiFileDiff } from '@pierre/diffs/react';
 import { fetchWithTimeout } from '@lib/utils/fetch';
 import { formatRelativeTime } from '@lib/utils/time';
 
@@ -41,12 +42,6 @@ type OverlapData = {
   first_user: 'a' | 'b';
 };
 
-const SEVERITY_COLORS: Record<string, string> = {
-  high: 'var(--accent-orange)',
-  warning: 'var(--accent-orange)',
-  info: 'var(--accent-blue)',
-};
-
 const SCOPE_LABELS: Record<string, string> = {
   line: 'Line overlap',
   function: 'Function overlap',
@@ -59,45 +54,19 @@ const USER_COLORS = {
   b: 'var(--accent-blue)',
 };
 
-const DECISION_DISPLAY: Record<string, { label: string; color: string; description: string }> = {
-  block: { label: 'BLOCKED', color: '#d95757', description: 'The overlapping user was blocked from editing this region' },
-  warn: { label: 'WARNED', color: 'var(--accent-orange)', description: 'The overlapping user was warned about this conflict' },
+const DECISION_DISPLAY: Record<string, { label: string; color: string }> = {
+  block: { label: 'BLOCKED', color: '#d95757' },
+  warn: { label: 'WARNED', color: 'var(--accent-orange)' },
 };
 
-function CodeBlock({ label, code, borderColor }: { label: string; code: string; borderColor: string }) {
-  return (
-    <div style={{ marginTop: 'var(--space-xs)' }}>
-      <span style={{
-        fontSize: '0.6875rem',
-        fontWeight: 600,
-        color: 'var(--text-muted)',
-        textTransform: 'uppercase',
-        letterSpacing: '0.05em',
-      }}>
-        {label}
-      </span>
-      <pre style={{
-        margin: '2px 0 0',
-        padding: 'var(--space-sm) var(--space-md)',
-        backgroundColor: 'var(--bg-primary)',
-        borderLeft: `3px solid ${borderColor}`,
-        borderRadius: '0 var(--radius-sm) var(--radius-sm) 0',
-        fontFamily: 'var(--font-mono)',
-        fontSize: '0.8125rem',
-        lineHeight: 1.5,
-        whiteSpace: 'pre-wrap',
-        wordBreak: 'break-word',
-        maxHeight: '300px',
-        overflowY: 'auto',
-        color: 'var(--text-secondary)',
-      }}>
-        {code}
-      </pre>
-    </div>
-  );
+function isRecent(dateStr: string, minutesThreshold: number): boolean {
+  return Date.now() - new Date(dateStr).getTime() < minutesThreshold * 60 * 1000;
 }
 
 function EditCard({ edit }: { edit: FileOp }) {
+  const hasDiff = edit.old_string || edit.new_string;
+  const fileName = edit.file_path?.split('/').pop() ?? 'file';
+
   return (
     <div style={{
       padding: 'var(--space-md)',
@@ -136,14 +105,19 @@ function EditCard({ edit }: { edit: FileOp }) {
         </div>
       )}
 
-      {/* Code blocks */}
-      {edit.old_string && (
-        <CodeBlock label="Removed" code={edit.old_string} borderColor="#d9575766" />
-      )}
-      {edit.new_string && (
-        <CodeBlock label="Added" code={edit.new_string} borderColor="#788c5d88" />
-      )}
-      {!edit.old_string && !edit.new_string && (
+      {/* Diff via @pierre/diffs */}
+      {hasDiff ? (
+        <div style={{ borderRadius: 'var(--radius-sm)', overflow: 'hidden' }}>
+          <MultiFileDiff
+            oldFile={{ name: fileName, contents: edit.old_string ?? '' }}
+            newFile={{ name: fileName, contents: edit.new_string ?? '' }}
+            options={{
+              diffStyle: 'unified',
+              theme: 'pierre-dark',
+            }}
+          />
+        </div>
+      ) : (
         <p className="text-muted" style={{ fontSize: '0.8125rem', fontStyle: 'italic', margin: 0 }}>
           No diff content recorded
         </p>
@@ -152,15 +126,23 @@ function EditCard({ edit }: { edit: FileOp }) {
   );
 }
 
-function UserEditsSection({ edits, userName, userColor, isFirst, sessionId }: {
+function UserEditsSection({ edits, userName, userColor, isFirst, sessionId, decision }: {
   edits: FileOp[];
   userName: string;
   userColor: string;
   isFirst: boolean;
   sessionId: string | null;
+  decision: 'block' | 'warn' | null;
 }) {
+  const badgeLabel = isFirst
+    ? 'EDITING FIRST'
+    : decision === 'block' ? 'BLOCKED' : decision === 'warn' ? 'WARNED' : 'OVERLAPPING';
+  const badgeColor = isFirst
+    ? 'var(--accent-green)'
+    : decision === 'block' ? '#d95757' : 'var(--accent-orange)';
+
   return (
-    <div style={{ marginBottom: 'var(--space-lg)' }}>
+    <div>
       {/* Section header */}
       <div style={{
         display: 'flex',
@@ -183,13 +165,13 @@ function UserEditsSection({ edits, userName, userColor, isFirst, sessionId }: {
           padding: '1px 6px',
           borderRadius: '4px',
           backgroundColor: 'var(--bg-primary)',
-          border: `1px solid ${isFirst ? 'var(--accent-green)' : 'var(--accent-orange)'}`,
-          color: isFirst ? 'var(--accent-green)' : 'var(--accent-orange)',
+          border: `1px solid ${badgeColor}`,
+          color: badgeColor,
           fontFamily: 'var(--font-mono)',
           textTransform: 'uppercase',
           letterSpacing: '0.05em',
         }}>
-          {isFirst ? 'edited first' : 'overlapping'}
+          {badgeLabel}
         </span>
         <span className="text-muted" style={{ fontSize: '0.75rem' }}>
           {edits.length} {edits.length === 1 ? 'edit' : 'edits'}
@@ -215,42 +197,54 @@ function UserEditsSection({ edits, userName, userColor, isFirst, sessionId }: {
 }
 
 function OverlapHeader({ data }: { data: OverlapData }) {
-  const color = SEVERITY_COLORS[data.severity] ?? 'var(--accent-blue)';
+  const decisionInfo = data.decision ? DECISION_DISPLAY[data.decision] : null;
+
+  // Build title: "Line overlap in validateToken()"
+  const scopeLabel = SCOPE_LABELS[data.overlap_scope] ?? 'Overlap';
+  const title = data.function_name
+    ? `${scopeLabel} in ${data.function_name}()`
+    : scopeLabel;
 
   return (
     <div className="card" style={{ marginBottom: 'var(--space-lg)' }}>
-      {/* Scope + severity + time */}
+      {/* Title + decision badge + severity + time */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-sm)', marginBottom: 'var(--space-md)', flexWrap: 'wrap' }}>
         <span style={{ fontWeight: 600, fontSize: '1.125rem' }}>
-          {SCOPE_LABELS[data.overlap_scope] ?? 'Overlap'}
+          {title}
         </span>
-        <span style={{
-          fontSize: '0.6875rem',
-          padding: '1px 6px',
-          borderRadius: '4px',
-          backgroundColor: 'var(--bg-primary)',
-          border: `1px solid ${color}`,
-          color: color,
-          fontFamily: 'var(--font-mono)',
-          textTransform: 'uppercase',
-          letterSpacing: '0.05em',
-        }}>
-          {data.severity}
-        </span>
+        {decisionInfo && (
+          <span style={{
+            fontSize: '0.6875rem',
+            padding: '2px 8px',
+            borderRadius: '4px',
+            backgroundColor: 'var(--bg-primary)',
+            border: `1px solid ${decisionInfo.color}`,
+            color: decisionInfo.color,
+            fontFamily: 'var(--font-mono)',
+            fontWeight: 700,
+            textTransform: 'uppercase',
+            letterSpacing: '0.05em',
+          }}>
+            {decisionInfo.label}
+          </span>
+        )}
         <span className="text-muted" style={{ fontSize: '0.75rem' }}>
           {formatRelativeTime(data.detected_at)}
+          {isRecent(data.detected_at, 60) && (
+            <span style={{ color: 'var(--status-active)', marginLeft: '4px' }}>· active</span>
+          )}
         </span>
       </div>
 
-      {/* File path + context */}
+      {/* File path + line range + function */}
       {data.file_path && (
         <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.875rem', marginBottom: 'var(--space-md)' }}>
           <span>{data.file_path}</span>
-          {data.function_name && (
-            <span className="text-muted"> : {data.function_name}()</span>
-          )}
           {data.start_line != null && data.end_line != null && (
-            <span className="text-muted"> L{data.start_line}–{data.end_line}</span>
+            <span className="text-muted"> · Lines {data.start_line}–{data.end_line}</span>
+          )}
+          {data.function_name && (
+            <span className="text-muted"> · {data.function_name}()</span>
           )}
         </div>
       )}
@@ -314,6 +308,8 @@ export function OverlapDetail({ overlapId }: { overlapId: string }) {
 
   const firstIsA = data.first_user === 'a';
   const decisionInfo = data.decision ? DECISION_DISPLAY[data.decision] : null;
+  const overlappingUser = firstIsA ? data.member_b_name : data.member_a_name;
+  const fileShort = data.file_path?.split('/').pop() ?? 'this region';
 
   return (
     <div>
@@ -343,7 +339,7 @@ export function OverlapDetail({ overlapId }: { overlapId: string }) {
                 {decisionInfo.label}
               </span>
               <span className="text-muted" style={{ fontSize: '0.75rem' }}>
-                {decisionInfo.description}
+                {overlappingUser} was {data.decision === 'block' ? 'blocked from' : 'warned about'} editing {fileShort}
               </span>
             </div>
           )}
@@ -358,7 +354,7 @@ export function OverlapDetail({ overlapId }: { overlapId: string }) {
                 display: 'block',
                 marginBottom: 'var(--space-xs)',
               }}>
-                Guidance sent to overlapping user
+                Guidance sent to {overlappingUser}'s agent
               </span>
               <p style={{ margin: 0, fontSize: '0.875rem', color: 'var(--text-secondary)', whiteSpace: 'pre-wrap' }}>
                 {data.description}
@@ -368,23 +364,29 @@ export function OverlapDetail({ overlapId }: { overlapId: string }) {
         </div>
       )}
 
-      {/* User A's edits (first user shown first) */}
-      <UserEditsSection
-        edits={firstIsA ? data.edits_a : data.edits_b}
-        userName={firstIsA ? data.member_a_name : data.member_b_name}
-        userColor={firstIsA ? USER_COLORS.a : USER_COLORS.b}
-        isFirst={true}
-        sessionId={firstIsA ? data.session_id_a : data.session_id_b}
-      />
-
-      {/* User B's edits (overlapping user) */}
-      <UserEditsSection
-        edits={firstIsA ? data.edits_b : data.edits_a}
-        userName={firstIsA ? data.member_b_name : data.member_a_name}
-        userColor={firstIsA ? USER_COLORS.b : USER_COLORS.a}
-        isFirst={false}
-        sessionId={firstIsA ? data.session_id_b : data.session_id_a}
-      />
+      {/* Side-by-side user edits */}
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(350px, 1fr))',
+        gap: 'var(--space-lg)',
+      }}>
+        <UserEditsSection
+          edits={firstIsA ? data.edits_a : data.edits_b}
+          userName={firstIsA ? data.member_a_name : data.member_b_name}
+          userColor={firstIsA ? USER_COLORS.a : USER_COLORS.b}
+          isFirst={true}
+          sessionId={firstIsA ? data.session_id_a : data.session_id_b}
+          decision={data.decision}
+        />
+        <UserEditsSection
+          edits={firstIsA ? data.edits_b : data.edits_a}
+          userName={firstIsA ? data.member_b_name : data.member_a_name}
+          userColor={firstIsA ? USER_COLORS.b : USER_COLORS.a}
+          isFirst={false}
+          sessionId={firstIsA ? data.session_id_b : data.session_id_a}
+          decision={data.decision}
+        />
+      </div>
     </div>
   );
 }
