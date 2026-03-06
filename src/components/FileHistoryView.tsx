@@ -128,7 +128,7 @@ export function FileHistoryView({ filePath, repoName }: FileHistoryViewProps) {
           <div style={{ marginTop: 'var(--space-md)', padding: 'var(--space-sm)', backgroundColor: 'var(--bg-elevated)', borderRadius: 'var(--radius-sm)' }}>
             <span style={{ color: 'var(--accent-orange)' }}>⚠️</span>
             <span className="text-secondary" style={{ marginLeft: 'var(--space-sm)', fontSize: '0.875rem' }}>
-              Hot file: {data.users_count} people have modified this file recently. Consider coordinating changes.
+              Hot file: {data.users_count} {data.users_count === 1 ? 'person has' : 'people have'} modified this file recently. Consider coordinating changes.
             </span>
           </div>
         )}

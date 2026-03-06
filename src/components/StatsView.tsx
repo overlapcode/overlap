@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { fetchWithTimeout } from '@lib/utils/fetch';
-import { deriveGitHubUrl, stripRepoRoot } from '@lib/utils/github';
+import { parseGitHubUrl, deriveGitHubUrl, stripRepoRoot } from '@lib/utils/github';
 
 type TeamStats = {
   total_sessions: number;
@@ -18,6 +18,7 @@ type TeamStats = {
   by_repo: Array<{
     repo_name: string;
     repo_id: string | null;
+    remote_url: string | null;
     session_count: number;
     total_cost: number;
   }>;
@@ -29,6 +30,7 @@ type TeamStats = {
   hottest_files: Array<{
     file_path: string;
     repo_name: string;
+    remote_url: string | null;
     session_count: number;
     user_count: number;
   }>;
@@ -225,7 +227,7 @@ export function StatsView() {
                   <div style={{ flex: 1 }}>
                     <span style={{ fontWeight: 500, color: 'var(--accent-blue)' }}>{m.display_name}</span>
                   </div>
-                  <span className="text-secondary" style={{ fontSize: '0.875rem', width: '6rem', textAlign: 'right' }}>{m.session_count} sessions</span>
+                  <span className="text-secondary" style={{ fontSize: '0.875rem', width: '6rem', textAlign: 'right' }}>{m.session_count} {m.session_count === 1 ? 'session' : 'sessions'}</span>
                   <span style={{ fontSize: '0.875rem', color: 'var(--accent-green)', fontFamily: 'var(--font-mono)', width: '5rem', textAlign: 'right' }}>
                     {formatCost(m.total_cost)}
                   </span>
@@ -242,7 +244,7 @@ export function StatsView() {
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column' }}>
               {stats.by_repo.map((r, i) => {
-                const ghUrl = deriveGitHubUrl(r.repo_name);
+                const ghUrl = parseGitHubUrl(r.remote_url) ?? deriveGitHubUrl(r.repo_name);
                 return (
                   <div key={r.repo_name} className="stats-row" style={tableRowStyle(i)}>
                     <div style={{ flex: 1, fontFamily: 'var(--font-mono)', fontSize: '0.875rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -254,7 +256,7 @@ export function StatsView() {
                         <span>{r.repo_name}</span>
                       )}
                     </div>
-                    <span className="text-secondary" style={{ fontSize: '0.875rem', width: '6rem', textAlign: 'right' }}>{r.session_count} sessions</span>
+                    <span className="text-secondary" style={{ fontSize: '0.875rem', width: '6rem', textAlign: 'right' }}>{r.session_count} {r.session_count === 1 ? 'session' : 'sessions'}</span>
                     <span style={{ fontSize: '0.875rem', color: 'var(--accent-green)', fontFamily: 'var(--font-mono)', width: '5rem', textAlign: 'right' }}>
                       {formatCost(r.total_cost)}
                     </span>
@@ -290,7 +292,7 @@ export function StatsView() {
                       {m.model}
                     </span>
                   </div>
-                  <span className="text-secondary" style={{ fontSize: '0.875rem', width: '6rem', textAlign: 'right' }}>{m.session_count} sessions</span>
+                  <span className="text-secondary" style={{ fontSize: '0.875rem', width: '6rem', textAlign: 'right' }}>{m.session_count} {m.session_count === 1 ? 'session' : 'sessions'}</span>
                   <span style={{ fontSize: '0.875rem', color: 'var(--accent-green)', fontFamily: 'var(--font-mono)', width: '5rem', textAlign: 'right' }}>
                     {formatCost(m.total_cost)}
                   </span>
@@ -307,7 +309,7 @@ export function StatsView() {
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column' }}>
               {stats.hottest_files.map((f, i) => {
-                const ghUrl = deriveGitHubUrl(f.repo_name);
+                const ghUrl = parseGitHubUrl(f.remote_url) ?? deriveGitHubUrl(f.repo_name);
                 const relativePath = stripRepoRoot(f.file_path, f.repo_name);
                 const fileUrl = ghUrl ? `${ghUrl}/blob/main/${relativePath.split('/').map(encodeURIComponent).join('/')}` : null;
                 return (
@@ -321,8 +323,8 @@ export function StatsView() {
                       )}
                       <span className="text-muted" style={{ fontSize: '0.6875rem', marginLeft: 'var(--space-xs)' }}>{f.repo_name}</span>
                     </div>
-                    <span className="text-secondary" style={{ fontSize: '0.75rem', width: '5.5rem', textAlign: 'right', flexShrink: 0 }}>{f.session_count} sessions</span>
-                    <span className="text-muted" style={{ fontSize: '0.75rem', width: '4.5rem', textAlign: 'right', flexShrink: 0 }}>{f.user_count} people</span>
+                    <span className="text-secondary" style={{ fontSize: '0.75rem', width: '5.5rem', textAlign: 'right', flexShrink: 0 }}>{f.session_count} {f.session_count === 1 ? 'session' : 'sessions'}</span>
+                    <span className="text-muted" style={{ fontSize: '0.75rem', width: '4.5rem', textAlign: 'right', flexShrink: 0 }}>{f.user_count} {f.user_count === 1 ? 'person' : 'people'}</span>
                   </div>
                 );
               })}
