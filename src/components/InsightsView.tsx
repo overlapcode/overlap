@@ -513,6 +513,24 @@ export function InsightsView() {
                       : 'Taking longer than usual — the LLM may be processing a large volume of data.'}
                 </p>
               </div>
+            ) : selectedInsight.status === 'failed' ? (
+              <div className="no-insight-selected failed-state">
+                <div className="failed-icon">!</div>
+                <p>Generation failed</p>
+                <p className="generating-sub">{selectedInsight.error || 'An unknown error occurred during generation.'}</p>
+                {canGenerateTeam && (
+                  <button
+                    className="btn-regenerate"
+                    onClick={() => {
+                      const period = allPeriods.find(p => p.start === selectedInsight.period_start);
+                      if (period) handleGenerate({ type: periodType, start: period.start, end: period.end, label: period.label }, true);
+                    }}
+                    disabled={generating}
+                  >
+                    {generating ? 'Regenerating...' : 'Try Again'}
+                  </button>
+                )}
+              </div>
             ) : parsedContent ? (
               <InsightReport
                 content={parsedContent}

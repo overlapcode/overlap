@@ -102,9 +102,15 @@ export async function POST(context: APIContext) {
 
     // Run generation in the background via waitUntil — response returns immediately
     const backgroundWork = (async () => {
+      const t0 = Date.now();
+      const log = (stage: string, detail?: string) =>
+        console.log(`[insight:${insightId.slice(0, 8)}] ${stage}${detail ? ` — ${detail}` : ''} (+${Date.now() - t0}ms)`);
+
       try {
         // Aggregate quantitative data
+        log('start', `scope=${scope} period=${periodStart}..${periodEnd} model=${model || 'default'}`);
         const aggregated = await aggregateInsightData(db, scope, userId, periodStart, periodEnd);
+        log('aggregated', `${aggregated.stats.total_sessions} sessions, ${aggregated.stats.total_files_touched} files`);
 
         if (aggregated.stats.total_sessions === 0) {
           await upsertInsight(db, {
@@ -129,24 +135,30 @@ export async function POST(context: APIContext) {
             error: null,
             generated_at: new Date().toISOString(),
           });
+          log('complete', 'no sessions — saved empty insight');
           return;
         }
 
         // Layer 1: Generate per-session facets (cached — only generates for sessions without facets)
+        log('facets:start');
         const teamConfig = await getTeamConfig(db);
         try {
-          await generateSessionFacets(db, scope, userId, periodStart, periodEnd, teamConfig!, encryptionKey || '', model);
+          const facetResult = await generateSessionFacets(db, scope, userId, periodStart, periodEnd, teamConfig!, encryptionKey || '', model);
+          log('facets:done', `generated=${facetResult.generated} total=${facetResult.total}`);
         } catch (facetErr) {
+          log('facets:error', facetErr instanceof Error ? facetErr.message : String(facetErr));
           console.error('Facet generation error (continuing with available facets):', facetErr);
         }
 
         // Fetch all facets for this period (including previously generated ones)
         const facets = await getSessionFacetsForPeriod(db, userId, periodStart, periodEnd);
+        log('facets:fetched', `${facets.length} facets for narrative`);
 
         // Layer 2: Synthesize narrative from facets + stats
         const available = getAvailablePeriods(periodType, periodStart);
         const periodLabel = available.find(p => p.start === periodStart)?.label || `${periodStart} to ${periodEnd}`;
 
+        log('narrative:start');
         let synthesis;
         try {
           synthesis = await generateInsightNarrative(
@@ -161,7 +173,9 @@ export async function POST(context: APIContext) {
             encryptionKey || '',
             model,
           );
+          log('narrative:done');
         } catch (llmError) {
+          log('narrative:error', llmError instanceof Error ? llmError.message : String(llmError));
           console.error('LLM insight synthesis error:', llmError);
           synthesis = {
             summary: `${aggregated.stats.total_sessions} sessions during ${periodLabel}.`,
@@ -175,6 +189,7 @@ export async function POST(context: APIContext) {
         }
 
         const content = { ...aggregated, ...synthesis };
+        log('saving');
 
         await upsertInsight(db, {
           id: insightId,
@@ -189,7 +204,9 @@ export async function POST(context: APIContext) {
           error: null,
           generated_at: new Date().toISOString(),
         });
+        log('complete', `total ${Date.now() - t0}ms`);
       } catch (bgError) {
+        log('FAILED', bgError instanceof Error ? bgError.message : String(bgError));
         console.error('Background insight generation error:', bgError);
         await upsertInsight(db, {
           id: insightId,

@@ -333,8 +333,28 @@ const teamConfig = await getTeamConfig(db);
     gap: var(--space-sm);
   }
 
-  :global(.generating-state) {
+  :global(.generating-state),
+  :global(.failed-state) {
     gap: var(--space-md);
+  }
+
+  :global(.failed-icon) {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: rgba(217, 119, 87, 0.15);
+    color: #d97757;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 1.2rem;
+    font-family: var(--font-mono);
+  }
+
+  :global(.failed-state p:first-of-type) {
+    color: #d97757;
+    font-weight: 600;
   }
 
   :global(.generating-spinner) {

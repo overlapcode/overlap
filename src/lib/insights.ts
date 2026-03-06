@@ -407,10 +407,13 @@ export async function generateSessionFacets(
   const model = modelOverride || teamConfig.llm_model || '';
 
   let generated = 0;
+  const totalBatches = Math.ceil(contexts.length / SESSIONS_PER_LLM_BATCH);
 
   // Process in batches — each batch = 1 LLM call analyzing multiple sessions
   for (let i = 0; i < contexts.length; i += SESSIONS_PER_LLM_BATCH) {
+    const batchNum = Math.floor(i / SESSIONS_PER_LLM_BATCH) + 1;
     const batch = contexts.slice(i, i + SESSIONS_PER_LLM_BATCH);
+    console.log(`[facets] batch ${batchNum}/${totalBatches} (${batch.length} sessions)`);
     const sessionsBlock = batch.map(ctx => formatSessionBlock(ctx)).join('\n\n');
     const prompt = BATCH_FACET_PROMPT.replace('{sessions_block}', sessionsBlock);
 
