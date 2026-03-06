@@ -133,10 +133,23 @@ export function InsightsView() {
   const prefetchedRef = useRef(false);
   const [generatingStartedAt, setGeneratingStartedAt] = useState<number | null>(null);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
   // Clean up polling on unmount
   useEffect(() => {
     return () => { if (pollRef.current) clearInterval(pollRef.current); };
+  }, []);
+
+  // Close dropdown on click outside
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
   }, []);
 
   // Elapsed time counter while generating
@@ -397,6 +410,11 @@ export function InsightsView() {
   const canGenerateTeam = scope === 'team' ? isAdmin : true;
   const modelOptions = llmProvider ? MODEL_OPTIONS[llmProvider] || [] : [];
 
+  // Current selected period label for dropdown trigger
+  const currentPeriodLabel = selectedInsight
+    ? allPeriods.find(p => p.start === selectedInsight.period_start)?.label || selectedInsight.period_start
+    : allPeriods[0]?.label || 'Select period';
+
   return (
     <div className="insights-container">
       {/* Header */}
@@ -420,13 +438,82 @@ export function InsightsView() {
         </div>
       </div>
 
-      {/* Period type tabs */}
-      <div className="period-tabs">
-        {(['week', 'month', 'quarter', 'year'] as InsightPeriodType[]).map((t) => (
-          <button key={t} className={`period-tab ${periodType === t ? 'active' : ''}`} onClick={() => setPeriodType(t)}>
-            {PERIOD_LABELS[t]}
-          </button>
-        ))}
+      {/* Period type tabs + period selector */}
+      <div className="period-toolbar">
+        <div className="period-tabs">
+          {(['week', 'month', 'quarter', 'year'] as InsightPeriodType[]).map((t) => (
+            <button key={t} className={`period-tab ${periodType === t ? 'active' : ''}`} onClick={() => setPeriodType(t)}>
+              {PERIOD_LABELS[t]}
+            </button>
+          ))}
+        </div>
+
+        {!loading && (
+          <div className="period-selector-row">
+            <div className="period-dropdown-wrap" ref={dropdownRef}>
+              <button className="period-dropdown-trigger" onClick={() => setDropdownOpen(o => !o)}>
+                <span className="period-dropdown-label">{currentPeriodLabel}</span>
+                <span className="period-dropdown-arrow">{dropdownOpen ? '\u25B4' : '\u25BE'}</span>
+              </button>
+
+              {dropdownOpen && (
+                <div className="period-dropdown-menu">
+                  {periodListItems.length === 0 && (
+                    <div className="dropdown-empty">No completed periods yet.</div>
+                  )}
+                  {periodListItems.map((item) => {
+                    if (item.kind === 'header') {
+                      return <div key={item.month} className="dropdown-month-header">{item.month}</div>;
+                    }
+                    const p = item.data;
+                    const isSelected = selectedPeriod === p.start || (!selectedPeriod && p.insight?.id === selectedInsight?.id);
+                    const sessionCount = getInsightSessionCount(p.insight);
+                    return (
+                      <div
+                        key={p.start}
+                        className={`dropdown-item ${isSelected ? 'selected' : ''} ${p.generated ? 'generated' : 'ungenerated'} ${p.insight?.status === 'failed' ? 'failed' : ''}`}
+                        onClick={() => {
+                          if (p.generated || p.insight?.status === 'generating') {
+                            setSelectedPeriod(p.start);
+                            setDropdownOpen(false);
+                          }
+                        }}
+                      >
+                        <span className="dropdown-item-label">{p.label}</span>
+                        <span className="dropdown-item-meta">
+                          {p.insight?.status === 'generating' ? (
+                            <span className="status-badge generating">Generating{elapsedSeconds > 0 ? ` ${elapsedSeconds}s` : '...'}</span>
+                          ) : p.insight?.status === 'failed' ? (
+                            <span className="status-badge failed">Failed</span>
+                          ) : p.generated && sessionCount !== null ? (
+                            <span className="dropdown-session-count">{sessionCount}s</span>
+                          ) : !p.generated && canGenerateTeam ? (
+                            <button
+                              className="btn-generate-inline"
+                              onClick={(e) => { e.stopPropagation(); handleGenerate({ type: periodType, start: p.start, end: p.end, label: p.label }); setDropdownOpen(false); }}
+                              disabled={generating}
+                            >
+                              Generate
+                            </button>
+                          ) : null}
+                        </span>
+                      </div>
+                    );
+                  })}
+                  {scope === 'team' && !isAdmin && ungeneratedPeriods.length > 0 && (
+                    <div className="dropdown-note">Only admins can generate team insights.</div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {canGenerateTeam && ungeneratedPeriods.length > 0 && (
+              <button className="btn-generate-all" onClick={handleGenerateAll} disabled={generating}>
+                {generating ? `Generating${elapsedSeconds > 0 ? ` (${elapsedSeconds}s)` : '...'}` : `Generate All (${ungeneratedPeriods.length})`}
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
       {error && <div className="insights-error">{error}</div>}
@@ -434,121 +521,61 @@ export function InsightsView() {
       {loading ? (
         <div className="insights-loading">Loading insights...</div>
       ) : (
-        <div className="insights-layout">
-          {/* Period list sidebar */}
-          <div className="period-list">
-            <div className="period-list-header">
-              <span>{PERIOD_LABELS[periodType]} Periods</span>
+        <div className="insight-detail">
+          {!selectedInsight ? (
+            <div className="no-insight-selected">
+              <p>No insights generated yet for {PERIOD_LABELS[periodType].toLowerCase()} periods.</p>
               {canGenerateTeam && ungeneratedPeriods.length > 0 && (
-                <button className="btn-generate-all" onClick={handleGenerateAll} disabled={generating}>
-                  {generating ? 'Generating...' : 'Generate All'}
+                <p>Select a period from the dropdown and click Generate.</p>
+              )}
+            </div>
+          ) : selectedInsight.status === 'generating' ? (
+            <div className="no-insight-selected generating-state">
+              <div className="generating-spinner" />
+              <p>Generating insight{elapsedSeconds > 0 ? ` (${elapsedSeconds}s)` : ''}...</p>
+              <p className="generating-sub">
+                {elapsedSeconds < 30
+                  ? 'Analyzing sessions, generating facets, and synthesizing your report.'
+                  : elapsedSeconds < 90
+                    ? 'Still working — this typically takes 30-90 seconds for large periods.'
+                    : 'Taking longer than usual — the LLM may be processing a large volume of data.'}
+              </p>
+            </div>
+          ) : selectedInsight.status === 'failed' ? (
+            <div className="no-insight-selected failed-state">
+              <div className="failed-icon">!</div>
+              <p>Generation failed</p>
+              <p className="generating-sub">{selectedInsight.error || 'An unknown error occurred during generation.'}</p>
+              {canGenerateTeam && (
+                <button
+                  className="btn-regenerate"
+                  onClick={() => {
+                    const period = allPeriods.find(p => p.start === selectedInsight.period_start);
+                    if (period) handleGenerate({ type: periodType, start: period.start, end: period.end, label: period.label }, true);
+                  }}
+                  disabled={generating}
+                >
+                  {generating ? 'Regenerating...' : 'Try Again'}
                 </button>
               )}
             </div>
-
-            {periodListItems.length === 0 && (
-              <div className="no-periods">No completed periods yet. Insights are generated for past periods only.</div>
-            )}
-
-            {periodListItems.map((item) => {
-              if (item.kind === 'header') {
-                return <div key={item.month} className="month-group-header">{item.month}</div>;
-              }
-              const p = item.data;
-              const sessionCount = getInsightSessionCount(p.insight);
-              return (
-                <div
-                  key={p.start}
-                  className={`period-item ${selectedPeriod === p.start || (!selectedPeriod && p.insight?.id === selectedInsight?.id) ? 'selected' : ''} ${p.generated ? 'generated' : 'ungenerated'}`}
-                  onClick={() => (p.generated || p.insight?.status === 'generating') ? setSelectedPeriod(p.start) : undefined}
-                >
-                  <div className="period-item-label">{p.label}</div>
-                  <div className="period-item-status">
-                    {p.insight?.status === 'generating' ? (
-                      <span className="status-badge generating">Generating{elapsedSeconds > 0 ? ` ${elapsedSeconds}s` : '...'}</span>
-                    ) : p.generated ? (
-                      <>
-                        {sessionCount !== null && <span className="period-session-count">{sessionCount} {sessionCount === 1 ? 'session' : 'sessions'}</span>}
-                        {p.insight?.status === 'failed' && <span className="status-badge failed">Failed</span>}
-                      </>
-                    ) : (
-                      canGenerateTeam && (
-                        <button
-                          className="btn-generate-single"
-                          onClick={(e) => { e.stopPropagation(); handleGenerate({ type: periodType, start: p.start, end: p.end, label: p.label }); }}
-                          disabled={generating}
-                        >
-                          Generate
-                        </button>
-                      )
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-
-            {scope === 'team' && !isAdmin && ungeneratedPeriods.length > 0 && (
-              <div className="admin-note">Only admins can generate team insights.</div>
-            )}
-          </div>
-
-          {/* Insight detail */}
-          <div className="insight-detail">
-            {!selectedInsight ? (
-              <div className="no-insight-selected">
-                <p>No insights generated yet for {PERIOD_LABELS[periodType].toLowerCase()} periods.</p>
-                {canGenerateTeam && ungeneratedPeriods.length > 0 && (
-                  <p>Select a period and click Generate to create your first insight.</p>
-                )}
-              </div>
-            ) : selectedInsight.status === 'generating' ? (
-              <div className="no-insight-selected generating-state">
-                <div className="generating-spinner" />
-                <p>Generating insight{elapsedSeconds > 0 ? ` (${elapsedSeconds}s)` : ''}...</p>
-                <p className="generating-sub">
-                  {elapsedSeconds < 30
-                    ? 'Analyzing sessions, generating facets, and synthesizing your report.'
-                    : elapsedSeconds < 90
-                      ? 'Still working — this typically takes 30-90 seconds for large periods.'
-                      : 'Taking longer than usual — the LLM may be processing a large volume of data.'}
-                </p>
-              </div>
-            ) : selectedInsight.status === 'failed' ? (
-              <div className="no-insight-selected failed-state">
-                <div className="failed-icon">!</div>
-                <p>Generation failed</p>
-                <p className="generating-sub">{selectedInsight.error || 'An unknown error occurred during generation.'}</p>
-                {canGenerateTeam && (
-                  <button
-                    className="btn-regenerate"
-                    onClick={() => {
-                      const period = allPeriods.find(p => p.start === selectedInsight.period_start);
-                      if (period) handleGenerate({ type: periodType, start: period.start, end: period.end, label: period.label }, true);
-                    }}
-                    disabled={generating}
-                  >
-                    {generating ? 'Regenerating...' : 'Try Again'}
-                  </button>
-                )}
-              </div>
-            ) : parsedContent ? (
-              <InsightReport
-                content={parsedContent}
-                insight={selectedInsight}
-                periodLabel={allPeriods.find(p => p.start === selectedInsight.period_start)?.label || ''}
-                onRegenerate={() => {
-                  const period = allPeriods.find(p => p.start === selectedInsight.period_start);
-                  if (period) handleGenerate({ type: periodType, start: period.start, end: period.end, label: period.label }, true);
-                }}
-                canRegenerate={canGenerateTeam}
-                generating={generating}
-              />
-            ) : (
-              <div className="no-insight-selected">
-                <p>Insight data could not be parsed.</p>
-              </div>
-            )}
-          </div>
+          ) : parsedContent ? (
+            <InsightReport
+              content={parsedContent}
+              insight={selectedInsight}
+              periodLabel={allPeriods.find(p => p.start === selectedInsight.period_start)?.label || ''}
+              onRegenerate={() => {
+                const period = allPeriods.find(p => p.start === selectedInsight.period_start);
+                if (period) handleGenerate({ type: periodType, start: period.start, end: period.end, label: period.label }, true);
+              }}
+              canRegenerate={canGenerateTeam}
+              generating={generating}
+            />
+          ) : (
+            <div className="no-insight-selected">
+              <p>Insight data could not be parsed.</p>
+            </div>
+          )}
         </div>
       )}
     </div>

@@ -18,7 +18,7 @@ const teamConfig = await getTeamConfig(db);
 
 <Layout title="Insights - Overlap">
   <Header teamName={teamConfig?.team_name} userName={authResult.context.member.display_name} client:load />
-  <main style="padding: var(--space-lg); max-width: 1200px; margin: 0 auto; overflow-y: auto; scrollbar-gutter: stable;">
+  <main style="padding: var(--space-lg); max-width: 1000px; margin: 0 auto;">
     <InsightsView client:load />
   </main>
 </Layout>
@@ -91,13 +91,21 @@ const teamConfig = await getTeamConfig(db);
     font-size: 0.75rem;
   }
 
-  /* Period tabs */
-  :global(.period-tabs) {
+  /* Period toolbar: tabs + selector on same row */
+  :global(.period-toolbar) {
     display: flex;
-    gap: var(--space-xs);
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-md);
     margin-bottom: var(--space-lg);
     border-bottom: 1px solid var(--border-subtle);
     padding-bottom: var(--space-xs);
+    flex-wrap: wrap;
+  }
+
+  :global(.period-tabs) {
+    display: flex;
+    gap: var(--space-xs);
   }
 
   :global(.period-tab) {
@@ -121,78 +129,168 @@ const teamConfig = await getTeamConfig(db);
     color: var(--text-secondary);
   }
 
-  /* Error & loading */
-  :global(.insights-error) {
-    padding: var(--space-md);
-    background: rgba(217, 119, 87, 0.1);
-    border: 1px solid var(--accent-orange);
-    border-radius: var(--radius-sm);
-    color: var(--accent-orange);
-    margin-bottom: var(--space-md);
-    font-size: 0.85rem;
+  /* Period selector row (dropdown + generate all) */
+  :global(.period-selector-row) {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
   }
 
-  :global(.insights-loading) {
-    padding: var(--space-2xl);
-    text-align: center;
-    color: var(--text-muted);
-    font-family: var(--font-mono);
+  /* Custom dropdown */
+  :global(.period-dropdown-wrap) {
+    position: relative;
   }
 
-  /* Layout */
-  :global(.insights-layout) {
-    display: grid;
-    grid-template-columns: 280px 1fr;
-    gap: var(--space-lg);
-    min-height: 0;
-  }
-
-  :global(.insights-layout > *) {
-    min-width: 0;
-  }
-
-  @media (max-width: 768px) {
-    :global(.insights-layout) {
-      grid-template-columns: 1fr;
-    }
-  }
-
-  /* Period list */
-  :global(.period-list) {
+  :global(.period-dropdown-trigger) {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    padding: var(--space-xs) var(--space-sm);
     background: var(--bg-surface);
-    border: 1px solid var(--border-subtle);
-    border-radius: var(--radius-md);
-    padding: var(--space-sm);
-    max-height: calc(100vh - 200px);
-    overflow-y: auto;
-    scrollbar-gutter: stable;
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    font-family: var(--font-mono);
+    font-size: 0.8rem;
+    color: var(--text-primary);
+    transition: border-color 0.15s;
+    min-width: 160px;
   }
 
-  :global(.period-list-header) {
+  :global(.period-dropdown-trigger:hover) {
+    border-color: var(--accent-orange);
+  }
+
+  :global(.period-dropdown-label) {
+    flex: 1;
+  }
+
+  :global(.period-dropdown-arrow) {
+    font-size: 0.65rem;
+    color: var(--text-muted);
+  }
+
+  :global(.period-dropdown-menu) {
+    position: absolute;
+    top: calc(100% + 4px);
+    right: 0;
+    min-width: 260px;
+    max-height: 360px;
+    overflow-y: auto;
+    background: var(--bg-surface);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-md);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+    z-index: 100;
+    padding: var(--space-xs);
+  }
+
+  :global(.dropdown-empty) {
+    padding: var(--space-md);
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    text-align: center;
+  }
+
+  :global(.dropdown-month-header) {
+    font-family: var(--font-mono);
+    font-size: 0.6rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    padding: var(--space-sm) var(--space-sm) var(--space-xs);
+    margin-top: var(--space-xs);
+  }
+
+  :global(.dropdown-month-header:first-child) {
+    margin-top: 0;
+  }
+
+  :global(.dropdown-item) {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: var(--space-sm) var(--space-sm) var(--space-md);
+    padding: var(--space-xs) var(--space-sm);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: background 0.1s;
+    gap: var(--space-sm);
+  }
+
+  :global(.dropdown-item.generated:hover),
+  :global(.dropdown-item.selected) {
+    background: var(--bg-elevated);
+  }
+
+  :global(.dropdown-item.selected) {
+    border-left: 2px solid var(--accent-orange);
+  }
+
+  :global(.dropdown-item.ungenerated) {
+    cursor: default;
+    opacity: 0.6;
+  }
+
+  :global(.dropdown-item.ungenerated:hover) {
+    opacity: 0.8;
+  }
+
+  :global(.dropdown-item-label) {
     font-family: var(--font-mono);
-    font-size: 0.75rem;
+    font-size: 0.78rem;
+    color: var(--text-primary);
+  }
+
+  :global(.dropdown-item.ungenerated .dropdown-item-label) {
     color: var(--text-muted);
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    border-bottom: 1px solid var(--border-subtle);
-    margin-bottom: var(--space-xs);
+  }
+
+  :global(.dropdown-item-meta) {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+  }
+
+  :global(.dropdown-session-count) {
+    font-family: var(--font-mono);
+    font-size: 0.65rem;
+    color: var(--text-dimmed);
+  }
+
+  :global(.dropdown-note) {
+    padding: var(--space-sm);
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    text-align: center;
+    font-style: italic;
+  }
+
+  :global(.btn-generate-inline) {
+    padding: 1px 6px;
+    background: transparent;
+    color: var(--accent-orange);
+    border: 1px solid var(--accent-orange);
+    border-radius: var(--radius-sm);
+    font-size: 0.6rem;
+    font-family: var(--font-mono);
+    cursor: pointer;
+  }
+
+  :global(.btn-generate-inline:disabled) {
+    opacity: 0.5;
+    cursor: not-allowed;
   }
 
   :global(.btn-generate-all) {
-    padding: 2px 8px;
+    padding: 4px 10px;
     background: var(--accent-orange);
     color: var(--bg-primary);
     border: none;
     border-radius: var(--radius-sm);
-    font-size: 0.65rem;
+    font-size: 0.7rem;
     font-family: var(--font-mono);
     cursor: pointer;
-    text-transform: none;
-    letter-spacing: 0;
+    white-space: nowrap;
   }
 
   :global(.btn-generate-all:disabled) {
@@ -200,43 +298,9 @@ const teamConfig = await getTeamConfig(db);
     cursor: not-allowed;
   }
 
-  :global(.period-item) {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: var(--space-sm) var(--space-sm);
-    border-radius: var(--radius-sm);
-    cursor: pointer;
-    transition: background 0.15s;
-    font-size: 0.85rem;
-  }
-
-  :global(.period-item.generated:hover),
-  :global(.period-item.selected) {
-    background: var(--bg-elevated);
-  }
-
-  :global(.period-item.selected) {
-    border-left: 2px solid var(--accent-orange);
-  }
-
-  :global(.period-item.ungenerated) {
-    cursor: default;
-    opacity: 0.7;
-  }
-
-  :global(.period-item-label) {
-    font-family: var(--font-mono);
-    font-size: 0.8rem;
-    color: var(--text-primary);
-  }
-
-  :global(.ungenerated .period-item-label) {
-    color: var(--text-muted);
-  }
-
+  /* Status badges */
   :global(.status-badge) {
-    font-size: 0.65rem;
+    font-size: 0.6rem;
     font-family: var(--font-mono);
     padding: 1px 6px;
     border-radius: var(--radius-sm);
@@ -263,58 +327,25 @@ const teamConfig = await getTeamConfig(db);
     color: #d97757;
   }
 
-  :global(.month-group-header) {
-    font-family: var(--font-mono);
-    font-size: 0.65rem;
-    color: var(--text-muted);
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    padding: var(--space-sm) var(--space-sm) var(--space-xs);
-    margin-top: var(--space-xs);
-  }
-
-  :global(.month-group-header:first-child) {
-    margin-top: 0;
-  }
-
-  :global(.period-session-count) {
-    font-family: var(--font-mono);
-    font-size: 0.65rem;
-    color: var(--text-muted);
-  }
-
-  :global(.btn-generate-single) {
-    padding: 2px 8px;
-    background: transparent;
-    color: var(--accent-orange);
+  /* Error & loading */
+  :global(.insights-error) {
+    padding: var(--space-md);
+    background: rgba(217, 119, 87, 0.1);
     border: 1px solid var(--accent-orange);
     border-radius: var(--radius-sm);
-    font-size: 0.65rem;
+    color: var(--accent-orange);
+    margin-bottom: var(--space-md);
+    font-size: 0.85rem;
+  }
+
+  :global(.insights-loading) {
+    padding: var(--space-2xl);
+    text-align: center;
+    color: var(--text-muted);
     font-family: var(--font-mono);
-    cursor: pointer;
   }
 
-  :global(.btn-generate-single:disabled) {
-    opacity: 0.5;
-    cursor: not-allowed;
-  }
-
-  :global(.admin-note) {
-    padding: var(--space-sm);
-    font-size: 0.75rem;
-    color: var(--text-muted);
-    text-align: center;
-    font-style: italic;
-  }
-
-  :global(.no-periods) {
-    padding: var(--space-lg) var(--space-sm);
-    font-size: 0.8rem;
-    color: var(--text-muted);
-    text-align: center;
-  }
-
-  /* Insight detail */
+  /* Insight detail (full-width) */
   :global(.insight-detail) {
     min-height: 300px;
     overflow-wrap: break-word;
@@ -617,31 +648,6 @@ const teamConfig = await getTeamConfig(db);
     color: var(--text-muted);
   }
 
-  /* Task pills */
-  :global(.task-pills) {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--space-xs);
-  }
-
-  :global(.task-pill) {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--space-xs);
-    padding: var(--space-xs) var(--space-sm);
-    background: var(--bg-elevated);
-    border: 1px solid var(--border-subtle);
-    border-radius: var(--radius-sm);
-    font-size: 0.75rem;
-    font-family: var(--font-mono);
-    color: var(--text-secondary);
-    text-transform: capitalize;
-  }
-
-  :global(.task-pill strong) {
-    color: var(--accent-blue);
-  }
-
   /* Facet grid (outcomes + session types) */
   :global(.facet-grid) {
     display: grid;
@@ -894,7 +900,7 @@ const teamConfig = await getTeamConfig(db);
     background: rgba(217, 119, 87, 0.5);
   }
 
-  /* Recommendations (updated for card format) */
+  /* Recommendations */
   :global(.recommendations-section) {
     background: rgba(138, 158, 109, 0.05);
     border: 1px solid rgba(138, 158, 109, 0.2);
