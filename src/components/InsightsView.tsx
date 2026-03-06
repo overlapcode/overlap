@@ -588,6 +588,246 @@ export function InsightsView() {
 
 // ── Export Helpers ──────────────────────────────────────────────────────
 
+function esc(s: string): string {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+function contentToPrintHTML(content: InsightContent, periodLabel: string, insight: Insight): string {
+  const s = content.stats;
+  const recs = (content.recommendations || []).map(r =>
+    typeof r === 'string' ? { title: r, description: '' } : r
+  );
+  const generatedDate = insight.generated_at ? new Date(insight.generated_at).toLocaleDateString() : '';
+  const logoUrl = `${window.location.origin}/logo.png`;
+
+  const section = (title: string, body: string) =>
+    `<div class="section"><h2>${esc(title)}</h2>${body}</div>`;
+
+  const accentSection = (title: string, body: string, accent: string) =>
+    `<div class="section accent-section" style="background:${accent}10;border:1px solid ${accent}25;border-radius:8px;padding:20px 24px;">`
+    + `<h2 style="color:${accent}">${esc(title)}</h2>${body}</div>`;
+
+  // Build stats cards
+  const statItems = [
+    ['Sessions', String(s.total_sessions)],
+    ['Cost', formatCost(s.total_cost_usd)],
+    ['Files Touched', String(s.total_files_touched)],
+    ['Prompts', String(s.total_prompts)],
+    ['Avg Session', formatDuration(s.avg_session_duration_ms)],
+    ['Total Tokens', formatTokens(s.total_input_tokens + s.total_output_tokens)],
+    ...(s.total_overlaps > 0 ? [['Overlaps', String(s.total_overlaps)], ['Blocked', String(s.total_blocks)]] : []),
+  ];
+  const statsHTML = `<div class="stats-grid">${statItems.map(([label, value]) =>
+    `<div class="stat"><div class="stat-val">${esc(value as string)}</div><div class="stat-lbl">${esc(label as string)}</div></div>`
+  ).join('')}</div>`;
+
+  // Highlights
+  const highlightsHTML = content.highlights?.length
+    ? section('Highlights', `<ul>${content.highlights.map(h => `<li>${esc(h)}</li>`).join('')}</ul>`)
+    : '';
+
+  // Session analysis
+  let sessionAnalysisHTML = '';
+  if (content.facet_stats && content.facet_stats.total_facets > 0) {
+    const fs = content.facet_stats;
+    let inner = '';
+    if (Object.keys(fs.outcomes).length) {
+      inner += '<div class="analysis-col"><h3>Outcomes</h3>';
+      const sorted = Object.entries(fs.outcomes).sort((a, b) => b[1] - a[1]);
+      sorted.forEach(([outcome, count]) => {
+        const pct = (count / fs.total_facets) * 100;
+        const color = outcome === 'fully_achieved' ? '#8a9e6d' : outcome === 'mostly_achieved' ? '#8abe6f'
+          : outcome === 'partially_achieved' ? '#d4a843' : '#d97757';
+        inner += `<div class="bar-row"><span class="bar-lbl">${esc(formatCategory(outcome))}</span>`
+          + `<div class="bar-track"><div class="bar-fill" style="width:${pct}%;background:${color}"></div></div>`
+          + `<span class="bar-ct">${count}</span></div>`;
+      });
+      inner += '</div>';
+    }
+    if (Object.keys(fs.session_types).length) {
+      inner += '<div class="analysis-col"><h3>Session Types</h3><div class="pills">';
+      Object.entries(fs.session_types).sort((a, b) => b[1] - a[1])
+        .forEach(([t, c]) => { inner += `<span class="pill">${esc(formatCategory(t))} <strong>${c}</strong></span>`; });
+      inner += '</div>';
+      if (fs.top_goal_categories?.length) {
+        inner += '<h3 style="margin-top:12px">Top Categories</h3><div class="pills">';
+        fs.top_goal_categories.slice(0, 6).forEach(g => {
+          inner += `<span class="pill cat">${esc(formatCategory(g.category))} <strong>${g.count}</strong></span>`;
+        });
+        inner += '</div>';
+      }
+      inner += '</div>';
+    }
+    sessionAnalysisHTML = section('Session Analysis', `<div class="analysis-grid">${inner}</div>`);
+  }
+
+  // Project areas
+  const areasHTML = content.project_areas?.length
+    ? section('What You Worked On', content.project_areas.map(a =>
+      `<div class="card"><div class="card-hdr"><span class="card-title">${esc(a.name)}</span>`
+      + `<span class="card-badge">${a.session_count} session${a.session_count !== 1 ? 's' : ''}</span></div>`
+      + `<p>${esc(a.description)}</p></div>`
+    ).join(''))
+    : '';
+
+  // Interaction style
+  const styleHTML = content.interaction_style
+    ? section('How You Use the Agent', content.interaction_style.split('\n\n').map(p => `<p>${esc(p)}</p>`).join(''))
+    : '';
+
+  // Narrative
+  const narrativeHTML = content.narrative
+    ? section('Analysis', content.narrative.split('\n\n').map(p => `<p>${esc(p)}</p>`).join(''))
+    : '';
+
+  // Accomplishments
+  const accomplishmentsHTML = content.accomplishments?.length
+    ? accentSection('Accomplishments', content.accomplishments.map(a =>
+      `<div class="item"><div class="item-title" style="color:#8a9e6d">${esc(a.title)}</div><p>${esc(a.description)}</p></div>`
+    ).join(''), '#8a9e6d')
+    : '';
+
+  // Friction
+  const frictionHTML = content.friction_analysis?.length
+    ? accentSection('Where Things Went Wrong', content.friction_analysis.map(f =>
+      `<div class="item"><div class="item-title" style="color:#d97757">${esc(f.category)}</div>`
+      + `<p>${esc(f.description)}</p>`
+      + (f.examples?.length ? `<ul class="examples">${f.examples.map(ex => `<li>${esc(ex)}</li>`).join('')}</ul>` : '')
+      + '</div>'
+    ).join(''), '#d97757')
+    : '';
+
+  // Tables
+  const makeTable = (title: string, headers: string[], rows: string[][]) => {
+    if (!rows.length) return '';
+    return section(title,
+      `<table><thead><tr>${headers.map(h => `<th>${esc(h)}</th>`).join('')}</tr></thead>`
+      + `<tbody>${rows.map(r => `<tr>${r.map(c => `<td>${esc(c)}</td>`).join('')}</tr>`).join('')}</tbody></table>`
+    );
+  };
+
+  const reposTable = makeTable('Repositories', ['Repo', 'Sessions', 'Files', 'Cost'],
+    content.by_repo.map(r => [r.repo_name, String(r.session_count), String(r.file_count), formatCost(r.cost)]));
+
+  // Tool usage as bar chart
+  let toolHTML = '';
+  if (content.tool_usage?.length) {
+    const max = content.tool_usage[0]?.count || 1;
+    toolHTML = section('Tool Usage', `<div class="tool-bars">${content.tool_usage.slice(0, 8).map(t =>
+      `<div class="bar-row"><span class="bar-lbl">${esc(t.tool_name)}</span>`
+      + `<div class="bar-track"><div class="bar-fill" style="width:${(t.count / max) * 100}%;background:#6b9edd"></div></div>`
+      + `<span class="bar-ct">${t.count}</span></div>`
+    ).join('')}</div>`);
+  }
+
+  const filesTable = makeTable('Most Active Files', ['File', 'Repo', 'Edits', 'Users'],
+    content.hottest_files.slice(0, 8).map(f => [f.file_path, f.repo_name, String(f.edit_count), String(f.user_count)]));
+
+  const modelsTable = makeTable('Models Used', ['Model', 'Sessions', 'Cost'],
+    content.by_model.map(m => [m.model, String(m.session_count), formatCost(m.cost)]));
+
+  const recsHTML = recs.length
+    ? accentSection('Recommendations', recs.map(r =>
+      `<div class="item"><div class="item-title" style="color:#8a9e6d">${esc(r.title)}</div>`
+      + (r.description ? `<p>${esc(r.description)}</p>` : '') + '</div>'
+    ).join(''), '#8a9e6d')
+    : '';
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>${esc(periodLabel)} — Overlap Insight Report</title>
+<style>
+  @page { margin: 16mm 14mm; size: A4; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: #1a1a2e; line-height: 1.6; padding: 0; background: #fff; font-size: 13px; }
+  .page { max-width: 720px; margin: 0 auto; padding: 0 20px; }
+  .header { display: flex; align-items: center; gap: 10px; padding-bottom: 16px; border-bottom: 2px solid #1a1a2e; margin-bottom: 24px; }
+  .header img { width: 28px; height: 28px; }
+  .header-brand { font-size: 1.3rem; font-weight: 700; letter-spacing: 0.04em; color: #1a1a2e; text-decoration: none; }
+  .header-right { margin-left: auto; text-align: right; font-size: 0.75rem; color: #666; }
+  .period-title { font-size: 1.5rem; font-weight: 700; color: #1a1a2e; margin-bottom: 4px; }
+  .summary { font-size: 0.95rem; color: #444; margin-bottom: 24px; line-height: 1.7; }
+  .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 28px; }
+  .stat { background: #f7f8fa; border: 1px solid #e5e7eb; border-radius: 6px; padding: 12px 10px; text-align: center; }
+  .stat-val { font-size: 1.2rem; font-weight: 700; color: #1a1a2e; font-family: 'SF Mono', 'Consolas', monospace; }
+  .stat-lbl { font-size: 0.65rem; color: #888; text-transform: uppercase; letter-spacing: 0.05em; margin-top: 2px; }
+  .section { margin-bottom: 24px; break-inside: avoid; }
+  .section h2 { font-size: 1rem; font-weight: 700; color: #1a1a2e; margin-bottom: 10px; padding-bottom: 6px; border-bottom: 1px solid #e5e7eb; }
+  .section h3 { font-size: 0.85rem; font-weight: 600; color: #555; margin-bottom: 6px; }
+  .section p { font-size: 0.85rem; color: #444; line-height: 1.7; margin-bottom: 8px; }
+  .section ul { padding-left: 18px; margin-bottom: 8px; }
+  .section li { font-size: 0.85rem; color: #444; margin-bottom: 4px; line-height: 1.6; }
+  .accent-section { margin-bottom: 24px; break-inside: avoid; }
+  .accent-section h2 { border-bottom: none; padding-bottom: 0; }
+  .analysis-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .analysis-col { min-width: 0; }
+  .bar-row { display: flex; align-items: center; gap: 8px; margin-bottom: 5px; }
+  .bar-lbl { font-size: 0.75rem; color: #555; min-width: 110px; font-family: 'SF Mono', 'Consolas', monospace; }
+  .bar-track { flex: 1; height: 6px; background: #eee; border-radius: 3px; overflow: hidden; }
+  .bar-fill { height: 100%; border-radius: 3px; }
+  .bar-ct { font-size: 0.72rem; color: #888; min-width: 24px; text-align: right; font-family: 'SF Mono', 'Consolas', monospace; }
+  .pills { display: flex; flex-wrap: wrap; gap: 5px; }
+  .pill { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; background: #f0f1f3; border: 1px solid #e0e2e6; border-radius: 4px; font-size: 0.72rem; color: #555; font-family: 'SF Mono', 'Consolas', monospace; }
+  .pill strong { color: #6b9edd; }
+  .pill.cat strong { color: #d4a843; }
+  .card { background: #f7f8fa; border: 1px solid #e5e7eb; border-radius: 6px; padding: 12px 16px; margin-bottom: 8px; }
+  .card-hdr { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
+  .card-title { font-weight: 600; font-size: 0.85rem; color: #1a1a2e; font-family: 'SF Mono', 'Consolas', monospace; }
+  .card-badge { font-size: 0.72rem; color: #888; background: #eee; padding: 1px 8px; border-radius: 4px; font-family: 'SF Mono', 'Consolas', monospace; }
+  .card p { font-size: 0.82rem; color: #555; margin: 0; }
+  .item { padding: 8px 0; border-bottom: 1px solid rgba(0,0,0,0.06); }
+  .item:last-child { border-bottom: none; padding-bottom: 0; }
+  .item-title { font-weight: 600; font-size: 0.85rem; margin-bottom: 3px; font-family: 'SF Mono', 'Consolas', monospace; }
+  .item p { font-size: 0.82rem; color: #555; margin: 0; }
+  .examples { margin-top: 6px; }
+  .examples li { font-size: 0.78rem; color: #777; font-style: italic; }
+  table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+  th { text-align: left; padding: 6px 10px; background: #f7f8fa; border-bottom: 2px solid #e5e7eb; font-weight: 600; color: #555; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.03em; }
+  td { padding: 6px 10px; border-bottom: 1px solid #f0f1f3; color: #444; }
+  tr:last-child td { border-bottom: none; }
+  .footer { margin-top: 32px; padding-top: 12px; border-top: 1px solid #e5e7eb; text-align: center; font-size: 0.75rem; color: #999; }
+  .footer a { color: #6b9edd; text-decoration: none; }
+  @media print {
+    body { padding: 0; }
+    .page { max-width: none; padding: 0; }
+    .section, .accent-section { break-inside: avoid; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="header">
+    <img src="${logoUrl}" alt="overlap" />
+    <a href="https://overlap.dev" class="header-brand">overlap</a>
+    <div class="header-right">
+      ${insight.model_used ? `Model: ${esc(insight.model_used)}<br>` : ''}
+      ${generatedDate ? `Generated ${esc(generatedDate)}` : ''}
+    </div>
+  </div>
+  <div class="period-title">${esc(periodLabel)}</div>
+  <div class="summary">${esc(content.summary || '')}</div>
+  ${statsHTML}
+  ${highlightsHTML}
+  ${sessionAnalysisHTML}
+  ${areasHTML}
+  ${styleHTML}
+  ${narrativeHTML}
+  ${accomplishmentsHTML}
+  ${frictionHTML}
+  ${reposTable}
+  ${toolHTML}
+  ${filesTable}
+  ${modelsTable}
+  ${recsHTML}
+  <div class="footer">Generated by <a href="https://overlap.dev">overlap</a></div>
+</div>
+<script>window.onload=()=>setTimeout(()=>window.print(),300)</script>
+</body>
+</html>`;
+}
+
 function contentToMarkdown(content: InsightContent, periodLabel: string, insight: Insight): string {
   const s = content.stats;
   const lines: string[] = [];
@@ -784,7 +1024,9 @@ function InsightReport({ content, insight, periodLabel, onRegenerate, canRegener
 
   const handleExportPDF = () => {
     setExportOpen(false);
-    window.print();
+    const html = contentToPrintHTML(content, periodLabel, insight);
+    const w = window.open('', '_blank');
+    if (w) { w.document.write(html); w.document.close(); }
   };
 
   const handleCopyMarkdown = async () => {
@@ -804,20 +1046,6 @@ function InsightReport({ content, insight, periodLabel, onRegenerate, canRegener
 
   return (
     <div className="insight-report">
-      {/* Print-only header */}
-      <div className="print-header">
-        <a href="https://overlap.dev" className="print-brand-link" target="_blank" rel="noopener noreferrer">
-          <img src="/logo.png" alt="Overlap" className="print-logo" />
-          <span className="print-brand">overlap</span>
-        </a>
-        <div className="print-period">{periodLabel}</div>
-        <div className="print-meta">
-          {insight.model_used ? `Model: ${insight.model_used}` : ''}
-          {insight.model_used && insight.generated_at ? ' \u00B7 ' : ''}
-          {insight.generated_at ? `Generated ${new Date(insight.generated_at).toLocaleDateString()}` : ''}
-        </div>
-      </div>
-
       {/* Report header */}
       <div className="report-header">
         <div>
@@ -1092,9 +1320,6 @@ function InsightReport({ content, insight, periodLabel, onRegenerate, canRegener
           </div>
         </div>
       )}
-
-      {/* Print-only footer */}
-      <div className="print-footer">Generated by <a href="https://overlap.dev" target="_blank" rel="noopener noreferrer">Overlap</a></div>
     </div>
   );
 }
