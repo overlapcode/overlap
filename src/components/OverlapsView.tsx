@@ -178,7 +178,8 @@ export function OverlapsView() {
       setError(null);
 
       try {
-        const params = new URLSearchParams({ days: String(days) });
+        const params = new URLSearchParams();
+        if (days > 0) params.set('days', String(days));
         const res = await fetchWithTimeout(`/api/overlaps?${params}`);
         if (!res.ok) {
           throw new Error('Failed to fetch overlaps');
@@ -218,14 +219,14 @@ export function OverlapsView() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-lg)' }}>
         <h1 style={{ margin: 0, fontSize: '1.5rem' }}>Overlaps</h1>
         <div style={{ display: 'flex', gap: 'var(--space-sm)' }}>
-          {[7, 14, 30].map((d) => (
+          {[7, 14, 30, 0].map((d) => (
             <button
               key={d}
               onClick={() => setDays(d)}
               className={days === d ? 'btn btn-primary' : 'btn btn-secondary'}
               style={{ fontSize: '0.75rem', padding: 'var(--space-xs) var(--space-sm)' }}
             >
-              {d === 7 ? 'This Week' : d === 14 ? '2 Weeks' : 'This Month'}
+              {d === 7 ? 'This Week' : d === 14 ? '2 Weeks' : d === 30 ? 'This Month' : 'All Time'}
             </button>
           ))}
         </div>
@@ -235,7 +236,7 @@ export function OverlapsView() {
       {overlaps.length === 0 ? (
         <div className="card" style={{ padding: 'var(--space-xl)', textAlign: 'center' }}>
           <p style={{ fontSize: '2rem', marginBottom: 'var(--space-sm)' }}>🎉</p>
-          <p className="text-muted">No overlaps detected in the last {days} days</p>
+          <p className="text-muted">No overlaps detected{days > 0 ? ` in the last ${days} days` : ''}</p>
           <p className="text-secondary" style={{ fontSize: '0.875rem' }}>Your team is working on different areas!</p>
         </div>
       ) : (

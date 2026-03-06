@@ -63,6 +63,12 @@ function isRecent(dateStr: string, minutesThreshold: number): boolean {
   return Date.now() - new Date(dateStr).getTime() < minutesThreshold * 60 * 1000;
 }
 
+/** Pad content with leading newlines so diff line numbers match the actual file. */
+function padToLineNumber(content: string, startLine: number | null): string {
+  if (!content || !startLine || startLine <= 1) return content;
+  return '\n'.repeat(startLine - 1) + content;
+}
+
 function EditCard({ edit }: { edit: FileOp }) {
   const hasDiff = edit.old_string || edit.new_string;
   const fileName = edit.file_path?.split('/').pop() ?? 'file';
@@ -109,8 +115,8 @@ function EditCard({ edit }: { edit: FileOp }) {
       {hasDiff ? (
         <div style={{ borderRadius: 'var(--radius-sm)', overflow: 'hidden' }}>
           <MultiFileDiff
-            oldFile={{ name: fileName, contents: edit.old_string ?? '' }}
-            newFile={{ name: fileName, contents: edit.new_string ?? '' }}
+            oldFile={{ name: fileName, contents: padToLineNumber(edit.old_string ?? '', edit.start_line) }}
+            newFile={{ name: fileName, contents: padToLineNumber(edit.new_string ?? '', edit.start_line) }}
             options={{
               diffStyle: 'unified',
               theme: 'pierre-dark',

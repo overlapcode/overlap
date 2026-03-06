@@ -722,16 +722,21 @@ export async function getOverlaps(
   db: D1Database,
   options: { repoName?: string; limit?: number; days?: number } = {}
 ): Promise<OverlapWithMembers[]> {
-  const { repoName, limit = 50, days = 7 } = options;
+  const { repoName, limit = 50, days } = options;
 
   let query = `
     SELECT o.*, ma.display_name as member_a_name, mb.display_name as member_b_name
     FROM overlaps o
     JOIN members ma ON o.user_id_a = ma.user_id
     JOIN members mb ON o.user_id_b = mb.user_id
-    WHERE datetime(o.detected_at) > datetime('now', '-' || ? || ' days')
+    WHERE 1=1
   `;
-  const params: unknown[] = [days];
+  const params: unknown[] = [];
+
+  if (days != null && days > 0) {
+    query += " AND datetime(o.detected_at) > datetime('now', '-' || ? || ' days')";
+    params.push(days);
+  }
 
   if (repoName) {
     query += ' AND o.repo_name = ?';
@@ -1131,12 +1136,14 @@ export async function getTeamStats(
       `SELECT
         COUNT(*) as total_sessions,
         COALESCE(SUM(total_cost_usd), 0) as total_cost_usd,
-        COALESCE(AVG(duration_ms), 0) as avg_duration_ms
+        COALESCE(AVG(duration_ms), 0) as avg_duration_ms,
+        COALESCE(SUM(total_input_tokens), 0) as total_input_tokens,
+        COALESCE(SUM(total_output_tokens), 0) as total_output_tokens
        FROM sessions
        WHERE 1=1 ${sessionDateFilter}`
     )
     .bind(...params)
-    .first<{ total_sessions: number; total_cost_usd: number; avg_duration_ms: number }>();
+    .first<{ total_sessions: number; total_cost_usd: number; avg_duration_ms: number; total_input_tokens: number; total_output_tokens: number }>();
 
   // Total unique files (JOIN query)
   const filesStats = await db
@@ -1248,6 +1255,8 @@ export async function getTeamStats(
     total_cost_usd: basicStats?.total_cost_usd ?? 0,
     total_files: filesStats?.total_files ?? 0,
     avg_duration_ms: basicStats?.avg_duration_ms ?? 0,
+    total_input_tokens: basicStats?.total_input_tokens ?? 0,
+    total_output_tokens: basicStats?.total_output_tokens ?? 0,
     by_member: byMemberResult.results.map((r: Record<string, unknown>) => ({
       user_id: r.user_id as string,
       display_name: r.display_name as string,

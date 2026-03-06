@@ -26,9 +26,10 @@ export async function GET(context: APIContext) {
   const url = new URL(context.request.url);
   const repoName = url.searchParams.get('repoName') ?? undefined;
   const limit = parseInt(url.searchParams.get('limit') ?? '50', 10);
-  const days = parseInt(url.searchParams.get('days') ?? '7', 10);
+  const daysParam = url.searchParams.get('days');
+  const days = daysParam != null ? parseInt(daysParam, 10) : 7;
 
-  const overlaps = await getOverlaps(db, { repoName, limit, days });
+  const overlaps = await getOverlaps(db, { repoName, limit, days: days > 0 ? days : undefined });
 
   return successResponse({ overlaps });
 }

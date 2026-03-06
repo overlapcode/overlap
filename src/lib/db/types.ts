@@ -292,6 +292,8 @@ export type TeamStats = {
   total_cost_usd: number;
   total_files: number;
   avg_duration_ms: number;
+  total_input_tokens: number;
+  total_output_tokens: number;
   by_member: Array<{
     user_id: string;
     display_name: string;

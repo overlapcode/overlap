@@ -251,6 +251,11 @@ a:hover {
   text-decoration: underline;
 }
 
+/* Stats table rows — hover effect */
+.stats-row:hover {
+  background-color: var(--bg-elevated) !important;
+}
+
 /* File path tooltip (replaces unreliable native title) */
 .file-tag[data-tooltip],
 .file-tag-link[data-tooltip] {
