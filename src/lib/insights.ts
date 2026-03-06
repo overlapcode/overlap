@@ -381,9 +381,10 @@ function formatSessionBlock(ctx: SessionContext): string {
   return lines.join('\n');
 }
 
-// Sessions per LLM call — balances prompt size vs subrequest count.
-// 10 sessions per call means 50 sessions = 5 LLM calls (well within limits).
-const SESSIONS_PER_LLM_BATCH = 10;
+// Sessions per LLM call — must be high enough to minimize external fetches.
+// Cloudflare waitUntil has a ~30s wall-clock limit, so fewer calls = better.
+// 50 sessions per call keeps most weekly/monthly periods to 1 LLM call for facets.
+const SESSIONS_PER_LLM_BATCH = 50;
 
 export async function generateSessionFacets(
   db: D1Database,

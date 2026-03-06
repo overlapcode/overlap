@@ -258,6 +258,7 @@ export function InsightsView() {
       const resp = await fetchWithTimeout('/api/insights/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        timeout: 5 * 60 * 1000, // 5 min — generation runs synchronously on server
         body: JSON.stringify({
           scope,
           periodType: period.type,
@@ -271,8 +272,15 @@ export function InsightsView() {
         const err = await resp.json() as { error: string };
         throw new Error(err.error || 'Generation failed');
       }
-      // Response returns immediately — poll for completion
-      startPolling(period.start, period.type, scope);
+      const result = await resp.json() as { data: { id: string; status: string } };
+      if (result.data.status === 'completed' || result.data.status === 'failed') {
+        // Server finished synchronously — refresh data instead of polling
+        await fetchInsights();
+        setGenerating(false);
+        setGeneratingStartedAt(null);
+      } else {
+        startPolling(period.start, period.type, scope);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Generation failed');
       setGenerating(false);
@@ -286,11 +294,12 @@ export function InsightsView() {
     setError(null);
     const ungenerated = getUngeneratedPeriods();
     try {
-      // Fire all generation requests (they return immediately now)
+      // Generate each period sequentially (each runs synchronously on server)
       for (const period of ungenerated) {
         const resp = await fetchWithTimeout('/api/insights/generate', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
+          timeout: 5 * 60 * 1000,
           body: JSON.stringify({
             scope,
             periodType: period.type,
@@ -304,35 +313,10 @@ export function InsightsView() {
           console.error(`Failed to generate ${period.label}:`, err.error);
         }
       }
-      // Poll until all are done
-      if (pollRef.current) clearInterval(pollRef.current);
-      const expectedStarts = new Set(ungenerated.map(p => p.start));
-      pollRef.current = setInterval(async () => {
-        try {
-          const resp = await fetchWithTimeout(
-            `/api/insights?scope=${scope}&periodType=${periodType}&includeAvailable=1`
-          );
-          if (!resp.ok) return;
-          const json = await resp.json() as { data: ApiResponse };
-          const key = `${scope}:${periodType}`;
-          cacheRef.current[key] = { insights: json.data.insights, available: json.data.available };
-          setInsights(json.data.insights);
-          setAvailable(json.data.available);
-
-          const allDone = [...expectedStarts].every(start => {
-            const match = json.data.insights.find(i => i.period_start === start && i.period_type === periodType);
-            return match && match.status !== 'generating';
-          });
-          if (allDone) {
-            if (pollRef.current) clearInterval(pollRef.current);
-            pollRef.current = null;
-            setGenerating(false);
-            setGeneratingStartedAt(null);
-          }
-        } catch {
-          // Ignore poll errors
-        }
-      }, 3000);
+      // All done — refresh
+      await fetchInsights();
+      setGenerating(false);
+      setGeneratingStartedAt(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Batch generation failed');
       setGenerating(false);
