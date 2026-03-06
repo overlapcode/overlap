@@ -297,21 +297,21 @@ export async function aggregateInsightData(
 
 // Batched facet prompt — analyzes multiple sessions in a single LLM call.
 // This keeps external fetch count low: ceil(N/10) calls instead of N calls.
-const BATCH_FACET_PROMPT = `You are analyzing multiple coding agent sessions. For each session, extract structured metadata.
+const BATCH_FACET_PROMPT = `You are analyzing coding sessions tracked by Overlap — a self-hosted team awareness tool for Claude Code. Overlap monitors what developers are working on, detects when teammates edit overlapping code areas, and generates productivity insights. These sessions come from Claude Code JSONL logs parsed by a tracer daemon, so data may be incomplete (truncated prompts, missing file context, partial session captures).
 
 Sessions to analyze:
 {sessions_block}
 
 For EACH session, produce a JSON object with these fields:
 - "session_key": The session key provided (MUST match exactly)
-- "underlying_goal": What the user was trying to accomplish (1-2 sentences)
+- "underlying_goal": What the developer was trying to build, fix, or ship (1-2 sentences). Focus on the concrete deliverable, not abstract descriptions.
 - "goal_categories": Object mapping categories to counts. Categories: bug_fix, feature_development, refactoring, debugging, deployment, documentation, infrastructure, code_review, exploration, configuration
-- "outcome": One of "fully_achieved", "mostly_achieved", "partially_achieved", "not_achieved"
+- "outcome": One of "fully_achieved", "mostly_achieved", "partially_achieved", "not_achieved". Infer from signals: many files edited with few prompts suggests productive flow; many prompts with few edits suggests struggle; very short sessions may be incomplete.
 - "session_type": One of "single_task", "multi_task", "exploration", "debugging", "infrastructure"
-- "friction_counts": Object mapping friction types to counts. Types: wrong_approach, repeated_errors, tool_limitation, unclear_requirements, environment_issue. Empty object if none.
-- "friction_detail": Brief friction description, or null
-- "primary_success": What went well (1 sentence), or null
-- "brief_summary": 1-2 sentence summary
+- "friction_counts": Object mapping friction types to counts. Types: wrong_approach, repeated_errors, tool_limitation, unclear_requirements, environment_issue. Only include friction you can see evidence of in the prompts or file patterns. Empty object if none apparent.
+- "friction_detail": Brief description of friction observed, or null if none
+- "primary_success": The most notable thing accomplished (1 sentence), or null if unclear
+- "brief_summary": 1-2 sentence summary of what happened in the session
 
 Respond with ONLY a JSON array of objects. No markdown, no explanation.`;
 
@@ -577,8 +577,15 @@ function aggregateFacets(facets: SessionFacet[]): InsightContent['facet_stats'] 
   };
 }
 
-const SYNTHESIS_PROMPT = `You are generating a comprehensive insight report for a software development team's coding agent usage.
-This report should be detailed, specific, and actionable — like a performance review of how the team/person uses AI coding agents.
+const SYNTHESIS_PROMPT = `You are generating an insight report for Overlap — a self-hosted team awareness tool for Claude Code. Overlap tracks what developers are working on across repos, detects when teammates edit overlapping code areas ("overlaps"), and surfaces weekly/monthly productivity insights.
+
+This report appears on the Overlap dashboard. Adapt your voice to the scope:
+- If scope is "user": The reader IS the developer. Write directly to them using "you/your". Write like a sharp colleague reviewing their week — direct, specific, practical. Skip corporate language.
+- If scope is "team": The reader is a team lead or the team collectively. Use "the team" or individual names where relevant. Focus on collaboration dynamics, cross-member patterns, who worked on what, and how work was distributed. Highlight overlap detections and coordination patterns.
+
+IMPORTANT — Known data limitations:
+- Cost, token counts, and model name may be zero or "Unknown" — this is normal tracer behavior, NOT a bug. Do not flag these as issues or recommend fixing them.
+- Overlap counts (overlaps, blocks, warns) reflect detected conflicts with teammates on shared code areas. Zero overlaps is normal for solo work or well-coordinated teams — not a problem to diagnose.
 
 Scope: {scope} ({scope_detail})
 Period: {period_label} ({period_start} to {period_end})
@@ -589,33 +596,39 @@ QUANTITATIVE DATA:
 PER-SESSION ANALYSIS (each session was individually analyzed):
 {facets_json}
 
-Based on this data, generate a JSON response with these fields:
+Generate a JSON response with these fields:
 
-1. "summary" - A compelling 2-3 sentence executive summary. Be specific about what was accomplished, not generic.
+1. "summary" - 2-3 sentence executive summary. Lead with what got built or shipped, not usage numbers. Be specific.
 
-2. "highlights" - Array of 4-6 key highlights. Each should be a specific, data-backed observation (not just restating numbers).
+2. "highlights" - Array of 4-6 key highlights. Each should be a specific, insight-driven observation — not just restating numbers the user can already see. Focus on patterns, achievements, and notable behaviors. For team scope, highlight cross-member dynamics and workload distribution.
 
-3. "project_areas" - Array of objects identifying distinct work areas/themes. Each has:
-   - "name": Short descriptive name
-   - "session_count": Number of sessions in this area
-   - "description": 2-3 sentences about what was done, what was accomplished, and any notable patterns
+3. "project_areas" - Array of objects identifying distinct work themes. Each has:
+   - "name": Short descriptive name (a feature or system, not just a repo name)
+   - "session_count": Number of sessions attributable to this area. Must be realistic — counts across all areas should roughly sum to the total session count, not repeat it.
+   - "description": 2-3 sentences about what was done and accomplished. For team scope, mention who contributed.
 
-4. "interaction_style" - A paragraph (3-5 sentences) describing how the user/team interacts with the coding agent. Cover patterns like: delegation style, level of direction, how they handle errors, typical session types.
+4. "interaction_style" - A paragraph (3-5 sentences). For user scope: how you interact with Claude Code — delegation style, error handling, session focus, iterative vs batch work. For team scope: how the team collectively uses Claude Code — who delegates heavily vs stays hands-on, common patterns, coordination style.
 
 5. "friction_analysis" - Array of friction categories encountered. Each has:
    - "category": Name of friction type
-   - "description": What this friction looks like and how to reduce it
+   - "description": What happened and a concrete suggestion to reduce it
    - "examples": Array of 1-3 specific examples from sessions
+   If no friction was detected, return an empty array. Do not speculate about missing instrumentation or fabricate friction.
 
 6. "accomplishments" - Array of notable accomplishments. Each has:
    - "title": Short title
-   - "description": What was impressive about this and what it demonstrates
+   - "description": What was impressive and why it matters — focus on the engineering outcome
 
-7. "narrative" - A 3-5 paragraph rich narrative covering productivity patterns, collaboration dynamics, tool usage patterns, and cost efficiency. Reference specific repos, files, and numbers.
+7. "narrative" - 3-5 paragraph narrative telling the story of this period. What got built, what was hard, what patterns emerged, and where momentum is heading. Don't restate numbers already visible in the stats — focus on meaning, trade-offs, and trajectory. Reference specific repos and files. For team scope, weave in how different members' work connected or diverged.
 
 8. "recommendations" - Array of actionable recommendations. Each has:
    - "title": Short actionable title
-   - "description": Specific, implementable recommendation based on the data
+   - "description": A specific, implementable suggestion
+   Recommendations should cover:
+   - Coding workflow improvements (session focus, file organization, iteration patterns)
+   - Prompting techniques (how to give Claude Code better context, structure prompts for complex tasks, use CLAUDE.md effectively, break down large tasks)
+   - For team scope: collaboration improvements (reducing overlaps, coordinating on shared code, balancing workload)
+   CRITICAL: Do NOT recommend fixing the tool's data quality, instrumentation, metadata tracking, or cost tracking. Focus entirely on how to work more effectively.
 
 Respond with ONLY valid JSON (no markdown, no explanation).`;
 

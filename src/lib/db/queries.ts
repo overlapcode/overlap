@@ -1521,7 +1521,7 @@ export async function getSessionsWithoutFacets(
       `SELECT s.* FROM sessions s
        LEFT JOIN session_facets sf ON s.id = sf.session_id
        WHERE s.started_at >= ? AND s.started_at <= ?${userFilter}
-       AND sf.id IS NULL AND s.num_turns > 0
+       AND sf.id IS NULL
        ORDER BY s.started_at DESC`
     )
     .bind(...params)
