@@ -195,9 +195,10 @@ export async function classifyActivity(
   promptText: string,
   promptTimestamp: string,
   encryptionKey?: string,
+  cachedTeamConfig?: import('@lib/db/types').TeamConfig | null,
 ): Promise<void> {
   try {
-    const teamConfig = await getTeamConfig(db);
+    const teamConfig = cachedTeamConfig !== undefined ? cachedTeamConfig : await getTeamConfig(db);
     if (!teamConfig) return;
 
     // Skip if no LLM provider or set to heuristic

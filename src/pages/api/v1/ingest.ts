@@ -11,8 +11,6 @@ import type { APIContext } from 'astro';
 import { z } from 'zod';
 import { authenticateTracer, errorResponse, successResponse } from '@lib/auth/middleware';
 import {
-  getSessionById,
-  getRepoByName,
   getTeamConfig,
 } from '@lib/db/queries';
 import type { IngestEvent, Session, Repo } from '@lib/db/types';
@@ -84,9 +82,6 @@ export async function POST(context: APIContext) {
 
   const { member } = authResult.context;
 
-  // Fetch team config for stale timeout check
-  const teamConfig = await getTeamConfig(db);
-
   // Parse and validate request body
   let payload: z.infer<typeof IngestPayloadSchema>;
   try {
@@ -109,22 +104,30 @@ export async function POST(context: APIContext) {
     agent_responses_created: 0,
   };
 
-  // ── Phase 1: Pre-cache unique sessions and repos (few queries) ──────
+  // ── Phase 1: Pre-cache unique sessions, repos, and config in parallel ─
   const uniqueSessionIds = [...new Set(payload.events.map((e) => e.session_id))];
   const uniqueRepoNames = [...new Set(payload.events.map((e) => e.repo_name))];
 
   const sessionCache = new Map<string, Session>();
   const repoCache = new Map<string, Repo | null>();
 
-  // Lookup each unique session (typically 1-3 per batch)
-  for (const id of uniqueSessionIds) {
-    const session = await getSessionById(db, id);
-    if (session) sessionCache.set(id, session);
-  }
+  const [sessionResults, repoResults, teamConfig] = await Promise.all([
+    uniqueSessionIds.length > 0
+      ? db.prepare(`SELECT * FROM sessions WHERE id IN (${uniqueSessionIds.map(() => '?').join(',')})`)
+          .bind(...uniqueSessionIds).all<Session>()
+      : { results: [] as Session[] },
+    uniqueRepoNames.length > 0
+      ? db.prepare(`SELECT * FROM repos WHERE name IN (${uniqueRepoNames.map(() => '?').join(',')})`)
+          .bind(...uniqueRepoNames).all<Repo>()
+      : { results: [] as Repo[] },
+    getTeamConfig(db),
+  ]);
 
-  // Lookup each unique repo (typically 1-2 per batch)
-  for (const name of uniqueRepoNames) {
-    repoCache.set(name, await getRepoByName(db, name));
+  for (const session of sessionResults.results) {
+    sessionCache.set(session.id, session);
+  }
+  for (const repo of repoResults.results) {
+    repoCache.set(repo.name, repo);
   }
 
   // ── Phase 2: Process events, collecting batch statements ────────────
@@ -439,23 +442,21 @@ export async function POST(context: APIContext) {
     }
   }
 
-  // ── Phase 3: Add event count increments, token totals, + member active ──
-  for (const [sessionId, count] of eventCountIncrements) {
-    statements.push(
-      db.prepare(`UPDATE sessions SET summary_event_count = summary_event_count + ? WHERE id = ?`).bind(count, sessionId)
-    );
-  }
-  // Flush per-session token totals (one update per session, using MAX to keep highest)
-  for (const [sessionId, tokens] of sessionTokenUpdates) {
+  // ── Phase 3: Merge event count + token totals into one UPDATE per session ──
+  const allSessionIds = new Set([...eventCountIncrements.keys(), ...sessionTokenUpdates.keys()]);
+  for (const sessionId of allSessionIds) {
+    const count = eventCountIncrements.get(sessionId) ?? 0;
+    const tokens = sessionTokenUpdates.get(sessionId);
     statements.push(
       db.prepare(
         `UPDATE sessions SET
+          summary_event_count = summary_event_count + ?,
           total_input_tokens = MAX(COALESCE(total_input_tokens, 0), ?),
           total_output_tokens = MAX(COALESCE(total_output_tokens, 0), ?),
           cache_creation_tokens = MAX(COALESCE(cache_creation_tokens, 0), ?),
           cache_read_tokens = MAX(COALESCE(cache_read_tokens, 0), ?)
         WHERE id = ?`
-      ).bind(tokens.input, tokens.output, tokens.cacheCreate, tokens.cacheRead, sessionId)
+      ).bind(count, tokens?.input ?? 0, tokens?.output ?? 0, tokens?.cacheCreate ?? 0, tokens?.cacheRead ?? 0, sessionId)
     );
   }
   statements.push(
@@ -471,14 +472,14 @@ export async function POST(context: APIContext) {
   const encryptionKey = context.locals.runtime.env.TEAM_ENCRYPTION_KEY;
 
   for (const sessionId of sessionsForSummary) {
-    context.locals.runtime.ctx.waitUntil(maybeGenerateSummary(db, sessionId, encryptionKey));
+    context.locals.runtime.ctx.waitUntil(maybeGenerateSummary(db, sessionId, encryptionKey, teamConfig));
   }
   for (const sessionId of endedSessions) {
-    context.locals.runtime.ctx.waitUntil(generateSessionSummary(db, sessionId, encryptionKey));
+    context.locals.runtime.ctx.waitUntil(generateSessionSummary(db, sessionId, encryptionKey, teamConfig));
   }
   for (const p of promptsForClassification) {
     context.locals.runtime.ctx.waitUntil(
-      classifyActivity(db, p.sessionId, p.userId, p.repoName, p.promptText, p.timestamp, encryptionKey)
+      classifyActivity(db, p.sessionId, p.userId, p.repoName, p.promptText, p.timestamp, encryptionKey, teamConfig)
     );
   }
 

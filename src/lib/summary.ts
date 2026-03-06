@@ -211,11 +211,12 @@ export async function shouldGenerateSummary(db: D1Database, sessionId: string): 
 export async function generateSessionSummary(
   db: D1Database,
   sessionId: string,
-  encryptionKey?: string
+  encryptionKey?: string,
+  cachedTeamConfig?: import('@lib/db/types').TeamConfig | null,
 ): Promise<void> {
   try {
-    // Get team config
-    const teamConfig = await getTeamConfig(db);
+    // Get team config (use cached if provided)
+    const teamConfig = cachedTeamConfig !== undefined ? cachedTeamConfig : await getTeamConfig(db);
     if (!teamConfig) {
       console.error('No team config found, cannot generate summary');
       return;
@@ -291,10 +292,11 @@ export async function generateSessionSummary(
 export async function maybeGenerateSummary(
   db: D1Database,
   sessionId: string,
-  encryptionKey?: string
+  encryptionKey?: string,
+  cachedTeamConfig?: import('@lib/db/types').TeamConfig | null,
 ): Promise<void> {
   const shouldGenerate = await shouldGenerateSummary(db, sessionId);
   if (shouldGenerate) {
-    await generateSessionSummary(db, sessionId, encryptionKey);
+    await generateSessionSummary(db, sessionId, encryptionKey, cachedTeamConfig);
   }
 }
