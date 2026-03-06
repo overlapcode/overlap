@@ -129,6 +129,7 @@ export function InsightsView() {
   const [selectedModel, setSelectedModel] = useState<string>('');
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const hasLoadedRef = useRef(false);
+  const cacheRef = useRef<Record<string, { insights: Insight[]; available: PeriodInfo[] }>>({});
 
   // Clean up polling on unmount
   useEffect(() => {
@@ -136,7 +137,8 @@ export function InsightsView() {
   }, []);
 
   const fetchInsights = useCallback(async () => {
-    if (!hasLoadedRef.current) setLoading(true);
+    const key = `${scope}:${periodType}`;
+    if (!hasLoadedRef.current && !cacheRef.current[key]) setLoading(true);
     setError(null);
     try {
       const resp = await fetchWithTimeout(
@@ -145,6 +147,7 @@ export function InsightsView() {
       if (!resp.ok) throw new Error('Failed to fetch');
       const json = await resp.json() as { data: ApiResponse };
       const data = json.data;
+      cacheRef.current[key] = { insights: data.insights, available: data.available };
       setInsights(data.insights);
       setAvailable(data.available);
       setMember(data.member);
@@ -159,8 +162,16 @@ export function InsightsView() {
     }
   }, [scope, periodType]);
 
-  useEffect(() => { fetchInsights(); }, [fetchInsights]);
-  useEffect(() => { setSelectedPeriod(null); }, [scope, periodType]);
+  useEffect(() => {
+    setSelectedPeriod(null);
+    const key = `${scope}:${periodType}`;
+    const cached = cacheRef.current[key];
+    if (cached) {
+      setInsights(cached.insights);
+      setAvailable(cached.available);
+    }
+    fetchInsights();
+  }, [scope, periodType, fetchInsights]);
 
   const startPolling = useCallback((periodStart: string, currentPeriodType: InsightPeriodType, currentScope: InsightScope) => {
     if (pollRef.current) clearInterval(pollRef.current);
@@ -284,17 +295,28 @@ export function InsightsView() {
       .sort((a, b) => b.start.localeCompare(a.start));
   };
 
-  const generatedForType = insights
+  // Use cached data during tab transitions to prevent flash
+  const cacheKey = `${scope}:${periodType}`;
+  const cachedData = cacheRef.current[cacheKey];
+  const displayInsights = cachedData?.insights ?? insights;
+  const displayAvailable = cachedData?.available ?? available;
+
+  const generatedForType = displayInsights
     .filter(i => i.period_type === periodType)
     .sort((a, b) => b.period_start.localeCompare(a.period_start));
 
-  const ungeneratedPeriods = getUngeneratedPeriods();
+  const ungeneratedPeriods = (() => {
+    const generatedStarts = new Set(generatedForType.map(i => i.period_start));
+    return displayAvailable
+      .filter(p => p.type === periodType && !generatedStarts.has(p.start))
+      .sort((a, b) => b.start.localeCompare(a.start));
+  })();
 
   const allPeriods = [
     ...generatedForType.map(i => ({
       start: i.period_start,
       end: i.period_end,
-      label: available.find(a => a.start === i.period_start)?.label || `${i.period_start} to ${i.period_end}`,
+      label: displayAvailable.find(a => a.start === i.period_start)?.label || `${i.period_start} to ${i.period_end}`,
       insight: i,
       generated: true,
     })),
