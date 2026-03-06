@@ -105,6 +105,14 @@ function formatCategory(cat: string): string {
   return cat.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
 }
 
+function getInsightSessionCount(insight: { content: string | null } | null): number | null {
+  if (!insight?.content) return null;
+  try {
+    const parsed = JSON.parse(insight.content) as { stats?: { total_sessions?: number } };
+    return parsed.stats?.total_sessions ?? null;
+  } catch { return null; }
+}
+
 export function InsightsView() {
   const [scope, setScope] = useState<InsightScope>('user');
   const [periodType, setPeriodType] = useState<InsightPeriodType>('month');
@@ -297,6 +305,25 @@ export function InsightsView() {
     })),
   ].sort((a, b) => b.start.localeCompare(a.start));
 
+  const periodListItems = (() => {
+    type Item = { kind: 'header'; month: string } | { kind: 'period'; data: (typeof allPeriods)[number] };
+    if (periodType !== 'week') {
+      return allPeriods.map(p => ({ kind: 'period' as const, data: p }));
+    }
+    const items: Item[] = [];
+    let currentMonth = '';
+    for (const p of allPeriods) {
+      const d = new Date(p.start + 'T00:00:00Z');
+      const month = d.toLocaleString('en', { month: 'long', timeZone: 'UTC' }) + ' ' + d.getUTCFullYear();
+      if (month !== currentMonth) {
+        currentMonth = month;
+        items.push({ kind: 'header', month });
+      }
+      items.push({ kind: 'period', data: p });
+    }
+    return items;
+  })();
+
   const selectedInsight = selectedPeriod
     ? generatedForType.find(i => i.period_start === selectedPeriod) ?? null
     : generatedForType[0] ?? null;
@@ -358,36 +385,46 @@ export function InsightsView() {
               )}
             </div>
 
-            {allPeriods.length === 0 && (
+            {periodListItems.length === 0 && (
               <div className="no-periods">No completed periods yet. Insights are generated for past periods only.</div>
             )}
 
-            {allPeriods.map((p) => (
-              <div
-                key={p.start}
-                className={`period-item ${selectedPeriod === p.start || (!selectedPeriod && p.insight?.id === selectedInsight?.id) ? 'selected' : ''} ${p.generated ? 'generated' : 'ungenerated'}`}
-                onClick={() => (p.generated || p.insight?.status === 'generating') ? setSelectedPeriod(p.start) : undefined}
-              >
-                <div className="period-item-label">{p.label}</div>
-                <div className="period-item-status">
-                  {p.insight?.status === 'generating' ? (
-                    <span className="status-badge generating">Generating...</span>
-                  ) : p.generated ? (
-                    <span className="status-badge completed">{p.insight?.status === 'failed' ? 'Failed' : 'Generated'}</span>
-                  ) : (
-                    canGenerateTeam && (
-                      <button
-                        className="btn-generate-single"
-                        onClick={(e) => { e.stopPropagation(); handleGenerate({ type: periodType, start: p.start, end: p.end, label: p.label }); }}
-                        disabled={generating}
-                      >
-                        Generate
-                      </button>
-                    )
-                  )}
+            {periodListItems.map((item) => {
+              if (item.kind === 'header') {
+                return <div key={item.month} className="month-group-header">{item.month}</div>;
+              }
+              const p = item.data;
+              const sessionCount = getInsightSessionCount(p.insight);
+              return (
+                <div
+                  key={p.start}
+                  className={`period-item ${selectedPeriod === p.start || (!selectedPeriod && p.insight?.id === selectedInsight?.id) ? 'selected' : ''} ${p.generated ? 'generated' : 'ungenerated'}`}
+                  onClick={() => (p.generated || p.insight?.status === 'generating') ? setSelectedPeriod(p.start) : undefined}
+                >
+                  <div className="period-item-label">{p.label}</div>
+                  <div className="period-item-status">
+                    {p.insight?.status === 'generating' ? (
+                      <span className="status-badge generating">Generating...</span>
+                    ) : p.generated ? (
+                      <>
+                        {sessionCount !== null && <span className="period-session-count">{sessionCount} {sessionCount === 1 ? 'session' : 'sessions'}</span>}
+                        {p.insight?.status === 'failed' && <span className="status-badge failed">Failed</span>}
+                      </>
+                    ) : (
+                      canGenerateTeam && (
+                        <button
+                          className="btn-generate-single"
+                          onClick={(e) => { e.stopPropagation(); handleGenerate({ type: periodType, start: p.start, end: p.end, label: p.label }); }}
+                          disabled={generating}
+                        >
+                          Generate
+                        </button>
+                      )
+                    )}
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
 
             {scope === 'team' && !isAdmin && ungeneratedPeriods.length > 0 && (
               <div className="admin-note">Only admins can generate team insights.</div>

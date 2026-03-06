@@ -252,6 +252,31 @@ const teamConfig = await getTeamConfig(db);
     50% { opacity: 0.5; }
   }
 
+  :global(.status-badge.failed) {
+    background: rgba(217, 119, 87, 0.2);
+    color: #d97757;
+  }
+
+  :global(.month-group-header) {
+    font-family: var(--font-mono);
+    font-size: 0.65rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    padding: var(--space-sm) var(--space-sm) var(--space-xs);
+    margin-top: var(--space-xs);
+  }
+
+  :global(.month-group-header:first-child) {
+    margin-top: 0;
+  }
+
+  :global(.period-session-count) {
+    font-family: var(--font-mono);
+    font-size: 0.65rem;
+    color: var(--text-muted);
+  }
+
   :global(.btn-generate-single) {
     padding: 2px 8px;
     background: transparent;

@@ -49,8 +49,14 @@ export function getAvailablePeriods(type: InsightPeriodType, earliestDate: strin
       const end = new Date(d);
       end.setUTCDate(end.getUTCDate() + 6);
       if (end < now) {
-        const weekNum = getISOWeek(d);
-        periods.push({ type: 'week', start, end: end.toISOString().split('T')[0], label: `Week ${weekNum}, ${d.getUTCFullYear()}` });
+        const startMonth = d.toLocaleString('en', { month: 'short', timeZone: 'UTC' });
+        const endMonth = end.toLocaleString('en', { month: 'short', timeZone: 'UTC' });
+        const startDay = d.getUTCDate();
+        const endDay = end.getUTCDate();
+        const label = startMonth === endMonth
+          ? `${startMonth} ${startDay} - ${endDay}`
+          : `${startMonth} ${startDay} - ${endMonth} ${endDay}`;
+        periods.push({ type: 'week', start, end: end.toISOString().split('T')[0], label });
       }
       d.setUTCDate(d.getUTCDate() + 7);
     }
@@ -89,13 +95,6 @@ export function getAvailablePeriods(type: InsightPeriodType, earliestDate: strin
   }
 
   return periods;
-}
-
-function getISOWeek(date: Date): number {
-  const d = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
-  d.setUTCDate(d.getUTCDate() + 4 - (d.getUTCDay() || 7));
-  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
-  return Math.ceil(((d.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
 }
 
 // ── LLM Provider ────────────────────────────────────────────────────────
