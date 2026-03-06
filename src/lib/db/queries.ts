@@ -1444,7 +1444,9 @@ export async function upsertInsight(
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
        ON CONFLICT(scope, COALESCE(user_id, '__team__'), period_type, period_start)
        DO UPDATE SET model_used = excluded.model_used, status = excluded.status, content = excluded.content,
-                     error = excluded.error, generated_at = excluded.generated_at, updated_at = datetime('now')`
+                     error = excluded.error, generated_at = excluded.generated_at,
+                     created_at = CASE WHEN excluded.status = 'generating' THEN datetime('now') ELSE insights.created_at END,
+                     updated_at = datetime('now')`
     )
     .bind(
       insight.id,
