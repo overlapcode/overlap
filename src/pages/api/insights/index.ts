@@ -11,7 +11,7 @@
 
 import type { APIContext } from 'astro';
 import { authenticateWebSession, errorResponse, successResponse } from '@lib/auth/middleware';
-import { getInsights } from '@lib/db/queries';
+import { getInsights, upsertInsight } from '@lib/db/queries';
 import { getEarliestSessionDate, getAvailablePeriods } from '@lib/insights';
 import type { InsightPeriodType, InsightScope } from '@lib/db/types';
 
@@ -32,6 +32,33 @@ export async function GET(context: APIContext) {
     const userId = scope === 'user' ? authResult.context.member.user_id : null;
 
     const insights = await getInsights(db, scope, userId, periodType ?? undefined);
+
+    // Auto-expire stuck "generating" insights (waitUntil may have been killed)
+    const STUCK_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
+    const now = Date.now();
+    for (const insight of insights) {
+      if (insight.status === 'generating' && insight.created_at) {
+        const created = new Date(insight.created_at + (insight.created_at.endsWith('Z') ? '' : 'Z')).getTime();
+        if (now - created > STUCK_TIMEOUT_MS) {
+          insight.status = 'failed';
+          insight.error = 'Generation timed out. Try again — if it persists, the period may have too many sessions for the current model.';
+          // Fire-and-forget DB update
+          upsertInsight(db, {
+            id: insight.id,
+            scope: insight.scope,
+            user_id: insight.user_id,
+            period_type: insight.period_type,
+            period_start: insight.period_start,
+            period_end: insight.period_end,
+            model_used: insight.model_used,
+            status: 'failed',
+            content: null,
+            error: insight.error,
+            generated_at: null,
+          }).catch(e => console.error('Failed to expire stuck insight:', e));
+        }
+      }
+    }
 
     let available: ReturnType<typeof getAvailablePeriods> = [];
     if (includeAvailable) {

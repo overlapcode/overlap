@@ -130,11 +130,26 @@ export function InsightsView() {
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const hasLoadedRef = useRef(false);
   const cacheRef = useRef<Record<string, { insights: Insight[]; available: PeriodInfo[] }>>({});
+  const prefetchedRef = useRef(false);
+  const [generatingStartedAt, setGeneratingStartedAt] = useState<number | null>(null);
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
 
   // Clean up polling on unmount
   useEffect(() => {
     return () => { if (pollRef.current) clearInterval(pollRef.current); };
   }, []);
+
+  // Elapsed time counter while generating
+  useEffect(() => {
+    if (!generating || !generatingStartedAt) {
+      setElapsedSeconds(0);
+      return;
+    }
+    const timer = setInterval(() => {
+      setElapsedSeconds(Math.floor((Date.now() - generatingStartedAt) / 1000));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [generating, generatingStartedAt]);
 
   const fetchInsights = useCallback(async () => {
     const key = `${scope}:${periodType}`;
@@ -170,7 +185,23 @@ export function InsightsView() {
       setInsights(cached.insights);
       setAvailable(cached.available);
     }
-    fetchInsights();
+    fetchInsights().then(() => {
+      // Prefetch other period types in background so tab switching is instant
+      if (!prefetchedRef.current) {
+        prefetchedRef.current = true;
+        const otherTypes = (['week', 'month', 'quarter', 'year'] as InsightPeriodType[])
+          .filter(t => t !== periodType);
+        for (const t of otherTypes) {
+          const otherKey = `${scope}:${t}`;
+          if (!cacheRef.current[otherKey]) {
+            fetchWithTimeout(`/api/insights?scope=${scope}&periodType=${t}&includeAvailable=1`)
+              .then(r => r.ok ? r.json() as Promise<{ data: ApiResponse }> : null)
+              .then(json => { if (json) cacheRef.current[otherKey] = { insights: json.data.insights, available: json.data.available }; })
+              .catch(() => {});
+          }
+        }
+      }
+    });
   }, [scope, periodType, fetchInsights]);
 
   const startPolling = useCallback((periodStart: string, currentPeriodType: InsightPeriodType, currentScope: InsightScope) => {
@@ -192,6 +223,7 @@ export function InsightsView() {
           if (pollRef.current) clearInterval(pollRef.current);
           pollRef.current = null;
           setGenerating(false);
+          setGeneratingStartedAt(null);
           setSelectedPeriod(periodStart);
           if (match.status === 'failed') {
             setError(match.error || 'Generation failed');
@@ -205,6 +237,7 @@ export function InsightsView() {
 
   const handleGenerate = async (period: PeriodInfo, regenerate = false) => {
     setGenerating(true);
+    setGeneratingStartedAt(Date.now());
     setError(null);
     try {
       const resp = await fetchWithTimeout('/api/insights/generate', {
@@ -228,11 +261,13 @@ export function InsightsView() {
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Generation failed');
       setGenerating(false);
+      setGeneratingStartedAt(null);
     }
   };
 
   const handleGenerateAll = async () => {
     setGenerating(true);
+    setGeneratingStartedAt(Date.now());
     setError(null);
     const ungenerated = getUngeneratedPeriods();
     try {
@@ -275,6 +310,7 @@ export function InsightsView() {
             if (pollRef.current) clearInterval(pollRef.current);
             pollRef.current = null;
             setGenerating(false);
+            setGeneratingStartedAt(null);
           }
         } catch {
           // Ignore poll errors
@@ -283,6 +319,7 @@ export function InsightsView() {
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Batch generation failed');
       setGenerating(false);
+      setGeneratingStartedAt(null);
     }
   };
 
@@ -367,10 +404,10 @@ export function InsightsView() {
         <h1>Insights</h1>
         <div className="insights-controls">
           <div className="scope-toggle">
-            <button className={`scope-btn ${scope === 'user' ? 'active' : ''}`} onClick={() => setScope('user')}>
+            <button className={`scope-btn ${scope === 'user' ? 'active' : ''}`} onClick={() => { setScope('user'); prefetchedRef.current = false; }}>
               My Insights
             </button>
-            <button className={`scope-btn ${scope === 'team' ? 'active' : ''}`} onClick={() => setScope('team')}>
+            <button className={`scope-btn ${scope === 'team' ? 'active' : ''}`} onClick={() => { setScope('team'); prefetchedRef.current = false; }}>
               Team Insights
             </button>
           </div>
@@ -428,7 +465,7 @@ export function InsightsView() {
                   <div className="period-item-label">{p.label}</div>
                   <div className="period-item-status">
                     {p.insight?.status === 'generating' ? (
-                      <span className="status-badge generating">Generating...</span>
+                      <span className="status-badge generating">Generating{elapsedSeconds > 0 ? ` ${elapsedSeconds}s` : '...'}</span>
                     ) : p.generated ? (
                       <>
                         {sessionCount !== null && <span className="period-session-count">{sessionCount} {sessionCount === 1 ? 'session' : 'sessions'}</span>}
@@ -467,8 +504,14 @@ export function InsightsView() {
             ) : selectedInsight.status === 'generating' ? (
               <div className="no-insight-selected generating-state">
                 <div className="generating-spinner" />
-                <p>Generating insight... This may take a minute.</p>
-                <p className="generating-sub">Analyzing sessions, generating facets, and synthesizing your report.</p>
+                <p>Generating insight{elapsedSeconds > 0 ? ` (${elapsedSeconds}s)` : ''}...</p>
+                <p className="generating-sub">
+                  {elapsedSeconds < 30
+                    ? 'Analyzing sessions, generating facets, and synthesizing your report.'
+                    : elapsedSeconds < 90
+                      ? 'Still working — this typically takes 30-90 seconds for large periods.'
+                      : 'Taking longer than usual — the LLM may be processing a large volume of data.'}
+                </p>
               </div>
             ) : parsedContent ? (
               <InsightReport

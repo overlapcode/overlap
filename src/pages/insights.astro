@@ -18,7 +18,7 @@ const teamConfig = await getTeamConfig(db);
 
 <Layout title="Insights - Overlap">
   <Header teamName={teamConfig?.team_name} userName={authResult.context.member.display_name} client:load />
-  <main style="padding: var(--space-lg); max-width: 1200px; margin: 0 auto;">
+  <main style="padding: var(--space-lg); max-width: 1200px; margin: 0 auto; overflow-y: auto; scrollbar-gutter: stable;">
     <InsightsView client:load />
   </main>
 </Layout>
@@ -144,6 +144,11 @@ const teamConfig = await getTeamConfig(db);
     display: grid;
     grid-template-columns: 280px 1fr;
     gap: var(--space-lg);
+    min-height: 0;
+  }
+
+  :global(.insights-layout > *) {
+    min-width: 0;
   }
 
   @media (max-width: 768px) {
@@ -160,6 +165,7 @@ const teamConfig = await getTeamConfig(db);
     padding: var(--space-sm);
     max-height: calc(100vh - 200px);
     overflow-y: auto;
+    scrollbar-gutter: stable;
   }
 
   :global(.period-list-header) {
@@ -311,6 +317,8 @@ const teamConfig = await getTeamConfig(db);
   /* Insight detail */
   :global(.insight-detail) {
     min-height: 300px;
+    overflow-wrap: break-word;
+    word-break: break-word;
   }
 
   :global(.no-insight-selected) {
