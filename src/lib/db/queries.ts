@@ -1377,6 +1377,182 @@ export async function getActivityBlocksByUser(
   return result.results;
 }
 
+// ============================================================================
+// INSIGHT QUERIES
+// ============================================================================
+
+export async function getInsights(
+  db: D1Database,
+  scope: import('./types').InsightScope,
+  userId: string | null,
+  periodType?: import('./types').InsightPeriodType,
+): Promise<import('./types').Insight[]> {
+  let query = 'SELECT * FROM insights WHERE scope = ?';
+  const params: unknown[] = [scope];
+
+  if (scope === 'user' && userId) {
+    query += ' AND user_id = ?';
+    params.push(userId);
+  } else if (scope === 'team') {
+    query += ' AND user_id IS NULL';
+  }
+
+  if (periodType) {
+    query += ' AND period_type = ?';
+    params.push(periodType);
+  }
+
+  query += ' ORDER BY period_start DESC';
+
+  const result = await db.prepare(query).bind(...params).all<import('./types').Insight>();
+  return result.results;
+}
+
+export async function getInsightById(
+  db: D1Database,
+  id: string,
+): Promise<import('./types').Insight | null> {
+  return db.prepare('SELECT * FROM insights WHERE id = ?').bind(id).first<import('./types').Insight>();
+}
+
+export async function getInsightByPeriod(
+  db: D1Database,
+  scope: import('./types').InsightScope,
+  userId: string | null,
+  periodType: import('./types').InsightPeriodType,
+  periodStart: string,
+): Promise<import('./types').Insight | null> {
+  if (scope === 'user' && userId) {
+    return db
+      .prepare('SELECT * FROM insights WHERE scope = ? AND user_id = ? AND period_type = ? AND period_start = ?')
+      .bind(scope, userId, periodType, periodStart)
+      .first<import('./types').Insight>();
+  }
+  return db
+    .prepare('SELECT * FROM insights WHERE scope = ? AND user_id IS NULL AND period_type = ? AND period_start = ?')
+    .bind(scope, periodType, periodStart)
+    .first<import('./types').Insight>();
+}
+
+export async function upsertInsight(
+  db: D1Database,
+  insight: Omit<import('./types').Insight, 'created_at' | 'updated_at'>,
+): Promise<void> {
+  await db
+    .prepare(
+      `INSERT INTO insights (id, scope, user_id, period_type, period_start, period_end, model_used, status, content, error, generated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT(scope, COALESCE(user_id, '__team__'), period_type, period_start)
+       DO UPDATE SET model_used = excluded.model_used, status = excluded.status, content = excluded.content,
+                     error = excluded.error, generated_at = excluded.generated_at, updated_at = datetime('now')`
+    )
+    .bind(
+      insight.id,
+      insight.scope,
+      insight.user_id,
+      insight.period_type,
+      insight.period_start,
+      insight.period_end,
+      insight.model_used,
+      insight.status,
+      insight.content,
+      insight.error,
+      insight.generated_at,
+    )
+    .run();
+}
+
+// ============================================================================
+// SESSION FACET QUERIES
+// ============================================================================
+
+export async function getSessionFacet(
+  db: D1Database,
+  sessionId: string,
+): Promise<import('./types').SessionFacet | null> {
+  return db
+    .prepare('SELECT * FROM session_facets WHERE session_id = ?')
+    .bind(sessionId)
+    .first<import('./types').SessionFacet>();
+}
+
+export async function getSessionFacetsForPeriod(
+  db: D1Database,
+  userId: string | null,
+  periodStart: string,
+  periodEnd: string,
+): Promise<import('./types').SessionFacet[]> {
+  if (userId) {
+    const result = await db
+      .prepare(
+        `SELECT sf.* FROM session_facets sf
+         JOIN sessions s ON sf.session_id = s.id
+         WHERE sf.user_id = ? AND s.started_at >= ? AND s.started_at <= ?
+         ORDER BY s.started_at DESC`
+      )
+      .bind(userId, periodStart, periodEnd + 'T23:59:59')
+      .all<import('./types').SessionFacet>();
+    return result.results;
+  }
+  const result = await db
+    .prepare(
+      `SELECT sf.* FROM session_facets sf
+       JOIN sessions s ON sf.session_id = s.id
+       WHERE s.started_at >= ? AND s.started_at <= ?
+       ORDER BY s.started_at DESC`
+    )
+    .bind(periodStart, periodEnd + 'T23:59:59')
+    .all<import('./types').SessionFacet>();
+  return result.results;
+}
+
+export async function getSessionsWithoutFacets(
+  db: D1Database,
+  userId: string | null,
+  periodStart: string,
+  periodEnd: string,
+): Promise<import('./types').Session[]> {
+  const userFilter = userId ? ' AND s.user_id = ?' : '';
+  const params = userId
+    ? [periodStart, periodEnd + 'T23:59:59', userId]
+    : [periodStart, periodEnd + 'T23:59:59'];
+  const result = await db
+    .prepare(
+      `SELECT s.* FROM sessions s
+       LEFT JOIN session_facets sf ON s.id = sf.session_id
+       WHERE s.started_at >= ? AND s.started_at <= ?${userFilter}
+       AND sf.id IS NULL AND s.num_turns > 0
+       ORDER BY s.started_at DESC`
+    )
+    .bind(...params)
+    .all<import('./types').Session>();
+  return result.results;
+}
+
+export async function upsertSessionFacet(
+  db: D1Database,
+  facet: Omit<import('./types').SessionFacet, 'created_at'>,
+): Promise<void> {
+  await db
+    .prepare(
+      `INSERT INTO session_facets (id, session_id, user_id, underlying_goal, goal_categories, outcome, session_type, friction_counts, friction_detail, primary_success, brief_summary, model_used, generated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT(session_id)
+       DO UPDATE SET underlying_goal = excluded.underlying_goal, goal_categories = excluded.goal_categories,
+                     outcome = excluded.outcome, session_type = excluded.session_type,
+                     friction_counts = excluded.friction_counts, friction_detail = excluded.friction_detail,
+                     primary_success = excluded.primary_success, brief_summary = excluded.brief_summary,
+                     model_used = excluded.model_used, generated_at = excluded.generated_at`
+    )
+    .bind(
+      facet.id, facet.session_id, facet.user_id,
+      facet.underlying_goal, facet.goal_categories, facet.outcome,
+      facet.session_type, facet.friction_counts, facet.friction_detail,
+      facet.primary_success, facet.brief_summary, facet.model_used, facet.generated_at,
+    )
+    .run();
+}
+
 export async function getActivityBlocksByRepo(
   db: D1Database,
   repoName: string,

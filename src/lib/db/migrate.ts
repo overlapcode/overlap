@@ -219,6 +219,51 @@ CREATE INDEX IF NOT EXISTS idx_file_ops_overlap_query ON file_operations(repo_na
 
 -- Unique index on overlap public_id for UUID lookups
 CREATE UNIQUE INDEX IF NOT EXISTS idx_overlaps_public_id ON overlaps(public_id) WHERE public_id IS NOT NULL;
+
+-- INSIGHTS
+-- Generated insight reports (per user or team, per period).
+CREATE TABLE IF NOT EXISTS insights (
+    id TEXT PRIMARY KEY,
+    scope TEXT NOT NULL DEFAULT 'user',
+    user_id TEXT REFERENCES members(user_id),
+    period_type TEXT NOT NULL,
+    period_start TEXT NOT NULL,
+    period_end TEXT NOT NULL,
+    model_used TEXT,
+    status TEXT NOT NULL DEFAULT 'pending',
+    content TEXT,
+    error TEXT,
+    generated_at TEXT,
+    created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_insights_user ON insights(user_id, period_type, period_start DESC);
+CREATE INDEX IF NOT EXISTS idx_insights_scope ON insights(scope, period_type, period_start DESC);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_insights_dedup ON insights(scope, COALESCE(user_id, '__team__'), period_type, period_start);
+
+-- SESSION_FACETS
+-- Per-session LLM analysis (Layer 1 of two-layer insight generation).
+-- Each session is analyzed individually; facets are aggregated for period insights.
+CREATE TABLE IF NOT EXISTS session_facets (
+    id TEXT PRIMARY KEY,
+    session_id TEXT NOT NULL REFERENCES sessions(id),
+    user_id TEXT NOT NULL,
+    underlying_goal TEXT,
+    goal_categories TEXT,
+    outcome TEXT,
+    session_type TEXT,
+    friction_counts TEXT,
+    friction_detail TEXT,
+    primary_success TEXT,
+    brief_summary TEXT,
+    model_used TEXT,
+    generated_at TEXT,
+    created_at TEXT DEFAULT (datetime('now'))
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_session_facets_session ON session_facets(session_id);
+CREATE INDEX IF NOT EXISTS idx_session_facets_user ON session_facets(user_id, generated_at DESC);
 `;
 
 /**

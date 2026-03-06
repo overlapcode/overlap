@@ -250,6 +250,125 @@ export type IngestEvent = {
 };
 
 // ============================================================================
+// INSIGHTS
+// Generated insight reports (per user or team, per period)
+// ============================================================================
+export type InsightPeriodType = 'week' | 'month' | 'quarter' | 'year';
+export type InsightScope = 'user' | 'team';
+export type InsightStatus = 'pending' | 'generating' | 'completed' | 'failed';
+
+export type Insight = {
+  id: string;
+  scope: InsightScope;
+  user_id: string | null;
+  period_type: InsightPeriodType;
+  period_start: string;
+  period_end: string;
+  model_used: string | null;
+  status: InsightStatus;
+  content: string | null; // JSON string of InsightContent
+  error: string | null;
+  generated_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+// ============================================================================
+// SESSION FACETS
+// Per-session LLM analysis (Layer 1 of two-layer insights)
+// ============================================================================
+export type SessionFacet = {
+  id: string;
+  session_id: string;
+  user_id: string;
+  underlying_goal: string | null;
+  goal_categories: string | null; // JSON: Record<string, number>
+  outcome: 'fully_achieved' | 'mostly_achieved' | 'partially_achieved' | 'not_achieved' | null;
+  session_type: 'single_task' | 'multi_task' | 'exploration' | 'debugging' | 'infrastructure' | null;
+  friction_counts: string | null; // JSON: Record<string, number>
+  friction_detail: string | null;
+  primary_success: string | null;
+  brief_summary: string | null;
+  model_used: string | null;
+  generated_at: string | null;
+  created_at: string;
+};
+
+export type ParsedGoalCategories = Record<string, number>;
+export type ParsedFrictionCounts = Record<string, number>;
+
+export type InsightContent = {
+  // Stats (always present)
+  stats: {
+    total_sessions: number;
+    total_cost_usd: number;
+    total_input_tokens: number;
+    total_output_tokens: number;
+    total_files_touched: number;
+    total_prompts: number;
+    avg_session_duration_ms: number;
+    total_overlaps: number;
+    total_blocks: number;
+    total_warns: number;
+  };
+  by_repo: Array<{
+    repo_name: string;
+    session_count: number;
+    file_count: number;
+    cost: number;
+  }>;
+  by_model: Array<{
+    model: string;
+    session_count: number;
+    cost: number;
+  }>;
+  hottest_files: Array<{
+    file_path: string;
+    repo_name: string;
+    edit_count: number;
+    user_count: number;
+  }>;
+  tool_usage: Array<{
+    tool_name: string;
+    count: number;
+  }>;
+
+  // Facet aggregation (from Layer 1)
+  facet_stats?: {
+    total_facets: number;
+    outcomes: Record<string, number>;
+    session_types: Record<string, number>;
+    top_goal_categories: Array<{ category: string; count: number }>;
+    total_friction_events: number;
+    friction_by_type: Record<string, number>;
+  };
+
+  // LLM synthesis (from Layer 2)
+  summary: string;
+  highlights: string[];
+  project_areas: Array<{
+    name: string;
+    session_count: number;
+    description: string;
+  }>;
+  interaction_style?: string;
+  friction_analysis: Array<{
+    category: string;
+    description: string;
+    examples: string[];
+  }>;
+  accomplishments: Array<{
+    title: string;
+    description: string;
+  }>;
+  narrative: string;
+  recommendations: Array<{
+    title: string;
+    description: string;
+  }>;
+};
+
+// ============================================================================
 // COMPOSITE TYPES FOR UI
 // ============================================================================
 

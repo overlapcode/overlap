@@ -66,6 +66,13 @@ export function Header({ teamName, userName }: HeaderProps) {
             Stats
           </a>
           <a
+            href="/insights"
+            className="btn btn-secondary"
+            style={{ fontSize: '0.75rem', padding: 'var(--space-xs) var(--space-sm)' }}
+          >
+            Insights
+          </a>
+          <a
             href="/overlaps"
             className="btn btn-secondary"
             style={{ fontSize: '0.75rem', padding: 'var(--space-xs) var(--space-sm)' }}
