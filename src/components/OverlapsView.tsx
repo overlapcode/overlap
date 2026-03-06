@@ -178,8 +178,7 @@ export function OverlapsView() {
       setError(null);
 
       try {
-        const params = new URLSearchParams();
-        if (days > 0) params.set('days', String(days));
+        const params = new URLSearchParams({ days: String(days) });
         const res = await fetchWithTimeout(`/api/overlaps?${params}`);
         if (!res.ok) {
           throw new Error('Failed to fetch overlaps');
@@ -216,9 +215,9 @@ export function OverlapsView() {
   return (
     <div>
       {/* Header with filter */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-lg)' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-lg)', flexWrap: 'wrap', gap: 'var(--space-sm)' }}>
         <h1 style={{ margin: 0, fontSize: '1.5rem' }}>Overlaps</h1>
-        <div style={{ display: 'flex', gap: 'var(--space-sm)' }}>
+        <div style={{ display: 'flex', gap: 'var(--space-sm)', flexWrap: 'wrap' }}>
           {[7, 14, 30, 0].map((d) => (
             <button
               key={d}

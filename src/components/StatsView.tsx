@@ -153,9 +153,9 @@ export function StatsView() {
   return (
     <div>
       {/* Header with date selector */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-lg)' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-lg)', flexWrap: 'wrap', gap: 'var(--space-sm)' }}>
         <h1 style={{ margin: 0, fontSize: '1.5rem' }}>Team Analytics</h1>
-        <div style={{ display: 'flex', gap: 'var(--space-sm)' }}>
+        <div style={{ display: 'flex', gap: 'var(--space-sm)', flexWrap: 'wrap' }}>
           {(['today', 'week', 'month', 'all'] as const).map((range) => (
             <button
               key={range}
