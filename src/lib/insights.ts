@@ -103,65 +103,20 @@ type LLMProvider = {
   call(prompt: string, apiKey: string, model: string, maxTokens?: number): Promise<string>;
 };
 
-/** Read an OpenAI-compatible SSE stream (works for OpenAI and xAI). */
-async function readOpenAIStream(resp: Response): Promise<string> {
-  const reader = resp.body!.getReader();
-  const decoder = new TextDecoder();
-  let text = '';
-  let buffer = '';
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    buffer += decoder.decode(value, { stream: true });
-    const lines = buffer.split('\n');
-    buffer = lines.pop() || '';
-    for (const line of lines) {
-      if (!line.startsWith('data: ') || line === 'data: [DONE]') continue;
-      try {
-        const event = JSON.parse(line.slice(6)) as { choices?: Array<{ delta?: { content?: string } }> };
-        const delta = event.choices?.[0]?.delta?.content;
-        if (delta) text += delta;
-      } catch { /* skip */ }
-    }
-  }
-  return text.trim() || '{}';
-}
-
 const providers: Record<string, LLMProvider> = {
   anthropic: {
     async call(prompt, apiKey, model, maxTokens = 2000) {
-      // Use streaming to prevent Cloudflare 524 timeouts on large/slow requests
       const resp = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
-        body: JSON.stringify({ model: model || 'claude-haiku-4-5', max_tokens: maxTokens, stream: true, messages: [{ role: 'user', content: prompt }] }),
+        body: JSON.stringify({ model: model || 'claude-haiku-4-5', max_tokens: maxTokens, messages: [{ role: 'user', content: prompt }] }),
       });
       if (!resp.ok) {
         const body = await resp.text().catch(() => '');
         throw new Error(`Anthropic API error ${resp.status}: ${body.slice(0, 300)}`);
       }
-      // Read SSE stream and collect text deltas
-      const reader = resp.body!.getReader();
-      const decoder = new TextDecoder();
-      let text = '';
-      let buffer = '';
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split('\n');
-        buffer = lines.pop() || '';
-        for (const line of lines) {
-          if (!line.startsWith('data: ') || line === 'data: [DONE]') continue;
-          try {
-            const event = JSON.parse(line.slice(6)) as { type: string; delta?: { type: string; text?: string } };
-            if (event.type === 'content_block_delta' && event.delta?.type === 'text_delta' && event.delta.text) {
-              text += event.delta.text;
-            }
-          } catch { /* skip unparseable SSE lines */ }
-        }
-      }
-      return text.trim() || '{}';
+      const data = (await resp.json()) as { content: Array<{ type: string; text?: string }> };
+      return data.content.find((c) => c.type === 'text')?.text?.trim() || '{}';
     },
   },
   openai: {
@@ -169,13 +124,14 @@ const providers: Record<string, LLMProvider> = {
       const resp = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
-        body: JSON.stringify({ model: model || 'gpt-4o-mini', max_tokens: maxTokens, stream: true, messages: [{ role: 'user', content: prompt }] }),
+        body: JSON.stringify({ model: model || 'gpt-4o-mini', max_tokens: maxTokens, messages: [{ role: 'user', content: prompt }] }),
       });
       if (!resp.ok) {
         const body = await resp.text().catch(() => '');
         throw new Error(`OpenAI API error ${resp.status}: ${body.slice(0, 300)}`);
       }
-      return readOpenAIStream(resp);
+      const data = (await resp.json()) as { choices: Array<{ message: { content: string } }> };
+      return data.choices[0]?.message?.content?.trim() || '{}';
     },
   },
   xai: {
@@ -183,20 +139,20 @@ const providers: Record<string, LLMProvider> = {
       const resp = await fetch('https://api.x.ai/v1/chat/completions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
-        body: JSON.stringify({ model: model || 'grok-4-fast-non-reasoning', max_tokens: maxTokens, stream: true, messages: [{ role: 'user', content: prompt }] }),
+        body: JSON.stringify({ model: model || 'grok-4-fast-non-reasoning', max_tokens: maxTokens, messages: [{ role: 'user', content: prompt }] }),
       });
       if (!resp.ok) {
         const body = await resp.text().catch(() => '');
         throw new Error(`xAI API error ${resp.status}: ${body.slice(0, 300)}`);
       }
-      return readOpenAIStream(resp);
+      const data = (await resp.json()) as { choices: Array<{ message: { content: string } }> };
+      return data.choices[0]?.message?.content?.trim() || '{}';
     },
   },
   google: {
     async call(prompt, apiKey, model, maxTokens = 2000) {
       const modelName = model || 'gemini-2.5-flash-lite';
-      // Google uses streamGenerateContent with alt=sse for streaming
-      const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelName}:streamGenerateContent?alt=sse&key=${apiKey}`, {
+      const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { maxOutputTokens: maxTokens } }),
@@ -205,26 +161,8 @@ const providers: Record<string, LLMProvider> = {
         const body = await resp.text().catch(() => '');
         throw new Error(`Google API error ${resp.status}: ${body.slice(0, 300)}`);
       }
-      const reader = resp.body!.getReader();
-      const decoder = new TextDecoder();
-      let text = '';
-      let buffer = '';
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split('\n');
-        buffer = lines.pop() || '';
-        for (const line of lines) {
-          if (!line.startsWith('data: ')) continue;
-          try {
-            const data = JSON.parse(line.slice(6)) as { candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }> };
-            const part = data.candidates?.[0]?.content?.parts?.[0]?.text;
-            if (part) text += part;
-          } catch { /* skip */ }
-        }
-      }
-      return text.trim() || '{}';
+      const data = (await resp.json()) as { candidates: Array<{ content: { parts: Array<{ text: string }> } }> };
+      return data.candidates[0]?.content?.parts[0]?.text?.trim() || '{}';
     },
   },
 };
