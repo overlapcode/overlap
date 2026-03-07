@@ -485,6 +485,9 @@ export async function generateSessionFacets(
         generated += batch.length;
       } else {
         // LLM returned unparseable response — heuristic fallback for whole batch
+        console.error('[insight:facet] LLM returned unparseable JSON. Length:', raw?.length);
+        console.error('[insight:facet] Response start:', raw?.slice(0, 1000));
+        console.error('[insight:facet] Response end:', raw?.slice(-1000));
         await batchUpsertHeuristicFacets(db, batch);
         generated += batch.length;
       }
@@ -753,7 +756,9 @@ export async function generateInsightNarrative(
   const result = parseJSON<SynthesisResult>(raw);
 
   if (!result) {
-    console.error('[insight:narrative] LLM returned unparseable JSON. First 500 chars:', raw?.slice(0, 500));
+    console.error('[insight:narrative] LLM returned unparseable JSON. Length:', raw?.length);
+    console.error('[insight:narrative] Response start:', raw?.slice(0, 1000));
+    console.error('[insight:narrative] Response end:', raw?.slice(-1000));
     throw new Error(`LLM returned invalid JSON (${raw?.length || 0} chars). Try regenerating or use a different model.`);
   }
 
