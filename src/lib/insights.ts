@@ -172,6 +172,13 @@ function parseJSON<T>(raw: string): T | null {
     const cleaned = raw.replace(/^```json?\n?/m, '').replace(/\n?```$/m, '').trim();
     return JSON.parse(cleaned) as T;
   } catch {
+    // Try extracting JSON object from within surrounding text
+    const match = raw.match(/\{[\s\S]*\}/);
+    if (match) {
+      try {
+        return JSON.parse(match[0]) as T;
+      } catch { /* fall through */ }
+    }
     return null;
   }
 }
@@ -742,11 +749,12 @@ export async function generateInsightNarrative(
     .replace('{stats_json}', JSON.stringify({ ...aggregated, facet_stats: facetStats }, null, 2))
     .replace('{facets_json}', JSON.stringify(facetSummaries, null, 2));
 
-  const raw = await provider.call(prompt, apiKey, model, 5000);
+  const raw = await provider.call(prompt, apiKey, model, 8000);
   const result = parseJSON<SynthesisResult>(raw);
 
   if (!result) {
-    return generateFallbackNarrative(aggregated, facetStats, scope, scopeDetail, periodLabel);
+    console.error('[insight:narrative] LLM returned unparseable JSON. First 500 chars:', raw?.slice(0, 500));
+    throw new Error(`LLM returned invalid JSON (${raw?.length || 0} chars). Try regenerating or use a different model.`);
   }
 
   return {
