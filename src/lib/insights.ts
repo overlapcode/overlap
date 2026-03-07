@@ -729,16 +729,22 @@ export async function generateInsightNarrative(
   }
 
   // Build compact facet summaries for the synthesis prompt
-  const facetSummaries = facets.slice(0, 50).map(f => ({
-    ...(scope === 'team' ? { user_name: memberNames[f.user_id] || 'Unknown' } : {}),
-    goal: f.underlying_goal,
-    categories: f.goal_categories ? JSON.parse(f.goal_categories) : {},
-    outcome: f.outcome,
-    type: f.session_type,
-    friction: f.friction_detail,
-    success: f.primary_success,
-    summary: f.brief_summary,
+  // Limit to 40 facets and keep summaries short to avoid Anthropic timeouts on large periods
+  const facetSummaries = facets.slice(0, 40).map(f => ({
+    ...(scope === 'team' ? { u: memberNames[f.user_id] || 'Unknown' } : {}),
+    g: f.underlying_goal,
+    o: f.outcome,
+    t: f.session_type,
+    f: f.friction_detail || undefined,
+    s: f.brief_summary,
   }));
+
+  // Send only the stats the LLM needs — strip large arrays already visible in the UI
+  const compactStats = {
+    stats: aggregated.stats,
+    repos: aggregated.by_repo.map(r => `${r.repo_name}(${r.session_count})`).join(', '),
+    facet_stats: facetStats,
+  };
 
   const prompt = SYNTHESIS_PROMPT
     .replace('{scope}', scope)
@@ -746,8 +752,8 @@ export async function generateInsightNarrative(
     .replace('{period_label}', periodLabel)
     .replace('{period_start}', periodStart)
     .replace('{period_end}', periodEnd)
-    .replace('{stats_json}', JSON.stringify({ ...aggregated, facet_stats: facetStats }, null, 2))
-    .replace('{facets_json}', JSON.stringify(facetSummaries, null, 2));
+    .replace('{stats_json}', JSON.stringify(compactStats))
+    .replace('{facets_json}', JSON.stringify(facetSummaries));
 
   const raw = await provider.call(prompt, apiKey, model, 8000);
   const result = parseJSON<SynthesisResult>(raw);
