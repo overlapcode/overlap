@@ -749,7 +749,7 @@ export async function generateInsightNarrative(
     .replace('{stats_json}', JSON.stringify({ ...aggregated, facet_stats: facetStats }, null, 2))
     .replace('{facets_json}', JSON.stringify(facetSummaries, null, 2));
 
-  const raw = await provider.call(prompt, apiKey, model, 4096);
+  const raw = await provider.call(prompt, apiKey, model, 6000);
   const result = parseJSON<SynthesisResult>(raw);
 
   if (!result) {
