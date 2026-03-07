@@ -59,6 +59,21 @@ type InsightContent = {
   narrative: string;
   recommendations: Array<{ title: string; description: string }>;
   // Backward compat: old insights may have string[] recommendations
+  member_insights?: Array<{
+    name: string;
+    session_count: number;
+    focus_areas: string[];
+    strengths: string;
+    suggestion: string;
+  }> | null;
+  environment_recommendations?: Array<{
+    type: 'claude_md_rule' | 'skill' | 'mcp_server' | 'workflow';
+    title: string;
+    description: string;
+    scope: 'repo' | 'global';
+    repo: string | null;
+    example: string;
+  }> | null;
 };
 
 type ApiResponse = {
@@ -73,8 +88,8 @@ type ApiResponse = {
 const MODEL_OPTIONS: Record<string, { id: string; label: string }[]> = {
   anthropic: [
     { id: 'claude-haiku-4-5', label: 'Claude Haiku 4.5' },
-    { id: 'claude-sonnet-4-5', label: 'Claude Sonnet 4.5' },
-    { id: 'claude-opus-4-20250514', label: 'Claude Opus 4' },
+    { id: 'claude-sonnet-4-6', label: 'Claude Sonnet 4.6' },
+    { id: 'claude-opus-4-6', label: 'Claude Opus 4.6' },
   ],
   openai: [
     { id: 'gpt-4o-mini', label: 'GPT-4o Mini' },
@@ -696,6 +711,29 @@ function contentToPrintHTML(content: InsightContent, periodLabel: string, insigh
     ).join(''), '#d97757')
     : '';
 
+  // Member insights (team scope)
+  const memberInsightsHTML = content.member_insights?.length
+    ? accentSection('Team Members', content.member_insights.map(m =>
+      `<div class="item"><div class="item-title" style="color:#6b9edd">${esc(m.name)}</div>`
+      + `<p style="font-size:0.75rem;color:#888;margin-bottom:4px">${m.session_count} session${m.session_count !== 1 ? 's' : ''} · ${m.focus_areas.map(a => esc(a)).join(', ')}</p>`
+      + `<p>${esc(m.strengths)}</p>`
+      + `<p style="margin-top:4px"><strong>Suggestion:</strong> ${esc(m.suggestion)}</p></div>`
+    ).join(''), '#6b9edd')
+    : '';
+
+  // Environment recommendations
+  const envRecsHTML = content.environment_recommendations?.length
+    ? accentSection('Environment & Tooling', content.environment_recommendations.map(r =>
+      `<div class="item"><div style="display:flex;gap:6px;align-items:center;margin-bottom:3px">`
+      + `<span class="pill"><strong>${esc(r.type.replace(/_/g, ' '))}</strong></span>`
+      + (r.scope === 'repo' && r.repo ? `<span class="pill cat"><strong>${esc(r.repo)}</strong></span>` : '')
+      + `</div><div class="item-title" style="color:#d4a843">${esc(r.title)}</div>`
+      + `<p>${esc(r.description)}</p>`
+      + (r.example ? `<pre style="background:#f7f8fa;border:1px solid #e5e7eb;border-radius:4px;padding:8px;font-size:0.75rem;overflow-x:auto;margin-top:4px"><code>${esc(r.example)}</code></pre>` : '')
+      + '</div>'
+    ).join(''), '#d4a843')
+    : '';
+
   // Tables
   const makeTable = (title: string, headers: string[], rows: string[][]) => {
     if (!rows.length) return '';
@@ -815,6 +853,8 @@ function contentToPrintHTML(content: InsightContent, periodLabel: string, insigh
   ${narrativeHTML}
   ${accomplishmentsHTML}
   ${frictionHTML}
+  ${memberInsightsHTML}
+  ${envRecsHTML}
   ${reposTable}
   ${toolHTML}
   ${filesTable}
@@ -935,6 +975,40 @@ function contentToMarkdown(content: InsightContent, periodLabel: string, insight
       if (f.examples?.length) {
         lines.push('');
         f.examples.forEach(ex => lines.push(`- ${ex}`));
+      }
+      lines.push('');
+    });
+  }
+
+  if (content.member_insights?.length) {
+    lines.push('## Team Members');
+    lines.push('');
+    content.member_insights.forEach(m => {
+      lines.push(`### ${m.name} (${m.session_count} session${m.session_count !== 1 ? 's' : ''})`);
+      lines.push('');
+      lines.push(`**Focus:** ${m.focus_areas.join(', ')}`);
+      lines.push('');
+      lines.push(m.strengths);
+      lines.push('');
+      lines.push(`**Suggestion:** ${m.suggestion}`);
+      lines.push('');
+    });
+  }
+
+  if (content.environment_recommendations?.length) {
+    lines.push('## Environment & Tooling');
+    lines.push('');
+    content.environment_recommendations.forEach(r => {
+      const tag = r.type.replace(/_/g, ' ');
+      const scopeTag = r.scope === 'repo' && r.repo ? ` (${r.repo})` : '';
+      lines.push(`### [${tag}] ${r.title}${scopeTag}`);
+      lines.push('');
+      lines.push(r.description);
+      if (r.example) {
+        lines.push('');
+        lines.push('```');
+        lines.push(r.example);
+        lines.push('```');
       }
       lines.push('');
     });
@@ -1216,6 +1290,52 @@ function InsightReport({ content, insight, periodLabel, onRegenerate, canRegener
                   <ul className="friction-examples">
                     {f.examples.map((ex, j) => <li key={j}>{ex}</li>)}
                   </ul>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Member Insights (team scope only) */}
+      {content.member_insights && content.member_insights.length > 0 && (
+        <div className="report-section member-insights-section">
+          <h3>Team Members</h3>
+          <div className="member-insights-list">
+            {content.member_insights.map((m, i) => (
+              <div key={i} className="member-card">
+                <div className="member-card-header">
+                  <span className="member-name">{m.name}</span>
+                  <span className="member-sessions">{m.session_count} session{m.session_count !== 1 ? 's' : ''}</span>
+                </div>
+                <div className="member-focus">
+                  {m.focus_areas.map((area, j) => (
+                    <span key={j} className="focus-pill">{area}</span>
+                  ))}
+                </div>
+                <p className="member-strengths">{m.strengths}</p>
+                <p className="member-suggestion"><strong>Suggestion:</strong> {m.suggestion}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Environment Recommendations */}
+      {content.environment_recommendations && content.environment_recommendations.length > 0 && (
+        <div className="report-section env-recs-section">
+          <h3>Environment & Tooling</h3>
+          <div className="env-recs-list">
+            {content.environment_recommendations.map((r, i) => (
+              <div key={i} className="env-rec-card">
+                <div className="env-rec-header">
+                  <span className="env-rec-type">{r.type.replace(/_/g, ' ')}</span>
+                  {r.scope === 'repo' && r.repo && <span className="env-rec-repo">{r.repo}</span>}
+                </div>
+                <div className="env-rec-title">{r.title}</div>
+                <p className="env-rec-desc">{r.description}</p>
+                {r.example && (
+                  <pre className="env-rec-example"><code>{r.example}</code></pre>
                 )}
               </div>
             ))}

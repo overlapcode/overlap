@@ -939,6 +939,171 @@ const teamConfig = await getTeamConfig(db);
     margin: 0;
   }
 
+  /* Member insights (team scope) */
+  :global(.member-insights-section) {
+    background: rgba(107, 158, 221, 0.05);
+    border: 1px solid rgba(107, 158, 221, 0.15);
+    border-radius: var(--radius-md);
+    padding: var(--space-lg);
+  }
+
+  :global(.member-insights-list) {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-md);
+  }
+
+  :global(.member-card) {
+    padding-bottom: var(--space-md);
+    border-bottom: 1px solid rgba(107, 158, 221, 0.1);
+  }
+
+  :global(.member-card:last-child) {
+    border-bottom: none;
+    padding-bottom: 0;
+  }
+
+  :global(.member-card-header) {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    margin-bottom: var(--space-xs);
+  }
+
+  :global(.member-name) {
+    font-family: var(--font-mono);
+    font-weight: 600;
+    font-size: 0.85rem;
+    color: var(--accent-blue);
+  }
+
+  :global(.member-sessions) {
+    font-size: 0.72rem;
+    color: var(--text-muted);
+    background: var(--bg-elevated);
+    padding: 1px 8px;
+    border-radius: var(--radius-sm);
+    font-family: var(--font-mono);
+  }
+
+  :global(.member-focus) {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-bottom: var(--space-xs);
+  }
+
+  :global(.focus-pill) {
+    display: inline-block;
+    padding: 1px 8px;
+    background: rgba(107, 158, 221, 0.1);
+    border: 1px solid rgba(107, 158, 221, 0.2);
+    border-radius: var(--radius-sm);
+    font-size: 0.72rem;
+    color: var(--text-secondary);
+    font-family: var(--font-mono);
+  }
+
+  :global(.member-strengths) {
+    font-size: 0.82rem;
+    color: var(--text-secondary);
+    line-height: 1.6;
+    margin: 0 0 var(--space-xs) 0;
+  }
+
+  :global(.member-suggestion) {
+    font-size: 0.82rem;
+    color: var(--text-secondary);
+    line-height: 1.6;
+    margin: 0;
+  }
+
+  /* Environment recommendations */
+  :global(.env-recs-section) {
+    background: rgba(212, 168, 67, 0.05);
+    border: 1px solid rgba(212, 168, 67, 0.15);
+    border-radius: var(--radius-md);
+    padding: var(--space-lg);
+  }
+
+  :global(.env-recs-list) {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-md);
+  }
+
+  :global(.env-rec-card) {
+    padding-bottom: var(--space-md);
+    border-bottom: 1px solid rgba(212, 168, 67, 0.1);
+  }
+
+  :global(.env-rec-card:last-child) {
+    border-bottom: none;
+    padding-bottom: 0;
+  }
+
+  :global(.env-rec-header) {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: var(--space-xs);
+  }
+
+  :global(.env-rec-type) {
+    font-size: 0.68rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+    background: rgba(212, 168, 67, 0.1);
+    border: 1px solid rgba(212, 168, 67, 0.2);
+    padding: 1px 6px;
+    border-radius: var(--radius-sm);
+    font-family: var(--font-mono);
+  }
+
+  :global(.env-rec-repo) {
+    font-size: 0.68rem;
+    color: var(--text-muted);
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-subtle);
+    padding: 1px 6px;
+    border-radius: var(--radius-sm);
+    font-family: var(--font-mono);
+  }
+
+  :global(.env-rec-title) {
+    font-family: var(--font-mono);
+    font-weight: 600;
+    font-size: 0.85rem;
+    color: var(--accent-yellow);
+    margin-bottom: var(--space-xs);
+  }
+
+  :global(.env-rec-desc) {
+    font-size: 0.82rem;
+    color: var(--text-secondary);
+    line-height: 1.6;
+    margin: 0;
+  }
+
+  :global(.env-rec-example) {
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-sm);
+    padding: var(--space-sm);
+    margin-top: var(--space-xs);
+    overflow-x: auto;
+    font-size: 0.75rem;
+    line-height: 1.5;
+  }
+
+  :global(.env-rec-example code) {
+    font-family: var(--font-mono);
+    color: var(--text-primary);
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+
   /* Report actions row */
   :global(.report-actions) {
     display: flex;

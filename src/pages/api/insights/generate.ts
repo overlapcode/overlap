@@ -162,6 +162,7 @@ export async function POST(context: APIContext) {
       let synthesis;
       try {
         synthesis = await generateInsightNarrative(
+          db,
           aggregated,
           facets,
           scope,

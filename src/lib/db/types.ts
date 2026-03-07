@@ -366,6 +366,21 @@ export type InsightContent = {
     title: string;
     description: string;
   }>;
+  member_insights?: Array<{
+    name: string;
+    session_count: number;
+    focus_areas: string[];
+    strengths: string;
+    suggestion: string;
+  }> | null;
+  environment_recommendations?: Array<{
+    type: 'claude_md_rule' | 'skill' | 'mcp_server' | 'workflow';
+    title: string;
+    description: string;
+    scope: 'repo' | 'global';
+    repo: string | null;
+    example: string;
+  }> | null;
 };
 
 // ============================================================================

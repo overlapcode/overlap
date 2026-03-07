@@ -631,7 +631,41 @@ Generate a JSON response with these fields:
    - For team scope: collaboration improvements (reducing overlaps, coordinating on shared code, balancing workload)
    CRITICAL: Do NOT recommend fixing the tool's data quality, instrumentation, metadata tracking, or cost tracking. Focus entirely on how to work more effectively.
 
+9. "member_insights" - (TEAM SCOPE ONLY — omit or set to null for user scope) Array of per-member breakdowns. Each has:
+   - "name": The member's display name (from the facet data)
+   - "session_count": Number of sessions this member had in the period
+   - "focus_areas": Array of 2-4 strings describing what they primarily worked on
+   - "strengths": 1-2 sentences on what they do well based on outcomes and patterns
+   - "suggestion": A single actionable suggestion tailored to this member's patterns
+   Focus on how each person contributes and how the team's work connects. Avoid generic commentary.
+
+10. "environment_recommendations" - Array of concrete tooling/environment suggestions. Each has:
+   - "type": One of "claude_md_rule" | "skill" | "mcp_server" | "workflow"
+   - "title": Short descriptive title
+   - "description": What it does and why it would help, based on observed patterns
+   - "scope": "repo" | "global" — whether this applies to a specific repo or the user's whole environment
+   - "repo": The repo name if scope is "repo", null otherwise
+   - "example": A concrete example (e.g. the actual CLAUDE.md rule text, a skill invocation, a workflow command)
+   Base suggestions on actual friction and patterns observed in the sessions. For user scope: recommend skills, CLAUDE.md rules, MCP servers, or workflows that would have helped. For team scope: recommend team-wide conventions, shared CLAUDE.md rules, or coordination workflows.
+
 Respond with ONLY valid JSON (no markdown, no explanation).`;
+
+type MemberInsight = {
+  name: string;
+  session_count: number;
+  focus_areas: string[];
+  strengths: string;
+  suggestion: string;
+};
+
+type EnvironmentRecommendation = {
+  type: 'claude_md_rule' | 'skill' | 'mcp_server' | 'workflow';
+  title: string;
+  description: string;
+  scope: 'repo' | 'global';
+  repo: string | null;
+  example: string;
+};
 
 type SynthesisResult = {
   summary: string;
@@ -642,9 +676,12 @@ type SynthesisResult = {
   accomplishments: Array<{ title: string; description: string }>;
   narrative: string;
   recommendations: Array<{ title: string; description: string }>;
+  member_insights?: MemberInsight[] | null;
+  environment_recommendations?: EnvironmentRecommendation[] | null;
 };
 
 export async function generateInsightNarrative(
+  db: D1Database,
   aggregated: AggregatedStats,
   facets: SessionFacet[],
   scope: InsightScope,
@@ -670,8 +707,23 @@ export async function generateInsightNarrative(
   const apiKey = await decrypt(teamConfig.llm_api_key_encrypted, encryptionKey);
   const model = modelOverride || teamConfig.llm_model || '';
 
+  // For team scope, look up member display names so LLM can reference them
+  let memberNames: Record<string, string> = {};
+  if (scope === 'team') {
+    const userIds = [...new Set(facets.map(f => f.user_id))];
+    if (userIds.length > 0) {
+      const placeholders = userIds.map(() => '?').join(',');
+      const result = await db
+        .prepare(`SELECT user_id, display_name FROM members WHERE user_id IN (${placeholders})`)
+        .bind(...userIds)
+        .all<{ user_id: string; display_name: string }>();
+      memberNames = Object.fromEntries(result.results.map(m => [m.user_id, m.display_name]));
+    }
+  }
+
   // Build compact facet summaries for the synthesis prompt
   const facetSummaries = facets.slice(0, 50).map(f => ({
+    ...(scope === 'team' ? { user_name: memberNames[f.user_id] || 'Unknown' } : {}),
     goal: f.underlying_goal,
     categories: f.goal_categories ? JSON.parse(f.goal_categories) : {},
     outcome: f.outcome,
@@ -690,7 +742,7 @@ export async function generateInsightNarrative(
     .replace('{stats_json}', JSON.stringify({ ...aggregated, facet_stats: facetStats }, null, 2))
     .replace('{facets_json}', JSON.stringify(facetSummaries, null, 2));
 
-  const raw = await provider.call(prompt, apiKey, model, 4000);
+  const raw = await provider.call(prompt, apiKey, model, 5000);
   const result = parseJSON<SynthesisResult>(raw);
 
   if (!result) {
@@ -707,6 +759,8 @@ export async function generateInsightNarrative(
     accomplishments: result.accomplishments || [],
     narrative: result.narrative || '',
     recommendations: result.recommendations || [],
+    member_insights: result.member_insights || null,
+    environment_recommendations: result.environment_recommendations || null,
   };
 }
 
