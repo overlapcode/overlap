@@ -70,11 +70,26 @@ type ApiResponse = {
   llm_provider: string | null;
 };
 
-const MODEL_OPTIONS: Record<string, string[]> = {
-  anthropic: ['claude-haiku-4-5', 'claude-sonnet-4-5', 'claude-opus-4'],
-  openai: ['gpt-4o-mini', 'gpt-4o', 'o3-mini'],
-  xai: ['grok-4-fast-non-reasoning', 'grok-4'],
-  google: ['gemini-2.5-flash-lite', 'gemini-2.5-flash', 'gemini-2.5-pro'],
+const MODEL_OPTIONS: Record<string, { id: string; label: string }[]> = {
+  anthropic: [
+    { id: 'claude-haiku-4-5', label: 'Claude Haiku 4.5' },
+    { id: 'claude-sonnet-4-5', label: 'Claude Sonnet 4.5' },
+    { id: 'claude-opus-4-20250514', label: 'Claude Opus 4' },
+  ],
+  openai: [
+    { id: 'gpt-4o-mini', label: 'GPT-4o Mini' },
+    { id: 'gpt-4o', label: 'GPT-4o' },
+    { id: 'o3-mini', label: 'o3-mini' },
+  ],
+  xai: [
+    { id: 'grok-4-fast-non-reasoning', label: 'Grok 4 Fast' },
+    { id: 'grok-4', label: 'Grok 4' },
+  ],
+  google: [
+    { id: 'gemini-2.5-flash-lite', label: 'Gemini 2.5 Flash Lite' },
+    { id: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash' },
+    { id: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro' },
+  ],
 };
 
 const PERIOD_LABELS: Record<InsightPeriodType, string> = {
@@ -420,7 +435,7 @@ export function InsightsView() {
           {hasLLM && modelOptions.length > 0 && (
             <select className="model-picker" value={selectedModel} onChange={(e) => setSelectedModel(e.target.value)}>
               <option value="">Default model</option>
-              {modelOptions.map((m) => <option key={m} value={m}>{m}</option>)}
+              {modelOptions.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
             </select>
           )}
         </div>
