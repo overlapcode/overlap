@@ -106,17 +106,38 @@ type LLMProvider = {
 const providers: Record<string, LLMProvider> = {
   anthropic: {
     async call(prompt, apiKey, model, maxTokens = 2000) {
+      // Use streaming to prevent Cloudflare 524 timeouts on large/slow requests
       const resp = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
-        body: JSON.stringify({ model: model || 'claude-haiku-4-5', max_tokens: maxTokens, messages: [{ role: 'user', content: prompt }] }),
+        body: JSON.stringify({ model: model || 'claude-haiku-4-5', max_tokens: maxTokens, stream: true, messages: [{ role: 'user', content: prompt }] }),
       });
       if (!resp.ok) {
         const body = await resp.text().catch(() => '');
         throw new Error(`Anthropic API error ${resp.status}: ${body.slice(0, 300)}`);
       }
-      const data = (await resp.json()) as { content: Array<{ type: string; text?: string }> };
-      return data.content.find((c) => c.type === 'text')?.text?.trim() || '{}';
+      // Read SSE stream and collect text deltas
+      const reader = resp.body!.getReader();
+      const decoder = new TextDecoder();
+      let text = '';
+      let buffer = '';
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+        for (const line of lines) {
+          if (!line.startsWith('data: ') || line === 'data: [DONE]') continue;
+          try {
+            const event = JSON.parse(line.slice(6)) as { type: string; delta?: { type: string; text?: string } };
+            if (event.type === 'content_block_delta' && event.delta?.type === 'text_delta' && event.delta.text) {
+              text += event.delta.text;
+            }
+          } catch { /* skip unparseable SSE lines */ }
+        }
+      }
+      return text.trim() || '{}';
     },
   },
   openai: {
@@ -729,22 +750,16 @@ export async function generateInsightNarrative(
   }
 
   // Build compact facet summaries for the synthesis prompt
-  // Limit to 40 facets and keep summaries short to avoid Anthropic timeouts on large periods
-  const facetSummaries = facets.slice(0, 40).map(f => ({
-    ...(scope === 'team' ? { u: memberNames[f.user_id] || 'Unknown' } : {}),
-    g: f.underlying_goal,
-    o: f.outcome,
-    t: f.session_type,
-    f: f.friction_detail || undefined,
-    s: f.brief_summary,
+  const facetSummaries = facets.slice(0, 50).map(f => ({
+    ...(scope === 'team' ? { user_name: memberNames[f.user_id] || 'Unknown' } : {}),
+    goal: f.underlying_goal,
+    categories: f.goal_categories ? JSON.parse(f.goal_categories) : {},
+    outcome: f.outcome,
+    type: f.session_type,
+    friction: f.friction_detail,
+    success: f.primary_success,
+    summary: f.brief_summary,
   }));
-
-  // Send only the stats the LLM needs — strip large arrays already visible in the UI
-  const compactStats = {
-    stats: aggregated.stats,
-    repos: aggregated.by_repo.map(r => `${r.repo_name}(${r.session_count})`).join(', '),
-    facet_stats: facetStats,
-  };
 
   const prompt = SYNTHESIS_PROMPT
     .replace('{scope}', scope)
@@ -752,8 +767,8 @@ export async function generateInsightNarrative(
     .replace('{period_label}', periodLabel)
     .replace('{period_start}', periodStart)
     .replace('{period_end}', periodEnd)
-    .replace('{stats_json}', JSON.stringify(compactStats))
-    .replace('{facets_json}', JSON.stringify(facetSummaries));
+    .replace('{stats_json}', JSON.stringify({ ...aggregated, facet_stats: facetStats }, null, 2))
+    .replace('{facets_json}', JSON.stringify(facetSummaries, null, 2));
 
   const raw = await provider.call(prompt, apiKey, model, 8000);
   const result = parseJSON<SynthesisResult>(raw);
