@@ -109,14 +109,34 @@ const providers: Record<string, LLMProvider> = {
       const resp = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
-        body: JSON.stringify({ model: model || 'claude-haiku-4-5', max_tokens: maxTokens, messages: [{ role: 'user', content: prompt }] }),
+        body: JSON.stringify({ model: model || 'claude-haiku-4-5', max_tokens: maxTokens, stream: true, messages: [{ role: 'user', content: prompt }] }),
       });
       if (!resp.ok) {
         const body = await resp.text().catch(() => '');
         throw new Error(`Anthropic API error ${resp.status}: ${body.slice(0, 300)}`);
       }
-      const data = (await resp.json()) as { content: Array<{ type: string; text?: string }> };
-      return data.content.find((c) => c.type === 'text')?.text?.trim() || '{}';
+      // Read SSE stream and collect text deltas
+      const reader = resp.body!.getReader();
+      const decoder = new TextDecoder();
+      let text = '';
+      let buf = '';
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buf += decoder.decode(value, { stream: true });
+        const lines = buf.split('\n');
+        buf = lines.pop() || '';
+        for (const line of lines) {
+          if (!line.startsWith('data: ') || line === 'data: [DONE]') continue;
+          try {
+            const evt = JSON.parse(line.slice(6)) as { type: string; delta?: { type: string; text?: string } };
+            if (evt.type === 'content_block_delta' && evt.delta?.text) {
+              text += evt.delta.text;
+            }
+          } catch { /* skip malformed SSE lines */ }
+        }
+      }
+      return text.trim() || '{}';
     },
   },
   openai: {
