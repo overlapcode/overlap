@@ -22,6 +22,9 @@ import type {
 } from '@lib/db/types';
 import {
   getSessionsWithoutFacets,
+  getTeamConfig,
+  upsertInsight,
+  getSessionFacetsForPeriod,
 } from '@lib/db/queries';
 import { decrypt } from '@lib/utils/crypto';
 
@@ -831,6 +834,108 @@ function generateFallbackNarrative(
       { title: 'Enable LLM Insights', description: 'Configure an LLM provider in settings for AI-generated behavioral analysis, friction patterns, and personalized recommendations.' },
     ],
   };
+}
+
+// ── Core Generation (shared by manual + auto-generate) ─────────────────
+
+export async function runInsightGeneration(
+  db: D1Database,
+  opts: {
+    insightId: string;
+    scope: InsightScope;
+    userId: string | null;
+    periodType: InsightPeriodType;
+    periodStart: string;
+    periodEnd: string;
+    periodLabel: string;
+    scopeDetail: string;
+    model: string | null;
+    encryptionKey: string;
+  },
+): Promise<{ status: 'completed' | 'failed'; error?: string }> {
+  const { insightId, scope, userId, periodType, periodStart, periodEnd, periodLabel, scopeDetail, model, encryptionKey } = opts;
+  const teamConfig = await getTeamConfig(db);
+  const teamLlmModel = teamConfig?.llm_model || null;
+
+  const t0 = Date.now();
+  const log = (stage: string, detail?: string) =>
+    console.log(`[insight:${insightId.slice(0, 8)}] ${stage}${detail ? ` — ${detail}` : ''} (+${Date.now() - t0}ms)`);
+
+  try {
+    log('start', `scope=${scope} period=${periodStart}..${periodEnd} model=${model || 'default'}`);
+    const aggregated = await aggregateInsightData(db, scope, userId, periodStart, periodEnd);
+    log('aggregated', `${aggregated.stats.total_sessions} sessions, ${aggregated.stats.total_files_touched} files`);
+
+    if (aggregated.stats.total_sessions === 0) {
+      await upsertInsight(db, {
+        id: insightId, scope, user_id: userId, period_type: periodType,
+        period_start: periodStart, period_end: periodEnd, model_used: null,
+        status: 'completed',
+        content: JSON.stringify({
+          ...aggregated,
+          summary: 'No sessions recorded during this period.',
+          highlights: ['No activity recorded'],
+          project_areas: [], friction_analysis: [], accomplishments: [],
+          narrative: 'There were no coding agent sessions during this period.',
+          recommendations: [],
+        }),
+        error: null, generated_at: new Date().toISOString(),
+      });
+      log('complete', 'no sessions — saved empty insight');
+      return { status: 'completed' };
+    }
+
+    // Layer 1: Per-session facets
+    log('facets:start');
+    try {
+      const facetResult = await generateSessionFacets(db, scope, userId, periodStart, periodEnd, teamConfig!, encryptionKey, model || undefined);
+      log('facets:done', `generated=${facetResult.generated} total=${facetResult.total}`);
+    } catch (facetErr) {
+      log('facets:error', facetErr instanceof Error ? facetErr.message : String(facetErr));
+    }
+
+    const facets = await getSessionFacetsForPeriod(db, userId, periodStart, periodEnd);
+    log('facets:fetched', `${facets.length} facets for narrative`);
+
+    // Layer 2: Narrative synthesis
+    log('narrative:start');
+    let synthesis;
+    try {
+      synthesis = await generateInsightNarrative(db, aggregated, facets, scope, scopeDetail, periodLabel, periodStart, periodEnd, teamConfig!, encryptionKey, model || undefined);
+      log('narrative:done');
+    } catch (llmError) {
+      const errMsg = llmError instanceof Error ? llmError.message : String(llmError);
+      log('narrative:error', errMsg);
+      synthesis = {
+        summary: `${aggregated.stats.total_sessions} sessions during ${periodLabel}. (LLM analysis failed)`,
+        highlights: [`${aggregated.stats.total_sessions} sessions`, `${aggregated.stats.total_files_touched} files touched`],
+        project_areas: [], friction_analysis: [], accomplishments: [],
+        narrative: 'LLM analysis unavailable — the report shows stats only. Check your API key in Settings.',
+        recommendations: [{ title: 'LLM Error', description: errMsg }],
+        llm_error: errMsg,
+      };
+    }
+
+    await upsertInsight(db, {
+      id: insightId, scope, user_id: userId, period_type: periodType,
+      period_start: periodStart, period_end: periodEnd,
+      model_used: model || teamLlmModel, status: 'completed',
+      content: JSON.stringify({ ...aggregated, ...synthesis }),
+      error: null, generated_at: new Date().toISOString(),
+    });
+    log('complete', `total ${Date.now() - t0}ms`);
+    return { status: 'completed' };
+  } catch (genError) {
+    const errMsg = genError instanceof Error ? genError.message : 'Generation failed';
+    log('FAILED', errMsg);
+    await upsertInsight(db, {
+      id: insightId, scope, user_id: userId, period_type: periodType,
+      period_start: periodStart, period_end: periodEnd,
+      model_used: model || teamLlmModel, status: 'failed',
+      content: null, error: errMsg, generated_at: null,
+    });
+    return { status: 'failed', error: errMsg };
+  }
 }
 
 // ── Earliest Session Date ───────────────────────────────────────────────

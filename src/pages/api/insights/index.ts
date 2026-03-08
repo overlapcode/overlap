@@ -71,6 +71,21 @@ export async function GET(context: APIContext) {
       }
     }
 
+    // Trigger auto-generation if LLM is configured and there are ungenerated periods
+    const hasLlm = !!authResult.context.teamConfig.llm_provider && authResult.context.teamConfig.llm_provider !== 'heuristic';
+    if (hasLlm && includeAvailable) {
+      const encryptionKey = context.locals.runtime.env.TEAM_ENCRYPTION_KEY;
+      if (encryptionKey) {
+        const autoUrl = new URL('/api/insights/auto-generate', context.request.url).toString();
+        context.locals.runtime.ctx.waitUntil(
+          fetch(autoUrl, {
+            method: 'POST',
+            headers: { 'X-Internal-Secret': encryptionKey },
+          }).catch(err => console.error('[insights] Auto-generate trigger failed:', err))
+        );
+      }
+    }
+
     return successResponse({
       insights,
       available,
@@ -80,7 +95,7 @@ export async function GET(context: APIContext) {
         role: authResult.context.member.role,
       },
       team_name: authResult.context.teamConfig.team_name,
-      has_llm: !!authResult.context.teamConfig.llm_provider && authResult.context.teamConfig.llm_provider !== 'heuristic',
+      has_llm: hasLlm,
       llm_provider: authResult.context.teamConfig.llm_provider,
     });
   } catch (error) {
