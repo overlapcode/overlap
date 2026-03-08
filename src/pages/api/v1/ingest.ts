@@ -260,11 +260,12 @@ export async function POST(context: APIContext) {
         }
 
         case 'file_op': {
-          // Ensure session exists
+          // Ensure session exists (OR IGNORE to handle D1 read-replica lag —
+          // session may exist on primary but not yet visible to read replica)
           if (!sessionCache.has(event.session_id)) {
             statements.push(
               db.prepare(
-                `INSERT INTO sessions (id, user_id, repo_id, repo_name, agent_type, started_at, status)
+                `INSERT OR IGNORE INTO sessions (id, user_id, repo_id, repo_name, agent_type, started_at, status)
                  VALUES (?, ?, ?, ?, ?, ?, 'active')`
               ).bind(event.session_id, event.user_id, repoId, event.repo_name, event.agent_type, event.timestamp)
             );
@@ -314,11 +315,11 @@ export async function POST(context: APIContext) {
         }
 
         case 'prompt': {
-          // Ensure session exists
+          // Ensure session exists (OR IGNORE to handle D1 read-replica lag)
           if (!sessionCache.has(event.session_id)) {
             statements.push(
               db.prepare(
-                `INSERT INTO sessions (id, user_id, repo_id, repo_name, agent_type, started_at, status)
+                `INSERT OR IGNORE INTO sessions (id, user_id, repo_id, repo_name, agent_type, started_at, status)
                  VALUES (?, ?, ?, ?, ?, ?, 'active')`
               ).bind(event.session_id, event.user_id, repoId, event.repo_name, event.agent_type, event.timestamp)
             );
@@ -372,11 +373,11 @@ export async function POST(context: APIContext) {
         }
 
         case 'agent_response': {
-          // Ensure session exists
+          // Ensure session exists (OR IGNORE to handle D1 read-replica lag)
           if (!sessionCache.has(event.session_id)) {
             statements.push(
               db.prepare(
-                `INSERT INTO sessions (id, user_id, repo_id, repo_name, agent_type, started_at, status)
+                `INSERT OR IGNORE INTO sessions (id, user_id, repo_id, repo_name, agent_type, started_at, status)
                  VALUES (?, ?, ?, ?, ?, ?, 'active')`
               ).bind(event.session_id, event.user_id, repoId, event.repo_name, event.agent_type, event.timestamp)
             );

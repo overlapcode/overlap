@@ -989,7 +989,7 @@ export async function queryOverlapsForFile(
        WHERE fo.repo_name = ? AND fo.file_path = ?
          AND fo.operation IN ('create', 'modify')
          AND datetime(fo.timestamp) > datetime('now', '-' || ? || ' hours')
-         AND s.status = 'active'
+         AND s.status != 'ended'
          AND s.user_id != ?
          AND s.id != ?
        GROUP BY s.id, m.display_name, s.user_id, s.repo_name, s.started_at,
