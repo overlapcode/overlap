@@ -1228,32 +1228,31 @@ const teamConfig = await getTeamConfig(db);
   }
 
   :global(.trends-delta-row) {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
+    display: flex;
+    flex-direction: column;
     gap: 0;
     margin-bottom: var(--space-md);
   }
 
   :global(.trends-delta-item) {
-    padding: var(--space-sm) var(--space-md);
-    border-right: 1px solid var(--border-subtle);
-  }
-
-  :global(.trends-delta-item:first-child) {
-    padding-left: 0;
+    display: flex;
+    align-items: baseline;
+    gap: var(--space-sm);
+    padding: var(--space-sm) 0;
+    border-bottom: 1px solid var(--border-subtle);
   }
 
   :global(.trends-delta-item:last-child) {
-    border-right: none;
+    border-bottom: none;
   }
 
   :global(.trends-delta-label) {
-    display: block;
+    flex-shrink: 0;
+    width: 80px;
     font-size: 0.65rem;
     color: var(--text-muted);
     text-transform: uppercase;
     letter-spacing: 0.06em;
-    margin-bottom: 4px;
   }
 
   :global(.trends-delta-value) {
@@ -1291,9 +1290,11 @@ const teamConfig = await getTeamConfig(db);
     border-left: 4px solid rgba(255, 152, 0, 0.6);
     border-radius: var(--radius-md);
     padding: var(--space-lg);
+    overflow-x: auto;
   }
 
   :global(.overlap-table) {
+    min-width: 700px;
     width: 100%;
     border-collapse: separate;
     border-spacing: 0 var(--space-xs);
@@ -1311,6 +1312,7 @@ const teamConfig = await getTeamConfig(db);
     letter-spacing: 0.04em;
     border-bottom: 1px solid var(--border-subtle);
     background: var(--bg-elevated);
+    white-space: nowrap;
   }
 
   :global(.overlap-table td) {
@@ -1322,10 +1324,20 @@ const teamConfig = await getTeamConfig(db);
 
   :global(.overlap-table td:first-child) {
     border-radius: var(--radius-sm) 0 0 var(--radius-sm);
+    white-space: nowrap;
+  }
+
+  :global(.overlap-table td:nth-child(2)) {
+    white-space: nowrap;
+  }
+
+  :global(.overlap-table td:nth-child(3)) {
+    white-space: nowrap;
   }
 
   :global(.overlap-table td:last-child) {
     border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+    white-space: nowrap;
   }
 
   /* Project area status badge */
@@ -1474,16 +1486,8 @@ const teamConfig = await getTeamConfig(db);
     :global(.stats-grid-8) {
       grid-template-columns: repeat(2, 1fr);
     }
-    :global(.trends-delta-row) {
-      grid-template-columns: 1fr;
-    }
-    :global(.trends-delta-item) {
-      border-right: none;
-      border-bottom: 1px solid var(--border-subtle);
-      padding-left: 0;
-    }
-    :global(.trends-delta-item:last-child) {
-      border-bottom: none;
+    :global(.trends-delta-label) {
+      width: 70px;
     }
     :global(.overlap-table) {
       font-size: 0.72rem;
