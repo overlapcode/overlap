@@ -695,12 +695,17 @@ function contentToPrintHTML(content: InsightContent, periodLabel: string, insigh
   let overlapDetailHTML = '';
   if (content.overlap_detail?.length) {
     overlapDetailHTML = section('Overlap Details',
-      `<table><thead><tr><th>Users</th><th>File</th><th>Scope</th><th>Description</th><th>Status</th></tr></thead><tbody>`
-      + content.overlap_detail.map(od =>
-        `<tr><td>${esc(od.users.join(', '))}</td><td style="font-family:'SF Mono','Consolas',monospace;font-size:0.78rem">${esc(od.file_path.split('/').pop() || od.file_path)}</td>`
-        + `<td>${esc(od.scope)}</td><td>${esc(od.description)}</td><td>${esc(od.resolved)}</td></tr>`
+      content.overlap_detail.map(od =>
+        `<div style="background:#f7f8fa;border:1px solid #e5e7eb;border-radius:8px;padding:16px;margin-bottom:10px">`
+        + `<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">`
+        + `<span style="font-family:'SF Mono','Consolas',monospace;font-size:0.82rem;font-weight:600;color:#1a1a2e">${esc(od.file_path.split('/').pop() || od.file_path)}</span>`
+        + `<span style="font-size:0.6rem;text-transform:uppercase;padding:2px 8px;border-radius:4px;background:rgba(255,152,0,0.1);color:#e68a00;font-weight:600">${esc(od.scope)}</span>`
+        + `</div>`
+        + `<div style="font-size:0.75rem;color:#888;margin-bottom:8px">${esc(od.users.join(', '))}</div>`
+        + `<div style="font-size:0.85rem;color:#444;line-height:1.6;margin-bottom:8px">${esc(od.description)}</div>`
+        + `<div style="font-size:0.75rem;color:#888">${esc(od.resolved)}</div>`
+        + `</div>`
       ).join('')
-      + `</tbody></table>`
     );
   }
 
@@ -1526,28 +1531,19 @@ function InsightReport({ content, insight, periodLabel, onRegenerate, canRegener
       {content.overlap_detail && content.overlap_detail.length > 0 && (
         <div className="report-section overlap-detail-section">
           <h3>Overlap Details</h3>
-          <table className="overlap-table">
-            <thead>
-              <tr>
-                <th>Users</th>
-                <th>File</th>
-                <th>Scope</th>
-                <th>Description</th>
-                <th>Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {content.overlap_detail.map((od, i) => (
-                <tr key={i}>
-                  <td>{od.users.join(', ')}</td>
-                  <td className="file-path">{od.file_path.split('/').pop()}<span className="file-repo" title={od.file_path}></span></td>
-                  <td><span className={`status-badge scope-badge scope-${od.scope}`}>{od.scope}</span></td>
-                  <td>{od.description}</td>
-                  <td>{od.resolved}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <div className="overlap-cards">
+            {content.overlap_detail.map((od, i) => (
+              <div key={i} className="overlap-card">
+                <div className="overlap-card-header">
+                  <span className="overlap-card-file">{od.file_path.split('/').pop()}</span>
+                  <span className={`status-badge scope-badge scope-${od.scope}`}>{od.scope}</span>
+                </div>
+                <div className="overlap-card-users">{od.users.join(', ')}</div>
+                <div className="overlap-card-desc">{od.description}</div>
+                <div className="overlap-card-status">{od.resolved}</div>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 

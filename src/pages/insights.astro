@@ -1290,54 +1290,51 @@ const teamConfig = await getTeamConfig(db);
     border-left: 4px solid rgba(255, 152, 0, 0.6);
     border-radius: var(--radius-md);
     padding: var(--space-lg);
-    overflow-x: auto;
   }
 
-  :global(.overlap-table) {
-    min-width: 700px;
-    width: 100%;
-    border-collapse: separate;
-    border-spacing: 0 var(--space-xs);
-    font-size: 0.8rem;
+  :global(.overlap-cards) {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-sm);
   }
 
-  :global(.overlap-table th) {
-    text-align: left;
-    padding: var(--space-xs) var(--space-sm);
+  :global(.overlap-card) {
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-sm);
+    padding: var(--space-md);
+  }
+
+  :global(.overlap-card-header) {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    margin-bottom: var(--space-xs);
+  }
+
+  :global(.overlap-card-file) {
     font-family: var(--font-mono);
-    font-size: 0.7rem;
+    font-size: 0.82rem;
     font-weight: 600;
+    color: var(--text-primary);
+  }
+
+  :global(.overlap-card-users) {
+    font-size: 0.75rem;
     color: var(--text-muted);
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-    border-bottom: 1px solid var(--border-subtle);
-    background: var(--bg-elevated);
-    white-space: nowrap;
+    margin-bottom: var(--space-sm);
   }
 
-  :global(.overlap-table td) {
-    padding: var(--space-md) var(--space-sm);
+  :global(.overlap-card-desc) {
+    font-size: 0.85rem;
     color: var(--text-secondary);
-    vertical-align: top;
-    background: var(--bg-elevated);
+    line-height: 1.6;
+    margin-bottom: var(--space-sm);
   }
 
-  :global(.overlap-table td:first-child) {
-    border-radius: var(--radius-sm) 0 0 var(--radius-sm);
-    white-space: nowrap;
-  }
-
-  :global(.overlap-table td:nth-child(2)) {
-    white-space: nowrap;
-  }
-
-  :global(.overlap-table td:nth-child(3)) {
-    white-space: nowrap;
-  }
-
-  :global(.overlap-table td:last-child) {
-    border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
-    white-space: nowrap;
+  :global(.overlap-card-status) {
+    font-size: 0.75rem;
+    color: var(--text-muted);
   }
 
   /* Project area status badge */
@@ -1488,9 +1485,6 @@ const teamConfig = await getTeamConfig(db);
     }
     :global(.trends-delta-label) {
       width: 70px;
-    }
-    :global(.overlap-table) {
-      font-size: 0.72rem;
     }
   }
 
