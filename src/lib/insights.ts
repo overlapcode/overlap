@@ -794,17 +794,17 @@ PER-SESSION ANALYSIS:
 
 Generate a JSON response with the following fields. Some fields are scope-dependent — follow the scope instructions to determine which to include and how to write them.
 
-1. "top_actions" — Array of 2-3 highest-priority actions for the upcoming period. Single sentence each, imperative voice, specific. These appear as a callout box at the top of the report.
+1. "top_actions" — Array of 2-3 concrete next steps for the upcoming period based on what was learned this period. Single sentence each, specific and grounded in the data. Frame as forward-looking priorities, not generic advice. These appear as a "Next Steps" section after accomplishments.
 
 2. "summary" — Executive summary. Lead with what got BUILT or SHIPPED, not usage numbers.
 
 3. "highlights" — Array of insight-driven observations. Not restated stats — patterns, achievements, notable behaviors.
 
 4. "trends" — Period-over-period comparison object. Only include if {comparison_json} is not null. Fields:
-   - "sessions_delta": e.g. "+12 sessions vs last period"
-   - "completion_delta": e.g. "Fully achieved rate improved from 5% to 12%"
-   - "friction_delta": e.g. "Friction events dropped from 28 to 20"
-   - "narrative": 2-3 sentences interpreting what the trends mean
+   - "sessions_delta": KEEP SHORT. e.g. "+12 vs last period", "-2 (6 vs 8)"
+   - "completion_delta": KEEP SHORT. e.g. "Steady at 33%", "Up 5% to 12%"
+   - "friction_delta": KEEP SHORT. e.g. "+9 events (17 vs 8)", "Down 30%"
+   - "narrative": 2-3 sentences interpreting what the trends mean together — what changed and why
    Set to null if no comparison data.
 
 5. "project_areas" — Array of distinct work themes. Each has:
@@ -875,7 +875,7 @@ VOICE: Write directly to the developer using "you/your". You are a sharp colleag
 
 SECTION BEHAVIOR:
 
-"top_actions": Address the developer directly. "Split billing-tab.tsx before your next feature session." Not "The developer should..."
+"top_actions": Frame as your priorities for next period based on what you learned. "Continue the billing-tab.tsx refactor — it's your most-edited file and splitting it will cut session friction." Ground each in this period's data.
 
 "summary": Lead with what YOU shipped. "You shipped the live demo call feature and pushed through 13+ PR fixes using a parallel agent workflow." Mention the repo by name.
 
@@ -907,7 +907,7 @@ VOICE: Write about "the team" and use individual names when attributing work. Th
 
 SECTION BEHAVIOR:
 
-"top_actions": Address the team lead or the team collectively. "Schedule a 15-minute sync between Michael and Iyanu on conversation_manager.py ownership." Frame as coordination and management actions.
+"top_actions": Frame as the team's priorities for next period based on this period's data. "The overlap on conversation_manager.py between Michael and Iyanu signals a need for ownership clarity before the next sprint." Ground each in specific observations from the report.
 
 "summary": Lead with what THE TEAM shipped collectively. Mention the top 2-3 contributors by name and what they drove. "The team shipped across a wide surface area — Omotayo closed 6+ backend issues, Michael pushed forward the delta experimentation layer, and Marvelous established a repeatable PR triage workflow." The summary should give a manager a 10-second understanding of the team's week/month.
 

@@ -470,7 +470,7 @@ const teamConfig = await getTeamConfig(db);
   /* Stats grid */
   :global(.stats-grid) {
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(3, 1fr);
     gap: var(--space-sm);
     margin-bottom: var(--space-xl);
   }
@@ -1177,64 +1177,86 @@ const teamConfig = await getTeamConfig(db);
     border-top: 1px solid var(--border-subtle);
   }
 
-  /* Top Actions callout */
-  :global(.top-actions-section) {
-    background: rgba(76, 175, 80, 0.06);
-    border: 1px solid rgba(76, 175, 80, 0.15);
-    border-left: 4px solid rgba(76, 175, 80, 0.7);
+  /* Next Steps callout */
+  :global(.next-steps-section) {
+    background: rgba(107, 158, 221, 0.06);
+    border: 1px solid rgba(107, 158, 221, 0.15);
+    border-left: 4px solid rgba(107, 158, 221, 0.5);
     border-radius: var(--radius-md);
     padding: var(--space-lg);
   }
 
-  :global(.top-actions-section ul) {
-    list-style: disc;
-    padding-left: var(--space-lg);
+  :global(.next-steps-section ul) {
+    list-style: none;
+    padding: 0;
     margin: 0;
   }
 
-  :global(.top-actions-section li) {
+  :global(.next-steps-section li) {
     font-size: 0.85rem;
     color: var(--text-secondary);
-    padding: var(--space-xs) 0;
+    padding: var(--space-sm) 0;
     line-height: 1.6;
+    border-bottom: 1px solid var(--border-subtle);
+    padding-left: var(--space-md);
+    position: relative;
+  }
+
+  :global(.next-steps-section li::before) {
+    content: '\2192';
+    position: absolute;
+    left: 0;
+    color: rgba(107, 158, 221, 0.7);
+    font-weight: 600;
+  }
+
+  :global(.next-steps-section li:last-child) {
+    border-bottom: none;
+    padding-bottom: 0;
   }
 
   /* Trends section */
   :global(.trends-section) {
-    background: rgba(0, 188, 212, 0.05);
-    border: 1px solid rgba(0, 188, 212, 0.15);
-    border-left: 4px solid rgba(0, 188, 212, 0.6);
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-subtle);
     border-radius: var(--radius-md);
     padding: var(--space-lg);
   }
 
-  :global(.trends-delta-grid) {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: var(--space-sm);
+  :global(.trends-delta-row) {
+    display: flex;
+    gap: var(--space-lg);
+    margin-bottom: var(--space-md);
+    flex-wrap: wrap;
   }
 
-  :global(.trends-delta-card) {
-    background: var(--bg-elevated);
-    border: 1px solid var(--border-subtle);
-    border-radius: var(--radius-sm);
-    padding: var(--space-md);
-    text-align: center;
+  :global(.trends-delta-item) {
+    display: flex;
+    align-items: baseline;
+    gap: var(--space-xs);
   }
 
-  :global(.trends-delta-card .stat-value) {
-    font-family: var(--font-mono);
-    font-size: 1.1rem;
-    font-weight: 700;
-    color: var(--text-primary);
-  }
-
-  :global(.trends-delta-card .stat-label) {
+  :global(.trends-delta-label) {
     font-size: 0.7rem;
     color: var(--text-muted);
     text-transform: uppercase;
     letter-spacing: 0.05em;
-    margin-top: var(--space-xs);
+    white-space: nowrap;
+  }
+
+  :global(.trends-delta-value) {
+    font-family: var(--font-mono);
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+  }
+
+  :global(.trends-narrative) {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    line-height: 1.7;
+    border-top: 1px solid var(--border-subtle);
+    padding-top: var(--space-md);
   }
 
   /* Outcome Analysis section */
@@ -1431,8 +1453,9 @@ const teamConfig = await getTeamConfig(db);
   }
 
   @media (max-width: 600px) {
-    :global(.trends-delta-grid) {
-      grid-template-columns: 1fr;
+    :global(.trends-delta-row) {
+      flex-direction: column;
+      gap: var(--space-sm);
     }
     :global(.overlap-table) {
       font-size: 0.72rem;

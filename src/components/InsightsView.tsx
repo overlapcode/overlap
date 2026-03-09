@@ -643,10 +643,10 @@ function contentToPrintHTML(content: InsightContent, periodLabel: string, insigh
     `<div class="stat"><div class="stat-val">${esc(value as string)}</div><div class="stat-lbl">${esc(label as string)}</div></div>`
   ).join('')}</div>`;
 
-  // Top Actions
-  const topActionsHTML = content.top_actions?.length
-    ? `<div class="section accent-section" style="background:rgba(76,175,80,0.08);border:1px solid rgba(76,175,80,0.2);border-radius:8px;padding:20px 24px;border-left:4px solid #4caf50">`
-      + `<h2 style="color:#4caf50">Top Actions</h2><ul>${content.top_actions.map(a => `<li>${esc(typeof a === 'string' ? a : (a as any).title || (a as any).description || JSON.stringify(a))}</li>`).join('')}</ul></div>`
+  // Next Steps (moved lower in the report)
+  const nextStepsHTML = content.top_actions?.length
+    ? `<div class="section accent-section" style="background:rgba(107,158,221,0.06);border:1px solid rgba(107,158,221,0.15);border-radius:8px;padding:20px 24px;border-left:4px solid rgba(107,158,221,0.5)">`
+      + `<h2 style="color:#6b9edd">Next Steps</h2><ul style="list-style:none;padding:0">${content.top_actions.map(a => `<li style="padding:6px 0;border-bottom:1px solid #eee;padding-left:16px;position:relative"><span style="position:absolute;left:0;color:#6b9edd">\u2192</span>${esc(typeof a === 'string' ? a : (a as any).title || (a as any).description || JSON.stringify(a))}</li>`).join('')}</ul></div>`
     : '';
 
   // Highlights
@@ -657,11 +657,11 @@ function contentToPrintHTML(content: InsightContent, periodLabel: string, insigh
   // Trends
   let trendsHTML = '';
   if (content.trends && content.display_config?.show_trends !== false) {
-    trendsHTML = section('Trends',
-      `<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:12px">`
-      + `<div class="stat"><div class="stat-val">${esc(content.trends.sessions_delta)}</div><div class="stat-lbl">Sessions</div></div>`
-      + `<div class="stat"><div class="stat-val">${esc(content.trends.completion_delta)}</div><div class="stat-lbl">Completion</div></div>`
-      + `<div class="stat"><div class="stat-val">${esc(content.trends.friction_delta)}</div><div class="stat-lbl">Friction</div></div>`
+    trendsHTML = section('Trends vs. Previous Period',
+      `<div style="display:flex;gap:24px;margin-bottom:12px;flex-wrap:wrap">`
+      + `<div><span style="font-size:0.7rem;color:#888;text-transform:uppercase;letter-spacing:0.05em">Sessions</span> <span style="font-family:'SF Mono','Consolas',monospace;font-size:0.82rem;font-weight:600;color:#444">${esc(content.trends.sessions_delta)}</span></div>`
+      + `<div><span style="font-size:0.7rem;color:#888;text-transform:uppercase;letter-spacing:0.05em">Completion</span> <span style="font-family:'SF Mono','Consolas',monospace;font-size:0.82rem;font-weight:600;color:#444">${esc(content.trends.completion_delta)}</span></div>`
+      + `<div><span style="font-size:0.7rem;color:#888;text-transform:uppercase;letter-spacing:0.05em">Friction</span> <span style="font-family:'SF Mono','Consolas',monospace;font-size:0.82rem;font-weight:600;color:#444">${esc(content.trends.friction_delta)}</span></div>`
       + `</div><p>${esc(content.trends.narrative)}</p>`
     );
   }
@@ -850,7 +850,7 @@ function contentToPrintHTML(content: InsightContent, periodLabel: string, insigh
   .header-right { margin-left: auto; text-align: right; font-size: 0.75rem; color: #666; }
   .period-title { font-size: 1.5rem; font-weight: 700; color: #1a1a2e; margin-bottom: 4px; }
   .summary { font-size: 0.95rem; color: #444; margin-bottom: 24px; line-height: 1.7; }
-  .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 28px; }
+  .stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 28px; }
   .stat { background: #f7f8fa; border: 1px solid #e5e7eb; border-radius: 6px; padding: 12px 10px; text-align: center; }
   .stat-val { font-size: 1.2rem; font-weight: 700; color: #1a1a2e; font-family: 'SF Mono', 'Consolas', monospace; }
   .stat-lbl { font-size: 0.65rem; color: #888; text-transform: uppercase; letter-spacing: 0.05em; margin-top: 2px; }
@@ -910,7 +910,6 @@ function contentToPrintHTML(content: InsightContent, periodLabel: string, insigh
   <div class="period-title">${esc(periodLabel)}</div>
   <div class="summary">${esc(content.summary || '')}</div>
   ${statsHTML}
-  ${topActionsHTML}
   ${highlightsHTML}
   ${trendsHTML}
   ${sessionAnalysisHTML}
@@ -919,6 +918,7 @@ function contentToPrintHTML(content: InsightContent, periodLabel: string, insigh
   ${outcomeAnalysisHTML}
   ${narrativeHTML}
   ${accomplishmentsHTML}
+  ${nextStepsHTML}
   ${frictionHTML}
   ${overlapDetailHTML}
   ${memberInsightsHTML}
@@ -964,13 +964,6 @@ function contentToMarkdown(content: InsightContent, periodLabel: string, insight
     lines.push(`| Blocked | ${s.total_blocks} |`);
   }
   lines.push('');
-
-  if (content.top_actions?.length) {
-    lines.push('## Top Actions');
-    lines.push('');
-    content.top_actions.forEach(a => lines.push(`- ${typeof a === 'string' ? a : (a as any).title || (a as any).description || JSON.stringify(a)}`));
-    lines.push('');
-  }
 
   if (content.highlights?.length) {
     lines.push('## Highlights');
@@ -1067,6 +1060,13 @@ function contentToMarkdown(content: InsightContent, periodLabel: string, insight
       lines.push(a.description);
       lines.push('');
     });
+  }
+
+  if (content.top_actions?.length) {
+    lines.push('## Next Steps');
+    lines.push('');
+    content.top_actions.forEach(a => lines.push(`- ${typeof a === 'string' ? a : (a as any).title || (a as any).description || JSON.stringify(a)}`));
+    lines.push('');
   }
 
   if (content.friction_analysis?.length) {
@@ -1286,16 +1286,6 @@ function InsightReport({ content, insight, periodLabel, onRegenerate, canRegener
         )}
       </div>
 
-      {/* Top Actions Callout */}
-      {content.top_actions && content.top_actions.length > 0 && (
-        <div className="report-section top-actions-section">
-          <h3>Top Actions</h3>
-          <ul>
-            {content.top_actions.map((action, i) => <li key={i}>{typeof action === 'string' ? action : (action as any).title || (action as any).description || JSON.stringify(action)}</li>)}
-          </ul>
-        </div>
-      )}
-
       {/* Highlights */}
       {content.highlights.length > 0 && (
         <div className="report-section">
@@ -1309,23 +1299,23 @@ function InsightReport({ content, insight, periodLabel, onRegenerate, canRegener
       {/* Trends */}
       {content.trends && content.display_config?.show_trends !== false && (
         <div className="report-section trends-section">
-          <h3>Trends</h3>
-          <div className="trends-delta-grid">
-            <div className="trends-delta-card">
-              <div className="stat-value">{content.trends.sessions_delta}</div>
-              <div className="stat-label">Sessions</div>
+          <h3>Trends vs. Previous Period</h3>
+          <div className="trends-delta-row">
+            <div className="trends-delta-item">
+              <span className="trends-delta-label">Sessions</span>
+              <span className="trends-delta-value">{content.trends.sessions_delta}</span>
             </div>
-            <div className="trends-delta-card">
-              <div className="stat-value">{content.trends.completion_delta}</div>
-              <div className="stat-label">Completion</div>
+            <div className="trends-delta-item">
+              <span className="trends-delta-label">Completion</span>
+              <span className="trends-delta-value">{content.trends.completion_delta}</span>
             </div>
-            <div className="trends-delta-card">
-              <div className="stat-value">{content.trends.friction_delta}</div>
-              <div className="stat-label">Friction</div>
+            <div className="trends-delta-item">
+              <span className="trends-delta-label">Friction</span>
+              <span className="trends-delta-value">{content.trends.friction_delta}</span>
             </div>
           </div>
-          <div className="narrative-text" style={{ marginTop: 'var(--space-md)' }}>
-            <p>{content.trends.narrative}</p>
+          <div className="trends-narrative">
+            {content.trends.narrative}
           </div>
         </div>
       )}
@@ -1491,6 +1481,16 @@ function InsightReport({ content, insight, periodLabel, onRegenerate, canRegener
               </div>
             ))}
           </div>
+        </div>
+      )}
+
+      {/* Next Steps */}
+      {content.top_actions && content.top_actions.length > 0 && (
+        <div className="report-section next-steps-section">
+          <h3>Next Steps</h3>
+          <ul>
+            {content.top_actions.map((action, i) => <li key={i}>{typeof action === 'string' ? action : (action as any).title || (action as any).description || JSON.stringify(action)}</li>)}
+          </ul>
         </div>
       )}
 
