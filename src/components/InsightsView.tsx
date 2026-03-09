@@ -646,12 +646,12 @@ function contentToPrintHTML(content: InsightContent, periodLabel: string, insigh
   // Top Actions
   const topActionsHTML = content.top_actions?.length
     ? `<div class="section accent-section" style="background:rgba(76,175,80,0.08);border:1px solid rgba(76,175,80,0.2);border-radius:8px;padding:20px 24px;border-left:4px solid #4caf50">`
-      + `<h2 style="color:#4caf50">Top Actions</h2><ul>${content.top_actions.map(a => `<li>${esc(a)}</li>`).join('')}</ul></div>`
+      + `<h2 style="color:#4caf50">Top Actions</h2><ul>${content.top_actions.map(a => `<li>${esc(typeof a === 'string' ? a : (a as any).title || (a as any).description || JSON.stringify(a))}</li>`).join('')}</ul></div>`
     : '';
 
   // Highlights
   const highlightsHTML = content.highlights?.length
-    ? section('Highlights', `<ul>${content.highlights.map(h => `<li>${esc(h)}</li>`).join('')}</ul>`)
+    ? section('Highlights', `<ul>${content.highlights.map(h => `<li>${esc(typeof h === 'string' ? h : (h as any).title || (h as any).description || JSON.stringify(h))}</li>`).join('')}</ul>`)
     : '';
 
   // Trends
@@ -770,7 +770,7 @@ function contentToPrintHTML(content: InsightContent, periodLabel: string, insigh
     ? accentSection('Where Things Went Wrong', content.friction_analysis.map(f =>
       `<div class="item"><div class="item-title" style="color:#d97757">${esc(f.category)}</div>`
       + `<p>${esc(f.description)}</p>`
-      + (f.examples?.length ? `<ul class="examples">${f.examples.map(ex => `<li>${esc(ex)}</li>`).join('')}</ul>` : '')
+      + (f.examples?.length ? `<ul class="examples">${f.examples.map(ex => `<li>${esc(typeof ex === 'string' ? ex : (ex as any).title || (ex as any).description || JSON.stringify(ex))}</li>`).join('')}</ul>` : '')
       + '</div>'
     ).join(''), '#d97757')
     : '';
@@ -968,14 +968,14 @@ function contentToMarkdown(content: InsightContent, periodLabel: string, insight
   if (content.top_actions?.length) {
     lines.push('## Top Actions');
     lines.push('');
-    content.top_actions.forEach(a => lines.push(`- ${a}`));
+    content.top_actions.forEach(a => lines.push(`- ${typeof a === 'string' ? a : (a as any).title || (a as any).description || JSON.stringify(a)}`));
     lines.push('');
   }
 
   if (content.highlights?.length) {
     lines.push('## Highlights');
     lines.push('');
-    content.highlights.forEach(h => lines.push(`- ${h}`));
+    content.highlights.forEach(h => lines.push(`- ${typeof h === 'string' ? h : (h as any).title || (h as any).description || JSON.stringify(h)}`));
     lines.push('');
   }
 
@@ -1080,7 +1080,7 @@ function contentToMarkdown(content: InsightContent, periodLabel: string, insight
       lines.push(f.description);
       if (f.examples?.length) {
         lines.push('');
-        f.examples.forEach(ex => lines.push(`- ${ex}`));
+        f.examples.forEach(ex => lines.push(`- ${typeof ex === 'string' ? ex : (ex as any).title || (ex as any).description || JSON.stringify(ex)}`));
       }
       lines.push('');
     });
@@ -1291,7 +1291,7 @@ function InsightReport({ content, insight, periodLabel, onRegenerate, canRegener
         <div className="report-section top-actions-section">
           <h3>Top Actions</h3>
           <ul>
-            {content.top_actions.map((action, i) => <li key={i}>{action}</li>)}
+            {content.top_actions.map((action, i) => <li key={i}>{typeof action === 'string' ? action : (action as any).title || (action as any).description || JSON.stringify(action)}</li>)}
           </ul>
         </div>
       )}
@@ -1301,7 +1301,7 @@ function InsightReport({ content, insight, periodLabel, onRegenerate, canRegener
         <div className="report-section">
           <h3>Highlights</h3>
           <ul className="highlights-list">
-            {content.highlights.map((h, i) => <li key={i}>{h}</li>)}
+            {content.highlights.map((h, i) => <li key={i}>{typeof h === 'string' ? h : (h as any).title || (h as any).description || JSON.stringify(h)}</li>)}
           </ul>
         </div>
       )}
@@ -1513,7 +1513,7 @@ function InsightReport({ content, insight, periodLabel, onRegenerate, canRegener
                 <p className="friction-desc">{f.description}</p>
                 {f.examples.length > 0 && (
                   <ul className="friction-examples">
-                    {f.examples.map((ex, j) => <li key={j}>{ex}</li>)}
+                    {f.examples.map((ex, j) => <li key={j}>{typeof ex === 'string' ? ex : (ex as any).title || (ex as any).description || JSON.stringify(ex)}</li>)}
                   </ul>
                 )}
               </div>
