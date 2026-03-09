@@ -850,7 +850,7 @@ function contentToPrintHTML(content: InsightContent, periodLabel: string, insigh
   .header-right { margin-left: auto; text-align: right; font-size: 0.75rem; color: #666; }
   .period-title { font-size: 1.5rem; font-weight: 700; color: #1a1a2e; margin-bottom: 4px; }
   .summary { font-size: 0.95rem; color: #444; margin-bottom: 24px; line-height: 1.7; }
-  .stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 28px; }
+  .stats-grid { display: grid; grid-template-columns: repeat(${statItems.length > 6 ? 4 : 3}, 1fr); gap: 10px; margin-bottom: 28px; }
   .stat { background: #f7f8fa; border: 1px solid #e5e7eb; border-radius: 6px; padding: 12px 10px; text-align: center; }
   .stat-val { font-size: 1.2rem; font-weight: 700; color: #1a1a2e; font-family: 'SF Mono', 'Consolas', monospace; }
   .stat-lbl { font-size: 0.65rem; color: #888; text-transform: uppercase; letter-spacing: 0.05em; margin-top: 2px; }
@@ -1271,7 +1271,7 @@ function InsightReport({ content, insight, periodLabel, onRegenerate, canRegener
       <div className="report-summary">{content.summary}</div>
 
       {/* Key stats */}
-      <div className="stats-grid">
+      <div className={`stats-grid${s.total_overlaps > 0 ? ' stats-grid-8' : ''}`}>
         <div className="stat-card"><div className="stat-value">{s.total_sessions}</div><div className="stat-label">Sessions</div></div>
         <div className="stat-card"><div className="stat-value">{formatCost(s.total_cost_usd)}</div><div className="stat-label">Cost</div></div>
         <div className="stat-card"><div className="stat-value">{s.total_files_touched}</div><div className="stat-label">Files Touched</div></div>

@@ -475,6 +475,10 @@ const teamConfig = await getTeamConfig(db);
     margin-bottom: var(--space-xl);
   }
 
+  :global(.stats-grid-8) {
+    grid-template-columns: repeat(4, 1fr);
+  }
+
   :global(.stat-card) {
     background: var(--bg-elevated);
     border: 1px solid var(--border-subtle);
@@ -1291,7 +1295,8 @@ const teamConfig = await getTeamConfig(db);
 
   :global(.overlap-table) {
     width: 100%;
-    border-collapse: collapse;
+    border-collapse: separate;
+    border-spacing: 0 var(--space-xs);
     font-size: 0.8rem;
   }
 
@@ -1309,14 +1314,18 @@ const teamConfig = await getTeamConfig(db);
   }
 
   :global(.overlap-table td) {
-    padding: var(--space-sm);
-    border-bottom: 1px solid var(--border-subtle);
+    padding: var(--space-md) var(--space-sm);
     color: var(--text-secondary);
     vertical-align: top;
+    background: var(--bg-elevated);
   }
 
-  :global(.overlap-table tr:last-child td) {
-    border-bottom: none;
+  :global(.overlap-table td:first-child) {
+    border-radius: var(--radius-sm) 0 0 var(--radius-sm);
+  }
+
+  :global(.overlap-table td:last-child) {
+    border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
   }
 
   /* Project area status badge */
@@ -1461,6 +1470,10 @@ const teamConfig = await getTeamConfig(db);
   }
 
   @media (max-width: 600px) {
+    :global(.stats-grid),
+    :global(.stats-grid-8) {
+      grid-template-columns: repeat(2, 1fr);
+    }
     :global(.trends-delta-row) {
       grid-template-columns: 1fr;
     }
