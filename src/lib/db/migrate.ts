@@ -250,10 +250,13 @@ CREATE TABLE IF NOT EXISTS session_facets (
     goal_categories TEXT,
     outcome TEXT,
     session_type TEXT,
+    scope_ambition TEXT,
     friction_counts TEXT,
     friction_detail TEXT,
     primary_success TEXT,
     brief_summary TEXT,
+    continuation_signal INTEGER DEFAULT 0,
+    collaboration_signal TEXT,
     model_used TEXT,
     generated_at TEXT,
     created_at TEXT DEFAULT (datetime('now'))
@@ -287,6 +290,10 @@ const MIGRATIONS = [
   `CREATE UNIQUE INDEX IF NOT EXISTS idx_overlaps_public_id ON overlaps(public_id) WHERE public_id IS NOT NULL`,
   // v1.8.1: Clear false 'warn' defaults on pre-existing overlaps (decision was never actually recorded)
   `UPDATE overlaps SET decision = NULL WHERE public_id IS NULL`,
+  // v1.8.0: Add v2 facet fields to session_facets (scope_ambition, continuation_signal, collaboration_signal)
+  `ALTER TABLE session_facets ADD COLUMN scope_ambition TEXT`,
+  `ALTER TABLE session_facets ADD COLUMN continuation_signal INTEGER DEFAULT 0`,
+  `ALTER TABLE session_facets ADD COLUMN collaboration_signal TEXT`,
 ];
 
 export async function ensureMigrated(db: D1Database): Promise<void> {

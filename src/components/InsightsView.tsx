@@ -49,22 +49,30 @@ type InsightContent = {
     top_goal_categories: Array<{ category: string; count: number }>;
     total_friction_events: number;
     friction_by_type: Record<string, number>;
+    scope_ambition_counts?: Record<string, number>;
   };
   summary: string;
   highlights: string[];
-  project_areas: Array<{ name: string; session_count: number; description: string }>;
+  project_areas: Array<{ name: string; session_count: number; description: string; status?: 'shipped' | 'in_progress' | 'stalled' | 'planning' }>;
   interaction_style?: string;
-  friction_analysis: Array<{ category: string; description: string; examples: string[] }>;
-  accomplishments: Array<{ title: string; description: string }>;
+  friction_analysis: Array<{ category: string; description: string; examples: string[]; count?: number; escalation?: 'new' | 'recurring' | 'improving' }>;
+  accomplishments: Array<{ title: string; description: string; impact_estimate?: string | null }>;
   narrative: string;
-  recommendations: Array<{ title: string; description: string }>;
+  recommendations: Array<{ title: string; description: string; priority?: 'high' | 'medium' | 'low' }>;
   // Backward compat: old insights may have string[] recommendations
+  top_actions?: string[] | null;
+  trends?: { sessions_delta: string; completion_delta: string; friction_delta: string; narrative: string } | null;
+  outcome_analysis?: { completion_breakdown: Record<string, number>; interpretation: string; highest_completion_pattern: string; lowest_completion_pattern: string } | null;
+  overlap_detail?: Array<{ users: string[]; file_path: string; scope: 'line' | 'function' | 'file'; description: string; resolved: string }> | null;
+  display_config?: { show_cost: boolean; show_avg_duration: boolean; show_tokens: boolean; show_trends: boolean; compact_repos: boolean; compact_tools: boolean } | null;
   member_insights?: Array<{
     name: string;
     session_count: number;
     focus_areas: string[];
     strengths: string;
     suggestion: string;
+    completion_rate?: number;
+    friction_rate?: number;
   }> | null;
   environment_recommendations?: Array<{
     type: 'claude_md_rule' | 'skill' | 'mcp_server' | 'workflow';
@@ -635,10 +643,66 @@ function contentToPrintHTML(content: InsightContent, periodLabel: string, insigh
     `<div class="stat"><div class="stat-val">${esc(value as string)}</div><div class="stat-lbl">${esc(label as string)}</div></div>`
   ).join('')}</div>`;
 
+  // Top Actions
+  const topActionsHTML = content.top_actions?.length
+    ? `<div class="section accent-section" style="background:rgba(76,175,80,0.08);border:1px solid rgba(76,175,80,0.2);border-radius:8px;padding:20px 24px;border-left:4px solid #4caf50">`
+      + `<h2 style="color:#4caf50">Top Actions</h2><ul>${content.top_actions.map(a => `<li>${esc(a)}</li>`).join('')}</ul></div>`
+    : '';
+
   // Highlights
   const highlightsHTML = content.highlights?.length
     ? section('Highlights', `<ul>${content.highlights.map(h => `<li>${esc(h)}</li>`).join('')}</ul>`)
     : '';
+
+  // Trends
+  let trendsHTML = '';
+  if (content.trends && content.display_config?.show_trends !== false) {
+    trendsHTML = section('Trends',
+      `<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:12px">`
+      + `<div class="stat"><div class="stat-val">${esc(content.trends.sessions_delta)}</div><div class="stat-lbl">Sessions</div></div>`
+      + `<div class="stat"><div class="stat-val">${esc(content.trends.completion_delta)}</div><div class="stat-lbl">Completion</div></div>`
+      + `<div class="stat"><div class="stat-val">${esc(content.trends.friction_delta)}</div><div class="stat-lbl">Friction</div></div>`
+      + `</div><p>${esc(content.trends.narrative)}</p>`
+    );
+  }
+
+  // Outcome Analysis
+  let outcomeAnalysisHTML = '';
+  if (content.outcome_analysis) {
+    const oa = content.outcome_analysis;
+    const breakdown = oa.completion_breakdown;
+    const total = Object.values(breakdown).reduce((a, b) => a + b, 0);
+    let barHTML = '';
+    if (total > 0) {
+      const colors: Record<string, string> = { fully_achieved: '#8a9e6d', mostly_achieved: '#8abe6f', partially_achieved: '#d4a843', not_achieved: '#d97757' };
+      barHTML = `<div style="display:flex;border-radius:4px;overflow:hidden;height:20px;margin-bottom:8px">`
+        + Object.entries(breakdown).sort((a, b) => b[1] - a[1]).map(([key, count]) =>
+          `<div style="width:${(count / total) * 100}%;background:${colors[key] || '#888'};display:flex;align-items:center;justify-content:center;font-size:0.65rem;color:#fff;min-width:${count > 0 ? '20px' : '0'}">${count}</div>`
+        ).join('') + `</div>`;
+    }
+    outcomeAnalysisHTML = accentSection('Outcome Analysis',
+      barHTML
+      + `<p>${esc(oa.interpretation)}</p>`
+      + `<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:8px">`
+      + `<div><strong style="color:#8a9e6d;font-size:0.75rem;text-transform:uppercase">Highest Completion</strong><p>${esc(oa.highest_completion_pattern)}</p></div>`
+      + `<div><strong style="color:#d97757;font-size:0.75rem;text-transform:uppercase">Lowest Completion</strong><p>${esc(oa.lowest_completion_pattern)}</p></div>`
+      + `</div>`,
+      '#9c27b0'
+    );
+  }
+
+  // Overlap Detail
+  let overlapDetailHTML = '';
+  if (content.overlap_detail?.length) {
+    overlapDetailHTML = section('Overlap Details',
+      `<table><thead><tr><th>Users</th><th>File</th><th>Scope</th><th>Description</th><th>Status</th></tr></thead><tbody>`
+      + content.overlap_detail.map(od =>
+        `<tr><td>${esc(od.users.join(', '))}</td><td style="font-family:'SF Mono','Consolas',monospace;font-size:0.78rem">${esc(od.file_path.split('/').pop() || od.file_path)}</td>`
+        + `<td>${esc(od.scope)}</td><td>${esc(od.description)}</td><td>${esc(od.resolved)}</td></tr>`
+      ).join('')
+      + `</tbody></table>`
+    );
+  }
 
   // Session analysis
   let sessionAnalysisHTML = '';
@@ -846,13 +910,17 @@ function contentToPrintHTML(content: InsightContent, periodLabel: string, insigh
   <div class="period-title">${esc(periodLabel)}</div>
   <div class="summary">${esc(content.summary || '')}</div>
   ${statsHTML}
+  ${topActionsHTML}
   ${highlightsHTML}
+  ${trendsHTML}
   ${sessionAnalysisHTML}
   ${areasHTML}
   ${styleHTML}
+  ${outcomeAnalysisHTML}
   ${narrativeHTML}
   ${accomplishmentsHTML}
   ${frictionHTML}
+  ${overlapDetailHTML}
   ${memberInsightsHTML}
   ${envRecsHTML}
   ${reposTable}
@@ -897,10 +965,28 @@ function contentToMarkdown(content: InsightContent, periodLabel: string, insight
   }
   lines.push('');
 
+  if (content.top_actions?.length) {
+    lines.push('## Top Actions');
+    lines.push('');
+    content.top_actions.forEach(a => lines.push(`- ${a}`));
+    lines.push('');
+  }
+
   if (content.highlights?.length) {
     lines.push('## Highlights');
     lines.push('');
     content.highlights.forEach(h => lines.push(`- ${h}`));
+    lines.push('');
+  }
+
+  if (content.trends && content.display_config?.show_trends !== false) {
+    lines.push('## Trends');
+    lines.push('');
+    lines.push(`- Sessions: ${content.trends.sessions_delta}`);
+    lines.push(`- Completion: ${content.trends.completion_delta}`);
+    lines.push(`- Friction: ${content.trends.friction_delta}`);
+    lines.push('');
+    lines.push(content.trends.narrative);
     lines.push('');
   }
 
@@ -948,6 +1034,24 @@ function contentToMarkdown(content: InsightContent, periodLabel: string, insight
     lines.push('');
   }
 
+  if (content.outcome_analysis) {
+    lines.push('## Outcome Analysis');
+    lines.push('');
+    if (Object.keys(content.outcome_analysis.completion_breakdown).length) {
+      lines.push('**Completion Breakdown:**');
+      Object.entries(content.outcome_analysis.completion_breakdown)
+        .sort((a, b) => b[1] - a[1])
+        .forEach(([key, count]) => lines.push(`- ${formatCategory(key)}: ${count}`));
+      lines.push('');
+    }
+    lines.push(content.outcome_analysis.interpretation);
+    lines.push('');
+    lines.push(`**Highest Completion:** ${content.outcome_analysis.highest_completion_pattern}`);
+    lines.push('');
+    lines.push(`**Lowest Completion:** ${content.outcome_analysis.lowest_completion_pattern}`);
+    lines.push('');
+  }
+
   if (content.narrative) {
     lines.push('## Analysis');
     lines.push('');
@@ -969,7 +1073,9 @@ function contentToMarkdown(content: InsightContent, periodLabel: string, insight
     lines.push('## Where Things Went Wrong');
     lines.push('');
     content.friction_analysis.forEach(f => {
-      lines.push(`### ${f.category}`);
+      const countStr = f.count != null ? ` (x${f.count})` : '';
+      const escStr = f.escalation ? ` [${f.escalation}]` : '';
+      lines.push(`### ${f.category}${countStr}${escStr}`);
       lines.push('');
       lines.push(f.description);
       if (f.examples?.length) {
@@ -978,6 +1084,17 @@ function contentToMarkdown(content: InsightContent, periodLabel: string, insight
       }
       lines.push('');
     });
+  }
+
+  if (content.overlap_detail?.length) {
+    lines.push('## Overlap Details');
+    lines.push('');
+    lines.push('| Users | File | Scope | Description | Status |');
+    lines.push('|-------|------|-------|-------------|--------|');
+    content.overlap_detail.forEach(od => {
+      lines.push(`| ${od.users.join(', ')} | ${od.file_path.split('/').pop() || od.file_path} | ${od.scope} | ${od.description} | ${od.resolved} |`);
+    });
+    lines.push('');
   }
 
   if (content.member_insights?.length) {
@@ -1169,6 +1286,16 @@ function InsightReport({ content, insight, periodLabel, onRegenerate, canRegener
         )}
       </div>
 
+      {/* Top Actions Callout */}
+      {content.top_actions && content.top_actions.length > 0 && (
+        <div className="report-section top-actions-section">
+          <h3>Top Actions</h3>
+          <ul>
+            {content.top_actions.map((action, i) => <li key={i}>{action}</li>)}
+          </ul>
+        </div>
+      )}
+
       {/* Highlights */}
       {content.highlights.length > 0 && (
         <div className="report-section">
@@ -1176,6 +1303,30 @@ function InsightReport({ content, insight, periodLabel, onRegenerate, canRegener
           <ul className="highlights-list">
             {content.highlights.map((h, i) => <li key={i}>{h}</li>)}
           </ul>
+        </div>
+      )}
+
+      {/* Trends */}
+      {content.trends && content.display_config?.show_trends !== false && (
+        <div className="report-section trends-section">
+          <h3>Trends</h3>
+          <div className="trends-delta-grid">
+            <div className="trends-delta-card">
+              <div className="stat-value">{content.trends.sessions_delta}</div>
+              <div className="stat-label">Sessions</div>
+            </div>
+            <div className="trends-delta-card">
+              <div className="stat-value">{content.trends.completion_delta}</div>
+              <div className="stat-label">Completion</div>
+            </div>
+            <div className="trends-delta-card">
+              <div className="stat-value">{content.trends.friction_delta}</div>
+              <div className="stat-label">Friction</div>
+            </div>
+          </div>
+          <div className="narrative-text" style={{ marginTop: 'var(--space-md)' }}>
+            <p>{content.trends.narrative}</p>
+          </div>
         </div>
       )}
 
@@ -1232,7 +1383,14 @@ function InsightReport({ content, insight, periodLabel, onRegenerate, canRegener
             {content.project_areas.map((area, i) => (
               <div key={i} className="project-area-card">
                 <div className="project-area-header">
-                  <span className="project-area-name">{area.name}</span>
+                  <span className="project-area-name">
+                    {area.name}
+                    {area.status && (
+                      <span className={`status-badge project-status-badge status-${area.status}`}>
+                        {area.status.replace(/_/g, ' ')}
+                      </span>
+                    )}
+                  </span>
                   <span className="project-area-count">{area.session_count} session{area.session_count !== 1 ? 's' : ''}</span>
                 </div>
                 <p className="project-area-desc">{area.description}</p>
@@ -1248,6 +1406,62 @@ function InsightReport({ content, insight, periodLabel, onRegenerate, canRegener
           <h3>How You Use the Agent</h3>
           <div className="narrative-text">
             {content.interaction_style.split('\n\n').map((p, i) => <p key={i}>{p}</p>)}
+          </div>
+        </div>
+      )}
+
+      {/* Outcome Analysis */}
+      {content.outcome_analysis && (
+        <div className="report-section outcome-analysis-section">
+          <h3>Outcome Analysis</h3>
+          {Object.keys(content.outcome_analysis.completion_breakdown).length > 0 && (
+            <div className="outcome-bar" style={{ marginBottom: 'var(--space-md)' }}>
+              <div style={{ display: 'flex', borderRadius: '4px', overflow: 'hidden', height: '24px' }}>
+                {(() => {
+                  const breakdown = content.outcome_analysis!.completion_breakdown;
+                  const total = Object.values(breakdown).reduce((a, b) => a + b, 0);
+                  if (total === 0) return null;
+                  const colors: Record<string, string> = { fully_achieved: '#8a9e6d', mostly_achieved: '#8abe6f', partially_achieved: '#d4a843', not_achieved: '#d97757' };
+                  return Object.entries(breakdown).sort((a, b) => b[1] - a[1]).map(([key, count]) => (
+                    <div
+                      key={key}
+                      title={`${formatCategory(key)}: ${count}`}
+                      style={{
+                        width: `${(count / total) * 100}%`,
+                        background: colors[key] || 'var(--text-muted)',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        fontSize: '0.65rem', color: '#fff', fontFamily: 'var(--font-mono)',
+                        minWidth: count > 0 ? '24px' : '0',
+                      }}
+                    >{count}</div>
+                  ));
+                })()}
+              </div>
+              <div style={{ display: 'flex', gap: 'var(--space-md)', marginTop: 'var(--space-xs)', flexWrap: 'wrap' }}>
+                {Object.entries(content.outcome_analysis!.completion_breakdown).sort((a, b) => b[1] - a[1]).map(([key]) => {
+                  const colors: Record<string, string> = { fully_achieved: '#8a9e6d', mostly_achieved: '#8abe6f', partially_achieved: '#d4a843', not_achieved: '#d97757' };
+                  return (
+                    <span key={key} style={{ fontSize: '0.7rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <span style={{ width: '8px', height: '8px', borderRadius: '2px', background: colors[key] || 'var(--text-muted)', display: 'inline-block' }} />
+                      {formatCategory(key)}
+                    </span>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+          <div className="narrative-text">
+            <p>{content.outcome_analysis.interpretation}</p>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-md)', marginTop: 'var(--space-sm)' }}>
+            <div style={{ fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
+              <strong style={{ color: 'var(--accent-green)', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Highest Completion</strong>
+              <p style={{ marginTop: '4px' }}>{content.outcome_analysis.highest_completion_pattern}</p>
+            </div>
+            <div style={{ fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
+              <strong style={{ color: '#d97757', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Lowest Completion</strong>
+              <p style={{ marginTop: '4px' }}>{content.outcome_analysis.lowest_completion_pattern}</p>
+            </div>
           </div>
         </div>
       )}
@@ -1271,6 +1485,9 @@ function InsightReport({ content, insight, periodLabel, onRegenerate, canRegener
               <div key={i} className="accomplishment-card">
                 <div className="accomplishment-title">{a.title}</div>
                 <p className="accomplishment-desc">{a.description}</p>
+                {a.impact_estimate && (
+                  <p className="accomplishment-impact">Impact: {a.impact_estimate}</p>
+                )}
               </div>
             ))}
           </div>
@@ -1284,7 +1501,15 @@ function InsightReport({ content, insight, periodLabel, onRegenerate, canRegener
           <div className="friction-list">
             {content.friction_analysis.map((f, i) => (
               <div key={i} className="friction-card">
-                <div className="friction-category">{f.category}</div>
+                <div className="friction-category">
+                  {f.category}
+                  {f.count != null && <span className="friction-count">x{f.count}</span>}
+                  {f.escalation && (
+                    <span className={`escalation-badge escalation-${f.escalation}`}>
+                      {f.escalation}
+                    </span>
+                  )}
+                </div>
                 <p className="friction-desc">{f.description}</p>
                 {f.examples.length > 0 && (
                   <ul className="friction-examples">
@@ -1294,6 +1519,35 @@ function InsightReport({ content, insight, periodLabel, onRegenerate, canRegener
               </div>
             ))}
           </div>
+        </div>
+      )}
+
+      {/* Overlap Detail */}
+      {content.overlap_detail && content.overlap_detail.length > 0 && (
+        <div className="report-section overlap-detail-section">
+          <h3>Overlap Details</h3>
+          <table className="overlap-table">
+            <thead>
+              <tr>
+                <th>Users</th>
+                <th>File</th>
+                <th>Scope</th>
+                <th>Description</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {content.overlap_detail.map((od, i) => (
+                <tr key={i}>
+                  <td>{od.users.join(', ')}</td>
+                  <td className="file-path">{od.file_path.split('/').pop()}<span className="file-repo" title={od.file_path}></span></td>
+                  <td><span className={`status-badge scope-badge scope-${od.scope}`}>{od.scope}</span></td>
+                  <td>{od.description}</td>
+                  <td>{od.resolved}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
 
@@ -1307,6 +1561,9 @@ function InsightReport({ content, insight, periodLabel, onRegenerate, canRegener
                 <div className="member-card-header">
                   <span className="member-name">{m.name}</span>
                   <span className="member-sessions">{m.session_count} session{m.session_count !== 1 ? 's' : ''}</span>
+                  {m.completion_rate != null && (
+                    <span className="member-completion">{Math.round(m.completion_rate)}% completion</span>
+                  )}
                 </div>
                 <div className="member-focus">
                   {m.focus_areas.map((area, j) => (
@@ -1432,7 +1689,14 @@ function InsightReport({ content, insight, periodLabel, onRegenerate, canRegener
           <div className="recommendations-list">
             {recommendations.map((r, i) => (
               <div key={i} className="recommendation-card">
-                <div className="recommendation-title">{r.title}</div>
+                <div className="recommendation-title">
+                  {r.title}
+                  {r.priority && (
+                    <span className={`priority-badge priority-${r.priority}`}>
+                      {r.priority}
+                    </span>
+                  )}
+                </div>
                 {r.description && <p className="recommendation-desc">{r.description}</p>}
               </div>
             ))}

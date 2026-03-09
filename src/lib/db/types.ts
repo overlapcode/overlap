@@ -284,11 +284,14 @@ export type SessionFacet = {
   underlying_goal: string | null;
   goal_categories: string | null; // JSON: Record<string, number>
   outcome: 'fully_achieved' | 'mostly_achieved' | 'partially_achieved' | 'not_achieved' | null;
-  session_type: 'single_task' | 'multi_task' | 'exploration' | 'debugging' | 'infrastructure' | null;
+  session_type: 'single_task' | 'multi_task' | 'exploration' | 'debugging' | 'infrastructure' | 'configuration' | null;
   friction_counts: string | null; // JSON: Record<string, number>
   friction_detail: string | null;
   primary_success: string | null;
   brief_summary: string | null;
+  scope_ambition: 'narrow' | 'moderate' | 'broad' | 'sweeping' | null;
+  continuation_signal: boolean | null;
+  collaboration_signal: string | null;
   model_used: string | null;
   generated_at: string | null;
   created_at: string;
@@ -341,37 +344,65 @@ export type InsightContent = {
     top_goal_categories: Array<{ category: string; count: number }>;
     total_friction_events: number;
     friction_by_type: Record<string, number>;
+    scope_ambition_counts?: Record<string, number>;
   };
 
   // LLM synthesis (from Layer 2)
+  top_actions?: string[] | null;
   summary: string;
   highlights: string[];
+  trends?: {
+    sessions_delta: string;
+    completion_delta: string;
+    friction_delta: string;
+    narrative: string;
+  } | null;
   project_areas: Array<{
     name: string;
     session_count: number;
     description: string;
+    status?: 'shipped' | 'in_progress' | 'stalled' | 'planning';
   }>;
+  outcome_analysis?: {
+    completion_breakdown: Record<string, number>;
+    interpretation: string;
+    highest_completion_pattern: string;
+    lowest_completion_pattern: string;
+  } | null;
   interaction_style?: string;
   friction_analysis: Array<{
     category: string;
+    count?: number;
     description: string;
     examples: string[];
+    escalation?: 'new' | 'recurring' | 'improving';
   }>;
   accomplishments: Array<{
     title: string;
     description: string;
+    impact_estimate?: string | null;
   }>;
   narrative: string;
+  overlap_detail?: Array<{
+    users: string[];
+    file_path: string;
+    scope: 'line' | 'function' | 'file';
+    description: string;
+    resolved: string;
+  }> | null;
   recommendations: Array<{
     title: string;
     description: string;
+    priority?: 'high' | 'medium' | 'low';
   }>;
   member_insights?: Array<{
     name: string;
     session_count: number;
+    completion_rate?: number;
     focus_areas: string[];
     strengths: string;
     suggestion: string;
+    friction_rate?: number;
   }> | null;
   environment_recommendations?: Array<{
     type: 'claude_md_rule' | 'skill' | 'mcp_server' | 'workflow';
@@ -381,6 +412,14 @@ export type InsightContent = {
     repo: string | null;
     example: string;
   }> | null;
+  display_config?: {
+    show_cost: boolean;
+    show_avg_duration: boolean;
+    show_tokens: boolean;
+    show_trends: boolean;
+    compact_repos: boolean;
+    compact_tools: boolean;
+  } | null;
 };
 
 // ============================================================================

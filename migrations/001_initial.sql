@@ -255,10 +255,13 @@ CREATE TABLE IF NOT EXISTS session_facets (
     goal_categories TEXT,
     outcome TEXT,
     session_type TEXT,
+    scope_ambition TEXT,
     friction_counts TEXT,
     friction_detail TEXT,
     primary_success TEXT,
     brief_summary TEXT,
+    continuation_signal INTEGER DEFAULT 0,
+    collaboration_signal TEXT,
     model_used TEXT,
     generated_at TEXT,
     created_at TEXT DEFAULT (datetime('now'))
