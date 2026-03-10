@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useBasePath } from '@lib/hooks/useBasePath';
 
 type VersionInfo = {
   local: string | null;
@@ -32,6 +33,7 @@ function compareVersions(local: string, latest: string): number {
 }
 
 export function UpdateBanner() {
+  const basePath = useBasePath();
   const [versionInfo, setVersionInfo] = useState<VersionInfo>({
     local: null,
     latest: null,
@@ -143,7 +145,7 @@ export function UpdateBanner() {
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-sm)' }}>
         <a
-          href="/update"
+          href={`${basePath}/update`}
           className="btn btn-primary"
           style={{ fontSize: '0.75rem', padding: '4px 12px' }}
         >

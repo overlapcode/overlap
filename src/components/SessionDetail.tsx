@@ -425,6 +425,7 @@ function BlockHeader({ block }: { block: ActivityBlockInfo }) {
 }
 
 export function SessionDetail({ sessionId }: SessionDetailProps) {
+  const basePath = useBasePath();
   const [session, setSession] = useState<SessionInfo | null>(null);
   const [activities, setActivities] = useState<ActivityItem[]>([]);
   const [activityBlocks, setActivityBlocks] = useState<ActivityBlockInfo[]>([]);
@@ -520,7 +521,7 @@ export function SessionDetail({ sessionId }: SessionDetailProps) {
     return (
       <div className="card" style={{ textAlign: 'center', padding: 'var(--space-xl)' }}>
         <p style={{ color: 'var(--accent-orange)', marginBottom: 'var(--space-md)' }}>{error}</p>
-        <a href="/" style={{ color: 'var(--accent-blue)', textDecoration: 'none', fontSize: '0.875rem' }}>
+        <a href={`${basePath}/`} style={{ color: 'var(--accent-blue)', textDecoration: 'none', fontSize: '0.875rem' }}>
           ← Back to Timeline
         </a>
       </div>
