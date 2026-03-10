@@ -63,28 +63,24 @@ export function GGHeader({ teamName, userName, activePage }: GGHeaderProps) {
           </span>
         </a>
 
-        {teamName && (
-          <>
-            <span style={{
-              color: 'var(--text-muted)',
-              fontFamily: 'var(--font-mono)',
-              fontSize: '0.7rem',
-            }}>/</span>
-            <a
-              href="/"
-              style={{
-                fontFamily: 'var(--font-mono)',
-                fontSize: '0.65rem',
-                textTransform: 'uppercase',
-                letterSpacing: '0.15em',
-                color: 'var(--text-secondary)',
-                textDecoration: 'none',
-              }}
-            >
-              {teamName}
-            </a>
-          </>
-        )}
+        <span style={{
+          color: 'var(--text-muted)',
+          fontFamily: 'var(--font-mono)',
+          fontSize: '0.7rem',
+        }}>/</span>
+        <a
+          href="/"
+          style={{
+            fontFamily: 'var(--font-mono)',
+            fontSize: '0.65rem',
+            textTransform: 'uppercase',
+            letterSpacing: '0.15em',
+            color: 'var(--text-secondary)',
+            textDecoration: 'none',
+          }}
+        >
+          {teamName || 'Dashboard'}
+        </a>
 
         {/* Status indicator */}
         <div style={{
