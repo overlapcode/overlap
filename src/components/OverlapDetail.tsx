@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { MultiFileDiff } from '@pierre/diffs/react';
 import { fetchWithTimeout } from '@lib/utils/fetch';
 import { formatRelativeTime } from '@lib/utils/time';
+import { useBasePath } from '@lib/hooks/useBasePath';
 
 type FileOp = {
   id: number;
@@ -140,6 +141,7 @@ function UserEditsSection({ edits, userName, userColor, isFirst, sessionId, deci
   sessionId: string | null;
   decision: 'block' | 'warn' | null;
 }) {
+  const basePath = useBasePath();
   const badgeLabel = isFirst
     ? 'EDITING FIRST'
     : decision === 'block' ? 'BLOCKED' : decision === 'warn' ? 'WARNED' : 'OVERLAPPING';
@@ -160,7 +162,7 @@ function UserEditsSection({ edits, userName, userColor, isFirst, sessionId, deci
       }}>
         <span style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: userColor, display: 'inline-block', flexShrink: 0 }} />
         {sessionId ? (
-          <a href={`/session/${sessionId}`} className="footer-link" style={{ fontWeight: 600, fontSize: '1rem' }}>
+          <a href={`${basePath}/session/${sessionId}`} className="footer-link" style={{ fontWeight: 600, fontSize: '1rem' }}>
             {userName}
           </a>
         ) : (
@@ -264,6 +266,7 @@ function OverlapHeader({ data }: { data: OverlapData }) {
 }
 
 export function OverlapDetail({ overlapId }: { overlapId: string }) {
+  const basePath = useBasePath();
   const [data, setData] = useState<OverlapData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -303,7 +306,7 @@ export function OverlapDetail({ overlapId }: { overlapId: string }) {
     return (
       <div className="card" style={{ textAlign: 'center', padding: 'var(--space-xl)' }}>
         <p style={{ color: 'var(--accent-orange)', marginBottom: 'var(--space-md)' }}>{error}</p>
-        <a href="/overlaps" style={{ color: 'var(--accent-blue)', textDecoration: 'none', fontSize: '0.875rem' }}>
+        <a href={`${basePath}/overlaps`} style={{ color: 'var(--accent-blue)', textDecoration: 'none', fontSize: '0.875rem' }}>
           &larr; Back to Overlaps
         </a>
       </div>

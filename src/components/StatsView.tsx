@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { fetchWithTimeout } from '@lib/utils/fetch';
 import { parseGitHubUrl, deriveGitHubUrl, stripRepoRoot } from '@lib/utils/github';
+import { useBasePath } from '@lib/hooks/useBasePath';
 
 type TeamStats = {
   total_sessions: number;
@@ -83,6 +84,7 @@ function getModelColor(model: string | null | undefined): string {
 }
 
 export function StatsView() {
+  const basePath = useBasePath();
   const [stats, setStats] = useState<TeamStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -220,7 +222,7 @@ export function StatsView() {
               {stats.by_member.map((m, i) => (
                 <a
                   key={m.user_id}
-                  href={`/?userId=${encodeURIComponent(m.user_id)}`}
+                  href={`${basePath}/?userId=${encodeURIComponent(m.user_id)}`}
                   className="stats-row"
                   style={{ ...tableRowStyle(i), textDecoration: 'none', color: 'inherit' }}
                 >
@@ -251,7 +253,7 @@ export function StatsView() {
                       {ghUrl ? (
                         <a href={ghUrl} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent-blue)', textDecoration: 'none' }}>{r.repo_name}</a>
                       ) : r.repo_id ? (
-                        <a href={`/repo/${r.repo_id}`} style={{ color: 'var(--accent-blue)', textDecoration: 'none' }}>{r.repo_name}</a>
+                        <a href={`${basePath}/repo/${r.repo_id}`} style={{ color: 'var(--accent-blue)', textDecoration: 'none' }}>{r.repo_name}</a>
                       ) : (
                         <span>{r.repo_name}</span>
                       )}

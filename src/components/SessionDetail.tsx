@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, memo } from 'react';
 import { useRelativeTime, formatRelativeTime } from '@lib/utils/time';
 import { parseGitHubUrl, deriveGitHubUrl, getRelativeFilePath, getStatusLabel, getAgentLabel, getFileUrl, getBranchUrl } from '@lib/utils/github';
 import { fetchWithTimeout } from '@lib/utils/fetch';
+import { useBasePath } from '@lib/hooks/useBasePath';
 
 type SessionInfo = {
   id: string;
@@ -113,6 +114,7 @@ function formatCost(cost: number | null | undefined): string | null {
 }
 
 function SessionHeader({ session }: { session: SessionInfo }) {
+  const basePath = useBasePath();
   const relativeTime = useRelativeTime(session.last_activity_at);
   const githubBaseUrl = parseGitHubUrl(session.repo?.remote_url ?? null) ?? deriveGitHubUrl(session.repo?.name);
   const branchUrl = getBranchUrl(githubBaseUrl, session.branch);
@@ -219,7 +221,7 @@ function SessionHeader({ session }: { session: SessionInfo }) {
           )}
           {session.branch && session.repo && <span> · </span>}
           {session.repo && (
-            <a href={`/repo/${session.repo.id}`} className="footer-link">
+            <a href={`${basePath}/repo/${session.repo.id}`} className="footer-link">
               {session.repo.name}
             </a>
           )}

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { fetchWithTimeout } from '@lib/utils/fetch';
+import { useBasePath } from '@lib/hooks/useBasePath';
 
 type Repo = {
   id: string;
@@ -18,6 +19,7 @@ function formatRemoteUrl(url: string | null): string {
 }
 
 export function RepoList() {
+  const basePath = useBasePath();
   const [repos, setRepos] = useState<Repo[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -82,7 +84,7 @@ export function RepoList() {
       {repos.map((repo) => (
         <a
           key={repo.id}
-          href={`/repo/${repo.id}`}
+          href={`${basePath}/repo/${repo.id}`}
           style={{
             display: 'block',
             textDecoration: 'none',

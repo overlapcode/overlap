@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { fetchWithTimeout } from '@lib/utils/fetch';
+import { useBasePath } from '@lib/hooks/useBasePath';
 
 type LLMSettings = {
   provider: string | null;
@@ -9,6 +10,7 @@ type LLMSettings = {
 };
 
 export function LLMBanner() {
+  const basePath = useBasePath();
   const [show, setShow] = useState(false);
   const [dismissed, setDismissed] = useState(false);
 
@@ -63,7 +65,7 @@ export function LLMBanner() {
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-sm)' }}>
         <a
-          href="/settings/llm"
+          href={`${basePath}/settings/llm`}
           className="btn btn-primary"
           style={{ fontSize: '0.75rem', padding: '4px 12px', textDecoration: 'none' }}
         >

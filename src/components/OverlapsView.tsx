@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { fetchWithTimeout } from '@lib/utils/fetch';
 import { formatRelativeTime } from '@lib/utils/time';
+import { useBasePath } from '@lib/hooks/useBasePath';
 
 type Overlap = {
   id: number;
@@ -58,7 +59,8 @@ function buildSummary(overlap: Overlap): string {
 }
 
 function OverlapCard({ overlap }: { overlap: Overlap }) {
-  const href = `/overlap/${overlap.public_id ?? overlap.id}`;
+  const basePath = useBasePath();
+  const href = `${basePath}/overlap/${overlap.public_id ?? overlap.id}`;
   const decisionStyle = overlap.decision ? DECISION_STYLES[overlap.decision] : null;
   const summary = buildSummary(overlap);
 

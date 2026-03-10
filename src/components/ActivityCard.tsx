@@ -2,6 +2,7 @@ import { memo, useState } from 'react';
 import { useRelativeTime, formatRelativeTime } from '@lib/utils/time';
 import { parseGitHubUrl, deriveGitHubUrl, getRelativeFilePath, getStatusLabel, getAgentLabel, getFileUrl, getBranchUrl } from '@lib/utils/github';
 import { fetchWithTimeout } from '@lib/utils/fetch';
+import { useBasePath } from '@lib/hooks/useBasePath';
 
 const WAITING_MESSAGES = [
   "Warming up the keyboard...",
@@ -109,6 +110,7 @@ function getModelColor(model: string | null | undefined): string {
 
 export const ActivityCard = memo(function ActivityCard({ session }: ActivityCardProps) {
   const { user, device, repo, branch, worktree, status, last_activity_at, activity, model, total_cost_usd, num_turns, agent_type } = session;
+  const basePath = useBasePath();
   const relativeTime = useRelativeTime(last_activity_at || session.started_at);
   const costLabel = formatCost(total_cost_usd);
   const modelLabel = getModelLabel(model);
@@ -325,7 +327,7 @@ export const ActivityCard = memo(function ActivityCard({ session }: ActivityCard
           )}
           {branch && repo && <span> · </span>}
           {repo && (
-            <a href={`/repo/${repo.id}`} className="footer-link" onClick={(e) => e.stopPropagation()}>
+            <a href={`${basePath}/repo/${repo.id}`} className="footer-link" onClick={(e) => e.stopPropagation()}>
               {repo.name}
             </a>
           )}
@@ -393,7 +395,7 @@ export const ActivityCard = memo(function ActivityCard({ session }: ActivityCard
           ) : null}
 
           <a
-            href={`/session/${session.id}`}
+            href={`${basePath}/session/${session.id}`}
             onClick={(e) => e.stopPropagation()}
             style={{
               display: 'inline-block',

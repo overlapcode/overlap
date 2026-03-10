@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { formatRelativeTime } from '@lib/utils/time';
 import { getStatusLabel } from '@lib/utils/github';
 import { fetchWithTimeout } from '@lib/utils/fetch';
+import { useBasePath } from '@lib/hooks/useBasePath';
 
 type ActivityItem = {
   id: string;
@@ -26,6 +27,7 @@ type HistorySession = {
 const PAGE_SIZE = 20;
 
 function HistoryCard({ session }: { session: HistorySession }) {
+  const basePath = useBasePath();
   const [expanded, setExpanded] = useState(false);
 
   const handleToggle = () => setExpanded(!expanded);
@@ -95,7 +97,7 @@ function HistoryCard({ session }: { session: HistorySession }) {
           {session.branch && <span>{session.branch}</span>}
           {session.branch && session.repo && <span> · </span>}
           {session.repo && (
-            <a href={`/repo/${session.repo.id}`} className="footer-link" onClick={(e) => e.stopPropagation()}>
+            <a href={`${basePath}/repo/${session.repo.id}`} className="footer-link" onClick={(e) => e.stopPropagation()}>
               {session.repo.name}
             </a>
           )}
@@ -104,7 +106,7 @@ function HistoryCard({ session }: { session: HistorySession }) {
 
       {/* Session detail link */}
       <a
-        href={`/session/${session.id}`}
+        href={`${basePath}/session/${session.id}`}
         style={{
           display: 'inline-block',
           marginTop: 'var(--space-sm)',
@@ -198,7 +200,7 @@ function HistoryCard({ session }: { session: HistorySession }) {
           )}
 
           <a
-            href={`/session/${session.id}`}
+            href={`${basePath}/session/${session.id}`}
             onClick={(e) => e.stopPropagation()}
             style={{
               display: 'inline-block',
