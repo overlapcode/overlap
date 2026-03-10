@@ -22,6 +22,15 @@ const { title, description = 'See where your team\'s heads are at' } = Astro.pro
     <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
     <link rel="manifest" href="/site.webmanifest" />
     <meta name="theme-color" content="#1a1a1a" />
+    <!-- Open Graph -->
+    <meta property="og:title" content={`${title} | Overlap`} />
+    <meta property="og:description" content={description} />
+    <meta property="og:type" content="website" />
+    <meta property="og:image" content="/og-image.png" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content={`${title} | Overlap`} />
+    <meta name="twitter:description" content={description} />
+    <meta name="twitter:image" content="/og-image.png" />
     <title>{title} | Overlap</title>
   </head>
   <body>

@@ -16,7 +16,7 @@ const teamConfig = await getTeamConfig(db);
 ---
 
 <GGLayout title="Overlaps">
-  <GGHeader teamName={teamConfig?.team_name} userName="Dashboard" activePage="overlaps" client:load />
+  <GGHeader teamName={teamConfig?.team_name} userName={authResult.context.member.display_name} activePage="overlaps" client:load />
   <main style="padding: var(--space-lg); max-width: 1200px; margin: 0 auto;">
     <div class="gg-sys-label" style="margin-bottom: var(--space-sm);">SYS.02 // COLLISION_DETECT</div>
     <OverlapsView client:load />

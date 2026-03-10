@@ -26,7 +26,7 @@ const teamName = sessionData.teamName;
 ---
 
 <GGLayout title="Overlap Detail">
-  <GGHeader teamName={teamName} userName="Dashboard" activePage="overlaps" client:load />
+  <GGHeader teamName={teamName} userName={sessionData.displayName} activePage="overlaps" client:load />
 
   <main class="container" style="padding-top: var(--space-xl); padding-bottom: var(--space-xl);">
     <div style="width: 100%; max-width: 1200px; margin: 0 auto;">

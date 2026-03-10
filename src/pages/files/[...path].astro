@@ -20,7 +20,7 @@ const repoName = url.searchParams.get('repo') || '';
 ---
 
 <GGLayout title={`${path} - File History`}>
-  <GGHeader teamName={teamConfig?.team_name} userName="Dashboard" client:load />
+  <GGHeader teamName={teamConfig?.team_name} userName={authResult.context.member.display_name} client:load />
   <main style="padding: var(--space-lg); max-width: 1200px; margin: 0 auto;">
     <div class="gg-sys-label" style="margin-bottom: var(--space-sm);">SYS.06 // FILE_TRACE</div>
     <FileHistoryView filePath={path || ''} repoName={repoName} client:load />

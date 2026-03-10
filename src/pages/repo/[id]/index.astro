@@ -33,7 +33,7 @@ const teamName = sessionData.teamName;
 ---
 
 <GGLayout title={repoName}>
-  <GGHeader teamName={teamName} userName="Dashboard" activePage="repos" client:load />
+  <GGHeader teamName={teamName} userName={sessionData.displayName} activePage="repos" client:load />
 
   <main class="container" style="padding-top: var(--space-xl); padding-bottom: var(--space-xl);">
     <div style="width: 100%; max-width: 800px; margin: 0 auto;">
