@@ -6,12 +6,12 @@ type GGHeaderProps = {
 
 export function GGHeader({ teamName, userName, activePage }: GGHeaderProps) {
   const navLinks = [
-    { href: '/gg/stats', label: 'Stats' },
-    { href: '/gg/insights', label: 'Insights' },
-    { href: '/gg/overlaps', label: 'Overlaps' },
-    { href: '/gg/repos', label: 'Repos' },
-    { href: '/gg/history', label: 'History' },
-    { href: '/gg/settings', label: 'Config' },
+    { href: '/stats', label: 'Stats' },
+    { href: '/insights', label: 'Insights' },
+    { href: '/overlaps', label: 'Overlaps' },
+    { href: '/repos', label: 'Repos' },
+    { href: '/history', label: 'History' },
+    { href: '/settings', label: 'Config' },
   ];
 
   return (
@@ -33,7 +33,7 @@ export function GGHeader({ teamName, userName, activePage }: GGHeaderProps) {
       {/* Left: Logo + Status */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
         <a
-          href="/gg"
+          href="/"
           style={{
             display: 'flex',
             alignItems: 'center',
@@ -71,7 +71,7 @@ export function GGHeader({ teamName, userName, activePage }: GGHeaderProps) {
               fontSize: '0.7rem',
             }}>/</span>
             <a
-              href="/gg"
+              href="/"
               style={{
                 fontFamily: 'var(--font-mono)',
                 fontSize: '0.65rem',

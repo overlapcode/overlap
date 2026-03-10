@@ -1,6 +1,6 @@
 ---
-import GGLayout from '@layouts/GGLayout.astro';
-import { GGHeader } from '@components/GGHeader';
+import Layout from '@layouts/Layout.astro';
+import { Header } from '@components/Header';
 import { OverlapDetail } from '@components/OverlapDetail';
 import { getSessionData } from '@lib/auth/session';
 import { ensureMigrated } from '@lib/db/migrate';
@@ -25,15 +25,15 @@ if (!sessionData) {
 const teamName = sessionData.teamName;
 ---
 
-<GGLayout title="Overlap Detail">
-  <GGHeader teamName={teamName} userName="Dashboard" activePage="overlaps" client:load />
+<Layout title="Overlap Detail">
+  <Header teamName={teamName} userName="Dashboard" client:load />
 
   <main class="container" style="padding-top: var(--space-xl); padding-bottom: var(--space-xl);">
     <div style="width: 100%; max-width: 1200px; margin: 0 auto;">
       <div style="margin-bottom: var(--space-lg);">
-        <a href="/gg/overlaps" class="gg-back-link">&larr; SYS.02 // COLLISIONS</a>
+        <a href="/gg/overlaps" class="footer-link" style="font-size: 0.875rem;">&larr; Back to Overlaps</a>
       </div>
       <OverlapDetail overlapId={id} client:load />
     </div>
   </main>
-</GGLayout>
+</Layout>

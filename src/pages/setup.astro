@@ -1,21 +1,22 @@
 ---
-import Layout from '@layouts/Layout.astro';
-import { Header } from '@components/Header';
+import GGLayout from '@layouts/GGLayout.astro';
+import { GGHeader } from '@components/GGHeader';
 ---
 
-<Layout title="Setup">
-  <Header client:load />
+<GGLayout title="Setup">
+  <GGHeader client:load />
 
   <main class="container" style="padding-top: var(--space-xl); padding-bottom: var(--space-xl);">
     <div style="width: 100%; max-width: 500px; margin: 0 auto;">
       <!-- Setup Form -->
       <div id="setup-section">
+        <div class="gg-sys-label" style="margin-bottom: var(--space-sm);">SYS.INIT // DEPLOY</div>
         <h1 style="font-size: 1.5rem; margin-bottom: var(--space-md);">Set Up Your Team</h1>
         <p class="text-secondary" style="margin-bottom: var(--space-xl);">
           Configure your Overlap instance. This creates your team and admin account.
         </p>
 
-        <form id="setup-form" class="card">
+        <form id="setup-form" class="card gg-bracket">
           <div style="margin-bottom: var(--space-lg);">
             <label
               for="team-name"
@@ -120,7 +121,7 @@ import { Header } from '@components/Header';
           </p>
         </div>
 
-        <div class="card" style="margin-bottom: var(--space-lg);">
+        <div class="card gg-bracket" style="margin-bottom: var(--space-lg);">
           <div style="margin-bottom: var(--space-lg);">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-sm);">
               <label style="font-weight: 500; font-size: 0.875rem;">Join Code</label>
@@ -229,7 +230,7 @@ import { Header } from '@components/Header';
       </div>
     </div>
   </main>
-</Layout>
+</GGLayout>
 
 <script>
   // Populate origin URL (can't use window in Astro template - it's server-rendered)

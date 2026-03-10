@@ -1,17 +1,19 @@
 ---
-import Layout from '@layouts/Layout.astro';
-import { Header } from '@components/Header';
+import GGLayout from '@layouts/GGLayout.astro';
+import { GGHeader } from '@components/GGHeader';
 ---
 
-<Layout title="Team Members">
-  <Header userName="Dashboard" client:load />
+<GGLayout title="Team Members">
+  <GGHeader userName="Dashboard" activePage="config" client:load />
 
   <main class="container" style="padding-top: var(--space-xl); padding-bottom: var(--space-xl);">
     <div style="width: 100%; max-width: 700px; margin: 0 auto;">
       <div style="display: flex; align-items: center; gap: var(--space-md); margin-bottom: var(--space-xl);">
-        <a href="/settings" class="text-muted" style="text-decoration: none;">← Back</a>
-        <h1 style="font-size: 1.5rem; margin: 0;">Team Members</h1>
+        <a href="/settings" class="gg-back-link">← SYS.CFG // MENU</a>
+        <h1 class="gg-page-title">Team Members</h1>
       </div>
+
+      <div class="gg-sys-label" style="margin-bottom: var(--space-md);">SYS.CFG // MEMBERS</div>
 
       <!-- Add Member Form (admin only, shown after load) -->
       <div id="add-member-section" style="display: none;">
@@ -94,7 +96,7 @@ import { Header } from '@components/Header';
       <div id="toast" class="toast"></div>
     </div>
   </main>
-</Layout>
+</GGLayout>
 
 <style is:global>
   .loading-state {

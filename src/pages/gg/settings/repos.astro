@@ -1,19 +1,17 @@
 ---
-import GGLayout from '@layouts/GGLayout.astro';
-import { GGHeader } from '@components/GGHeader';
+import Layout from '@layouts/Layout.astro';
+import { Header } from '@components/Header';
 ---
 
-<GGLayout title="Repositories">
-  <GGHeader userName="Dashboard" activePage="config" client:load />
+<Layout title="Repositories">
+  <Header userName="Dashboard" client:load />
 
   <main class="container" style="padding-top: var(--space-xl); padding-bottom: var(--space-xl);">
     <div style="width: 100%; max-width: 700px; margin: 0 auto;">
       <div style="display: flex; align-items: center; gap: var(--space-md); margin-bottom: var(--space-xl);">
-        <a href="/gg/settings" class="gg-back-link">← SYS.CFG // MENU</a>
-        <h1 class="gg-page-title">Repositories</h1>
+        <a href="/gg/settings" class="text-muted" style="text-decoration: none;">← Back</a>
+        <h1 style="font-size: 1.5rem; margin: 0;">Repositories</h1>
       </div>
-
-      <div class="gg-sys-label" style="margin-bottom: var(--space-md);">SYS.CFG // REPOS</div>
 
       <!-- Add Repo Form -->
       <div class="card" style="margin-bottom: var(--space-lg);">
@@ -55,7 +53,7 @@ import { GGHeader } from '@components/GGHeader';
 
     </div>
   </main>
-</GGLayout>
+</Layout>
 
 <style is:global>
   .loading-state {

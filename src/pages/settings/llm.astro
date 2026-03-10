@@ -1,17 +1,19 @@
 ---
-import Layout from '@layouts/Layout.astro';
-import { Header } from '@components/Header';
+import GGLayout from '@layouts/GGLayout.astro';
+import { GGHeader } from '@components/GGHeader';
 ---
 
-<Layout title="LLM Settings">
-  <Header userName="Dashboard" client:load />
+<GGLayout title="LLM Settings">
+  <GGHeader userName="Dashboard" activePage="config" client:load />
 
   <main class="container" style="padding-top: var(--space-xl); padding-bottom: var(--space-xl);">
     <div style="width: 100%; max-width: 600px; margin: 0 auto;">
       <div style="display: flex; align-items: center; gap: var(--space-md); margin-bottom: var(--space-xl);">
-        <a href="/settings" class="text-muted" style="text-decoration: none;">← Back</a>
-        <h1 style="font-size: 1.5rem;">LLM Classification</h1>
+        <a href="/settings" class="gg-back-link">← SYS.CFG // MENU</a>
+        <h1 class="gg-page-title">LLM Classification</h1>
       </div>
+
+      <div class="gg-sys-label" style="margin-bottom: var(--space-md);">SYS.CFG // CLASSIFIER</div>
 
       <div class="card" style="margin-bottom: var(--space-lg); background: var(--bg-elevated);">
         <p class="text-secondary" style="font-size: 0.875rem;">
@@ -211,7 +213,7 @@ import { Header } from '@components/Header';
       </div>
     </div>
   </main>
-</Layout>
+</GGLayout>
 
 <script>
   const form = document.getElementById('llm-form') as HTMLFormElement | null;

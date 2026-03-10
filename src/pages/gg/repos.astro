@@ -1,6 +1,6 @@
 ---
-import GGLayout from '@layouts/GGLayout.astro';
-import { GGHeader } from '@components/GGHeader';
+import Layout from '@layouts/Layout.astro';
+import { Header } from '@components/Header';
 import { RepoList } from '@components/RepoList';
 import { getSessionData } from '@lib/auth/session';
 import { ensureMigrated } from '@lib/db/migrate';
@@ -20,19 +20,18 @@ if (!sessionData) {
 const teamName = sessionData.teamName;
 ---
 
-<GGLayout title="Repositories">
-  <GGHeader teamName={teamName} userName="Dashboard" activePage="repos" client:load />
+<Layout title="Repositories">
+  <Header teamName={teamName} userName="Dashboard" client:load />
 
   <main class="container" style="padding-top: var(--space-xl); padding-bottom: var(--space-xl);">
     <div style="width: 100%; max-width: 800px; margin: 0 auto;">
       <div style="display: flex; align-items: center; gap: var(--space-md); margin-bottom: var(--space-lg);">
-        <a href="/gg" class="gg-back-link">← SYS.00 // TIMELINE</a>
+        <a href="/gg" class="footer-link" style="font-size: 0.875rem;">← Back to Timeline</a>
       </div>
-      <div class="gg-sys-label" style="margin-bottom: var(--space-sm);">SYS.01 // REPOSITORIES</div>
-      <h1 class="gg-page-title" style="margin: 0 0 var(--space-lg) 0;">
+      <h1 style="font-size: 1.25rem; margin: 0 0 var(--space-lg) 0; color: var(--text-primary);">
         Repositories
       </h1>
       <RepoList client:load />
     </div>
   </main>
-</GGLayout>
+</Layout>

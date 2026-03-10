@@ -18,7 +18,7 @@ export function Header({ teamName, userName }: HeaderProps) {
       {/* Logo */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-md)' }}>
         <a
-          href="/"
+          href="/gg"
           style={{
             display: 'flex',
             alignItems: 'center',
@@ -47,7 +47,7 @@ export function Header({ teamName, userName }: HeaderProps) {
         {teamName && (
           <>
             <span className="text-muted">/</span>
-            <a href="/" className="text-secondary" style={{ textDecoration: 'none' }}>{teamName}</a>
+            <a href="/gg" className="text-secondary" style={{ textDecoration: 'none' }}>{teamName}</a>
           </>
         )}
       </div>
@@ -55,46 +55,46 @@ export function Header({ teamName, userName }: HeaderProps) {
       {/* User info */}
       {userName && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-md)' }}>
-          <a href="/" className="text-secondary" style={{ fontSize: '0.875rem', textDecoration: 'none' }}>
+          <a href="/gg" className="text-secondary" style={{ fontSize: '0.875rem', textDecoration: 'none' }}>
             {userName}
           </a>
           <a
-            href="/stats"
+            href="/gg/stats"
             className="btn btn-secondary"
             style={{ fontSize: '0.75rem', padding: 'var(--space-xs) var(--space-sm)' }}
           >
             Stats
           </a>
           <a
-            href="/insights"
+            href="/gg/insights"
             className="btn btn-secondary"
             style={{ fontSize: '0.75rem', padding: 'var(--space-xs) var(--space-sm)' }}
           >
             Insights
           </a>
           <a
-            href="/overlaps"
+            href="/gg/overlaps"
             className="btn btn-secondary"
             style={{ fontSize: '0.75rem', padding: 'var(--space-xs) var(--space-sm)' }}
           >
             Overlaps
           </a>
           <a
-            href="/repos"
+            href="/gg/repos"
             className="btn btn-secondary"
             style={{ fontSize: '0.75rem', padding: 'var(--space-xs) var(--space-sm)' }}
           >
             Repos
           </a>
           <a
-            href="/history"
+            href="/gg/history"
             className="btn btn-secondary"
             style={{ fontSize: '0.75rem', padding: 'var(--space-xs) var(--space-sm)' }}
           >
             History
           </a>
           <a
-            href="/settings"
+            href="/gg/settings"
             className="btn btn-secondary"
             style={{ fontSize: '0.75rem', padding: 'var(--space-xs) var(--space-sm)' }}
           >

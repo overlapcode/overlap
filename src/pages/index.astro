@@ -1,6 +1,6 @@
 ---
-import Layout from '@layouts/Layout.astro';
-import { Header } from '@components/Header';
+import GGLayout from '@layouts/GGLayout.astro';
+import { GGHeader } from '@components/GGHeader';
 import { UpdateBanner } from '@components/UpdateBanner';
 import { LLMBanner } from '@components/LLMBanner';
 import { Timeline } from '@components/Timeline';
@@ -9,33 +9,26 @@ import { getTeamConfig, markStaleSessions, deleteExpiredWebSessions } from '@lib
 import { ensureMigrated } from '@lib/db/migrate';
 import { maybeHeartbeat } from '@lib/heartbeat';
 
-// Get session data from cookie
 let sessionData = null;
 let teamExists = false;
 let teamName = '';
 
 if (Astro.locals.runtime?.env?.DB) {
   const db = Astro.locals.runtime.env.DB;
-
-  // Ensure database is migrated before querying
   await ensureMigrated(db);
-
   sessionData = await getSessionData(Astro.cookies, db);
 
-  // Stale session detection on each dashboard load (replaces cron trigger)
   if (sessionData) {
     try {
       await markStaleSessions(db);
       await deleteExpiredWebSessions(db);
     } catch { /* non-fatal */ }
 
-    // Heartbeat to Overlap Cloud (once daily, non-blocking)
     try {
       await maybeHeartbeat(db, Astro.url.origin);
     } catch { /* non-fatal */ }
   }
 
-  // Check if a team exists (for non-authenticated visitors)
   const config = await getTeamConfig(db);
   if (config) {
     teamExists = true;
@@ -46,19 +39,20 @@ if (Astro.locals.runtime?.env?.DB) {
 const isAuthenticated = !!sessionData;
 ---
 
-<Layout title="Timeline">
-  <Header teamName={teamName} userName={isAuthenticated ? sessionData?.displayName : undefined} client:load />
+<GGLayout title="Timeline">
+  <GGHeader teamName={teamName} userName={isAuthenticated ? sessionData?.displayName : undefined} client:load />
   <UpdateBanner client:load />
   {isAuthenticated && <LLMBanner client:load />}
 
   <main class="container" style="padding-top: var(--space-xl); padding-bottom: var(--space-xl);">
     <div style="width: 100%; max-width: 800px; margin: 0 auto;">
-      <h1 style="font-size: 1.5rem; margin-bottom: var(--space-lg); text-align: center;">Team Activity</h1>
+      <div class="gg-sys-label" style="margin-bottom: var(--space-sm);">SYS.00 // ACTIVITY_FEED</div>
+      <h1 class="gg-page-title" style="margin-bottom: var(--space-lg); text-align: center;">Team Activity</h1>
 
       {isAuthenticated ? (
         <Timeline client:load />
       ) : teamExists ? (
-        <div class="card" style="text-align: center; padding: var(--space-xl);">
+        <div class="card gg-bracket" style="text-align: center; padding: var(--space-xl);">
           <h2 style="font-size: 1.25rem; margin-bottom: var(--space-md);">{teamName}</h2>
           <p class="text-secondary" style="margin-bottom: var(--space-lg);">
             Enter your user token to view team activity.
@@ -81,29 +75,29 @@ const isAuthenticated = !!sessionData;
                   font-size: 0.875rem;
                 "
               />
-              <button type="submit" class="btn btn-primary" id="login-btn">Login</button>
+              <button type="submit" class="btn btn-primary" id="login-btn">LOGIN</button>
             </div>
             <p id="login-error" style="color: var(--accent-red); font-size: 0.75rem; margin-top: var(--space-sm); display: none;"></p>
           </form>
 
           <p class="text-muted" style="font-size: 0.8rem;">
-            New member? <a href="/join" style="color: var(--accent-blue);">Join team</a>
+            New member? <a href="/join">Join team</a>
           </p>
         </div>
       ) : (
-        <div class="card" style="text-align: center; padding: var(--space-xl);">
+        <div class="card gg-bracket" style="text-align: center; padding: var(--space-xl);">
           <h2 style="font-size: 1.25rem; margin-bottom: var(--space-md);">Welcome to Overlap</h2>
           <p class="text-secondary" style="margin-bottom: var(--space-lg);">
             Prevent your coding agents from writing conflicting code.
           </p>
           <div style="display: flex; gap: var(--space-md); justify-content: center;">
-            <a href="/setup" class="btn btn-primary">Set Up Team</a>
+            <a href="/setup" class="btn btn-primary">INITIALIZE</a>
           </div>
         </div>
       )}
     </div>
   </main>
-</Layout>
+</GGLayout>
 
 {!isAuthenticated && teamExists && (
 <script>
@@ -137,7 +131,7 @@ const isAuthenticated = !!sessionData;
       errorEl.style.display = 'block';
     } finally {
       loginBtn.disabled = false;
-      loginBtn.textContent = 'Login';
+      loginBtn.textContent = 'LOGIN';
     }
   });
 </script>

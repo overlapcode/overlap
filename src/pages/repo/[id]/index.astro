@@ -1,6 +1,6 @@
 ---
-import Layout from '@layouts/Layout.astro';
-import { Header } from '@components/Header';
+import GGLayout from '@layouts/GGLayout.astro';
+import { GGHeader } from '@components/GGHeader';
 import { RepoActivity } from '@components/RepoActivity';
 import { getSessionData } from '@lib/auth/session';
 import { getRepoById } from '@lib/db/queries';
@@ -32,18 +32,19 @@ if (!sessionData) {
 const teamName = sessionData.teamName;
 ---
 
-<Layout title={repoName}>
-  <Header teamName={teamName} userName="Dashboard" client:load />
+<GGLayout title={repoName}>
+  <GGHeader teamName={teamName} userName="Dashboard" activePage="repos" client:load />
 
   <main class="container" style="padding-top: var(--space-xl); padding-bottom: var(--space-xl);">
     <div style="width: 100%; max-width: 800px; margin: 0 auto;">
       <div style="display: flex; align-items: center; gap: var(--space-md); margin-bottom: var(--space-lg);">
-        <a href="/repos" class="footer-link" style="font-size: 0.875rem;">← Repositories</a>
+        <a href="/repos" class="gg-back-link">← SYS.01 // REPOSITORIES</a>
       </div>
-      <h1 style="font-size: 1.25rem; font-family: var(--font-mono); margin: 0 0 var(--space-lg) 0; color: var(--text-primary);">
+      <div class="gg-sys-label" style="margin-bottom: var(--space-xs);">SYS.01.XX // REPO_DETAIL</div>
+      <h1 class="gg-page-title" style="margin: 0 0 var(--space-lg) 0;">
         {repoName}
       </h1>
       <RepoActivity repoId={repoId!} client:load />
     </div>
   </main>
-</Layout>
+</GGLayout>

@@ -1,13 +1,12 @@
 ---
-import Layout from '../layouts/Layout.astro';
-import { Header } from '../components/Header';
-import { OverlapsView } from '../components/OverlapsView';
+import GGLayout from '@layouts/GGLayout.astro';
+import { GGHeader } from '@components/GGHeader';
+import { OverlapsView } from '@components/OverlapsView';
 import { authenticateWebSession } from '@lib/auth/middleware';
 import { getTeamConfig } from '@lib/db/queries';
 
 const db = Astro.locals.runtime.env.DB;
 
-// Authenticate
 const authResult = await authenticateWebSession(Astro.request, db);
 if (!authResult.success) {
   return Astro.redirect('/');
@@ -16,9 +15,10 @@ if (!authResult.success) {
 const teamConfig = await getTeamConfig(db);
 ---
 
-<Layout title="Overlaps - Overlap">
-  <Header teamName={teamConfig?.team_name} userName="Dashboard" client:load />
+<GGLayout title="Overlaps">
+  <GGHeader teamName={teamConfig?.team_name} userName="Dashboard" activePage="overlaps" client:load />
   <main style="padding: var(--space-lg); max-width: 1200px; margin: 0 auto;">
+    <div class="gg-sys-label" style="margin-bottom: var(--space-sm);">SYS.02 // COLLISION_DETECT</div>
     <OverlapsView client:load />
   </main>
-</Layout>
+</GGLayout>

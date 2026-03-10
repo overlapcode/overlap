@@ -1,14 +1,13 @@
 ---
-import Layout from '../../layouts/Layout.astro';
-import { Header } from '../../components/Header';
-import { FileHistoryView } from '../../components/FileHistoryView';
+import GGLayout from '@layouts/GGLayout.astro';
+import { GGHeader } from '@components/GGHeader';
+import { FileHistoryView } from '@components/FileHistoryView';
 import { authenticateWebSession } from '@lib/auth/middleware';
 import { getTeamConfig } from '@lib/db/queries';
 
 const db = Astro.locals.runtime.env.DB;
 const { path } = Astro.params;
 
-// Authenticate
 const authResult = await authenticateWebSession(Astro.request, db);
 if (!authResult.success) {
   return Astro.redirect('/');
@@ -16,14 +15,14 @@ if (!authResult.success) {
 
 const teamConfig = await getTeamConfig(db);
 
-// Get repo from query param
 const url = new URL(Astro.request.url);
 const repoName = url.searchParams.get('repo') || '';
 ---
 
-<Layout title={`${path} - File History - Overlap`}>
-  <Header teamName={teamConfig?.team_name} userName="Dashboard" client:load />
+<GGLayout title={`${path} - File History`}>
+  <GGHeader teamName={teamConfig?.team_name} userName="Dashboard" client:load />
   <main style="padding: var(--space-lg); max-width: 1200px; margin: 0 auto;">
+    <div class="gg-sys-label" style="margin-bottom: var(--space-sm);">SYS.06 // FILE_TRACE</div>
     <FileHistoryView filePath={path || ''} repoName={repoName} client:load />
   </main>
-</Layout>
+</GGLayout>

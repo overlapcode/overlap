@@ -1,21 +1,22 @@
 ---
-import Layout from '@layouts/Layout.astro';
-import { Header } from '@components/Header';
+import GGLayout from '@layouts/GGLayout.astro';
+import { GGHeader } from '@components/GGHeader';
 ---
 
-<Layout title="Settings">
-  <Header userName="Dashboard" client:load />
+<GGLayout title="Settings">
+  <GGHeader userName="Dashboard" activePage="config" client:load />
 
   <main class="container" style="padding-top: var(--space-xl); padding-bottom: var(--space-xl);">
     <div style="width: 100%; max-width: 800px; margin: 0 auto;">
       <div style="display: flex; align-items: center; gap: var(--space-md); margin-bottom: var(--space-xl);">
-        <a href="/" class="text-muted" style="text-decoration: none;">← Dashboard</a>
-        <h1 style="font-size: 1.5rem;">Settings</h1>
+        <a href="/" class="gg-back-link">← SYS.00 // DASHBOARD</a>
+        <h1 class="gg-page-title">Settings</h1>
       </div>
 
+      <div class="gg-sys-label" style="margin-bottom: var(--space-md);">SYS.CFG // MENU</div>
+
       <div style="display: grid; gap: var(--space-lg);">
-        <!-- My Account -->
-        <a href="/settings/profile" class="card" style="text-decoration: none; color: inherit;">
+        <a href="/settings/profile" class="card gg-bracket" style="text-decoration: none; color: inherit;">
           <div style="display: flex; justify-content: space-between; align-items: center;">
             <div>
               <h2 style="font-size: 1.125rem; margin-bottom: var(--space-xs);">My Account</h2>
@@ -27,8 +28,7 @@ import { Header } from '@components/Header';
           </div>
         </a>
 
-        <!-- Team Settings -->
-        <a href="/settings/team" class="card" style="text-decoration: none; color: inherit;">
+        <a href="/settings/team" class="card gg-bracket" style="text-decoration: none; color: inherit;">
           <div style="display: flex; justify-content: space-between; align-items: center;">
             <div>
               <h2 style="font-size: 1.125rem; margin-bottom: var(--space-xs);">Team Settings</h2>
@@ -40,8 +40,7 @@ import { Header } from '@components/Header';
           </div>
         </a>
 
-        <!-- Team Members -->
-        <a href="/settings/users" class="card" style="text-decoration: none; color: inherit;">
+        <a href="/settings/users" class="card gg-bracket" style="text-decoration: none; color: inherit;">
           <div style="display: flex; justify-content: space-between; align-items: center;">
             <div>
               <h2 style="font-size: 1.125rem; margin-bottom: var(--space-xs);">Team Members</h2>
@@ -53,8 +52,7 @@ import { Header } from '@components/Header';
           </div>
         </a>
 
-        <!-- Repositories -->
-        <a href="/settings/repos" class="card" style="text-decoration: none; color: inherit;">
+        <a href="/settings/repos" class="card gg-bracket" style="text-decoration: none; color: inherit;">
           <div style="display: flex; justify-content: space-between; align-items: center;">
             <div>
               <h2 style="font-size: 1.125rem; margin-bottom: var(--space-xs);">Repositories</h2>
@@ -66,8 +64,7 @@ import { Header } from '@components/Header';
           </div>
         </a>
 
-        <!-- LLM Classification -->
-        <a href="/settings/llm" class="card" style="text-decoration: none; color: inherit;">
+        <a href="/settings/llm" class="card gg-bracket" style="text-decoration: none; color: inherit;">
           <div style="display: flex; justify-content: space-between; align-items: center;">
             <div>
               <h2 style="font-size: 1.125rem; margin-bottom: var(--space-xs);">LLM Classification</h2>
@@ -81,4 +78,4 @@ import { Header } from '@components/Header';
       </div>
     </div>
   </main>
-</Layout>
+</GGLayout>

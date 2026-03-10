@@ -1,12 +1,13 @@
 ---
-import GGLayout from '@layouts/GGLayout.astro';
-import { GGHeader } from '@components/GGHeader';
+import Layout from '@layouts/Layout.astro';
+import { Header } from '@components/Header';
 import { InsightsView } from '@components/InsightsView';
 import { authenticateWebSession } from '@lib/auth/middleware';
 import { getTeamConfig } from '@lib/db/queries';
 
 const db = Astro.locals.runtime.env.DB;
 
+// Authenticate
 const authResult = await authenticateWebSession(Astro.request, db);
 if (!authResult.success) {
   return Astro.redirect('/gg');
@@ -15,13 +16,12 @@ if (!authResult.success) {
 const teamConfig = await getTeamConfig(db);
 ---
 
-<GGLayout title="Insights">
-  <GGHeader teamName={teamConfig?.team_name} userName={authResult.context.member.display_name} activePage="insights" client:load />
+<Layout title="Insights - Overlap">
+  <Header teamName={teamConfig?.team_name} userName={authResult.context.member.display_name} client:load />
   <main style="padding: var(--space-lg); max-width: 1000px; margin: 0 auto;">
-    <div class="gg-sys-label" style="margin-bottom: var(--space-sm);">SYS.04 // INTELLIGENCE</div>
     <InsightsView client:load />
   </main>
-</GGLayout>
+</Layout>
 
 <style>
   /* Insights page styles */

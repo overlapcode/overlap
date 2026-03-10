@@ -1,6 +1,6 @@
 ---
-import GGLayout from '@layouts/GGLayout.astro';
-import { GGHeader } from '@components/GGHeader';
+import Layout from '@layouts/Layout.astro';
+import { Header } from '@components/Header';
 import { SessionHistory } from '@components/SessionHistory';
 import { getSessionData } from '@lib/auth/session';
 import { ensureMigrated } from '@lib/db/migrate';
@@ -20,16 +20,15 @@ if (!sessionData) {
 const teamName = sessionData.teamName;
 ---
 
-<GGLayout title="Session History">
-  <GGHeader teamName={teamName} userName="Dashboard" activePage="history" client:load />
+<Layout title="Session History">
+  <Header teamName={teamName} userName="Dashboard" client:load />
 
   <main class="container" style="padding-top: var(--space-xl); padding-bottom: var(--space-xl);">
     <div style="width: 100%; max-width: 800px; margin: 0 auto;">
       <div style="margin-bottom: var(--space-lg);">
-        <a href="/gg" class="gg-back-link">← SYS.00 // TIMELINE</a>
+        <a href="/gg" class="footer-link" style="font-size: 0.875rem;">← Back to Timeline</a>
       </div>
-      <div class="gg-sys-label" style="margin-bottom: var(--space-sm);">SYS.03 // SESSION_LOG</div>
       <SessionHistory client:load />
     </div>
   </main>
-</GGLayout>
+</Layout>

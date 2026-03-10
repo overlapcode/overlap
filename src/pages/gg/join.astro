@@ -1,22 +1,21 @@
 ---
-import GGLayout from '@layouts/GGLayout.astro';
-import { GGHeader } from '@components/GGHeader';
+import Layout from '@layouts/Layout.astro';
+import { Header } from '@components/Header';
 ---
 
-<GGLayout title="Join Team">
-  <GGHeader client:load />
+<Layout title="Join Team">
+  <Header client:load />
 
   <main class="container" style="padding-top: var(--space-xl); padding-bottom: var(--space-xl);">
     <div style="width: 100%; max-width: 500px; margin: 0 auto;">
       <!-- Join Form -->
       <div id="join-section">
-        <div class="gg-sys-label" style="margin-bottom: var(--space-sm);">SYS.INIT // JOIN</div>
         <h1 style="font-size: 1.5rem; margin-bottom: var(--space-md);">Join Your Team</h1>
         <p class="text-secondary" style="margin-bottom: var(--space-xl);">
           Enter the team join code to join an existing Overlap team.
         </p>
 
-        <form id="join-form" class="card gg-bracket">
+        <form id="join-form" class="card">
           <div style="margin-bottom: var(--space-lg);">
             <label
               for="team-join-code-input"
@@ -125,7 +124,7 @@ import { GGHeader } from '@components/GGHeader';
           </p>
         </div>
 
-        <div class="card gg-bracket" style="margin-bottom: var(--space-lg);">
+        <div class="card" style="margin-bottom: var(--space-lg);">
           <div>
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-sm);">
               <label style="font-weight: 500; font-size: 0.875rem;">Your User Token</label>
@@ -224,7 +223,7 @@ import { GGHeader } from '@components/GGHeader';
       </div>
     </div>
   </main>
-</GGLayout>
+</Layout>
 
 <script>
   const form = document.getElementById('join-form') as HTMLFormElement;
