@@ -1,0 +1,356 @@
+/* GG Design System — /gg route theme override
+   Inspired by overlap.dev/gg landing page aesthetic.
+   Imports after global.css to override CSS variables. */
+
+/* Google Fonts are loaded in GGLayout.astro <head> */
+
+:root {
+  /* Background — darker, warmer */
+  --bg-primary: #0c0907;
+  --bg-surface: #0a0705;
+  --bg-elevated: #1e1a17;
+
+  /* Text — warmer off-whites */
+  --text-primary: #ede8e3;
+  --text-secondary: #8a8078;
+  --text-muted: #554d45;
+
+  /* Borders — warm subtle */
+  --border-subtle: #1e1a17;
+  --border-default: #2e2620;
+
+  /* Accents — burnt orange primary */
+  --accent-orange: #C8602A;
+  --accent-orange-hover: #d97757;
+  --accent-blue: #C8602A;
+  --accent-green: #5B9A3C;
+  --accent-gold: #e8a060;
+  --accent-yellow: #e8a060;
+  --accent-red: #cc4433;
+
+  /* Status */
+  --status-active: #C8602A;
+  --status-stale: #8a8078;
+  --status-ended: #5B9A3C;
+
+  /* Typography — swap to /gg fonts */
+  --font-mono: 'JetBrains Mono', 'Geist Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  --font-sans: 'Space Grotesk', 'Geist Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+
+  /* Radius — slightly tighter */
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 10px;
+}
+
+/* Selection highlight */
+::selection {
+  background-color: #C8602A;
+  color: #fff;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 8px; }
+::-webkit-scrollbar-track { background: #000; border-left: 1px solid #1a1a1a; }
+::-webkit-scrollbar-thumb { background: #2e2620; border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: #554d45; }
+
+/* Body override */
+body {
+  background-color: #0c0907;
+  font-family: var(--font-sans);
+}
+
+/* Links — burnt orange */
+a {
+  color: #C8602A;
+}
+
+a:hover {
+  color: #d97757;
+}
+
+/* Headings — monospace */
+h1, h2, h3, h4 {
+  font-family: var(--font-mono);
+  font-weight: 600;
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+}
+
+/* ── GG Visual Effects ── */
+
+/* Dot grid background */
+.gg-grid {
+  background-image: radial-gradient(#1e1a17 1px, transparent 1px);
+  background-size: 24px 24px;
+  background-position: -12px -12px;
+}
+
+.gg-grid-dense {
+  background-image: radial-gradient(#221e1a 1px, transparent 1px);
+  background-size: 12px 12px;
+}
+
+/* Scanline overlay */
+.gg-scanline {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.gg-scanline::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: rgba(200, 96, 42, 0.04);
+  animation: gg-scanline 8s linear infinite;
+}
+
+@keyframes gg-scanline {
+  0% { transform: translateY(-100%); }
+  100% { transform: translateY(100vh); }
+}
+
+/* Bracket corner decorators */
+.gg-bracket {
+  position: relative;
+}
+
+.gg-bracket::before,
+.gg-bracket::after {
+  content: '';
+  position: absolute;
+  width: 6px;
+  height: 6px;
+  border: 1px solid #554d45;
+  transition: border-color 0.2s;
+}
+
+.gg-bracket::before {
+  top: -1px;
+  left: -1px;
+  border-right: none;
+  border-bottom: none;
+}
+
+.gg-bracket::after {
+  bottom: -1px;
+  right: -1px;
+  border-left: none;
+  border-top: none;
+}
+
+.gg-bracket:hover::before,
+.gg-bracket:hover::after {
+  border-color: #C8602A;
+}
+
+/* System label — "SYS.XX // LABEL" */
+.gg-sys-label {
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  color: var(--text-muted);
+}
+
+/* Status dot with glow */
+.gg-status-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #C8602A;
+  box-shadow: 0 0 8px rgba(200, 96, 42, 0.6);
+  animation: gg-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@keyframes gg-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.6; transform: scale(1.1); }
+}
+
+/* ── GG Card Override ── */
+.card {
+  background-color: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+}
+
+.card:hover {
+  border-color: #C8602A;
+}
+
+/* ── GG Button Override ── */
+.btn-primary {
+  background-color: #C8602A;
+  color: #0c0907;
+  font-family: var(--font-mono);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 0.8rem;
+}
+
+.btn-primary:hover {
+  background-color: #d97757;
+  opacity: 1;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(200, 96, 42, 0.25);
+}
+
+.btn-secondary {
+  background-color: transparent;
+  border: 1px solid var(--border-default);
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.btn-secondary:hover {
+  border-color: #C8602A;
+  color: var(--text-primary);
+  background-color: rgba(200, 96, 42, 0.05);
+}
+
+/* ── GG Input Override ── */
+input, select, textarea {
+  font-family: var(--font-mono);
+}
+
+input:focus, select:focus, textarea:focus {
+  outline: none;
+  border-color: #C8602A !important;
+  box-shadow: 0 0 0 1px rgba(200, 96, 42, 0.2);
+}
+
+/* ── GG Code Override ── */
+code {
+  color: #C8602A;
+  background: var(--bg-elevated);
+  font-family: var(--font-mono);
+}
+
+/* ── GG Status Dots ── */
+.status-dot.active {
+  background-color: #C8602A;
+  box-shadow: 0 0 6px rgba(200, 96, 42, 0.5);
+  animation: gg-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+.status-dot.stale {
+  background-color: #8a8078;
+}
+
+.status-dot.ended {
+  background-color: #5B9A3C;
+}
+
+/* ── GG Scope Badge ── */
+.scope-badge {
+  border-color: var(--border-default);
+  background-color: var(--bg-elevated);
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+/* ── GG Nav Active States ── */
+.gg-nav-link {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  color: var(--text-muted);
+  text-decoration: none;
+  padding: 6px 10px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  transition: all 0.2s ease;
+}
+
+.gg-nav-link:hover {
+  color: var(--text-primary);
+  border-color: var(--border-default);
+  background-color: rgba(255, 255, 255, 0.03);
+  text-decoration: none;
+}
+
+.gg-nav-link.active {
+  color: #C8602A;
+  border-color: rgba(200, 96, 42, 0.3);
+  background-color: rgba(200, 96, 42, 0.05);
+}
+
+/* ── GG Footer ── */
+.gg-footer {
+  border-top: 1px solid var(--border-subtle);
+  padding: var(--space-lg) var(--space-xl);
+  text-align: center;
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  color: var(--text-muted);
+}
+
+.gg-footer a {
+  color: var(--text-muted);
+  text-decoration: none;
+}
+
+.gg-footer a:hover {
+  color: #C8602A;
+  text-decoration: none;
+}
+
+/* ── GG Page Title ── */
+.gg-page-title {
+  font-family: var(--font-mono);
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* ── GG Back Link ── */
+.gg-back-link {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--text-muted);
+  text-decoration: none;
+}
+
+.gg-back-link:hover {
+  color: #C8602A;
+  text-decoration: none;
+}
+
+/* ── Reduced Motion ── */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* ── Mobile Adjustments ── */
+@media (max-width: 768px) {
+  .gg-nav-link {
+    font-size: 0.6rem;
+    padding: 4px 6px;
+    letter-spacing: 0.1em;
+  }
+}

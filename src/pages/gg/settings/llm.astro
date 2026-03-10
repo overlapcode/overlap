@@ -1,0 +1,411 @@
+---
+import GGLayout from '@layouts/GGLayout.astro';
+import { GGHeader } from '@components/GGHeader';
+---
+
+<GGLayout title="LLM Settings">
+  <GGHeader userName="Dashboard" activePage="config" client:load />
+
+  <main class="container" style="padding-top: var(--space-xl); padding-bottom: var(--space-xl);">
+    <div style="width: 100%; max-width: 600px; margin: 0 auto;">
+      <div style="display: flex; align-items: center; gap: var(--space-md); margin-bottom: var(--space-xl);">
+        <a href="/gg/settings" class="gg-back-link">← SYS.CFG // MENU</a>
+        <h1 class="gg-page-title">LLM Classification</h1>
+      </div>
+
+      <div class="gg-sys-label" style="margin-bottom: var(--space-md);">SYS.CFG // CLASSIFIER</div>
+
+      <div class="card" style="margin-bottom: var(--space-lg); background: var(--bg-elevated);">
+        <p class="text-secondary" style="font-size: 0.875rem;">
+          Overlap can use AI to classify what you're working on. This provides better summaries
+          and more accurate overlap detection. Choose a provider or use the free heuristic mode.
+        </p>
+      </div>
+
+      <!-- Read-only view for non-admins -->
+      <div id="readonly-view" class="card" style="display: none;">
+        <div style="margin-bottom: var(--space-lg);">
+          <label style="display: block; margin-bottom: var(--space-sm); font-weight: 500;">
+            Provider
+          </label>
+          <div
+            id="readonly-provider"
+            style="
+              padding: var(--space-sm) var(--space-md);
+              background: var(--bg-elevated);
+              border: 1px solid var(--border-default);
+              border-radius: var(--radius-sm);
+              color: var(--text-secondary);
+            "
+          >-</div>
+        </div>
+
+        <div id="readonly-model-section" style="margin-bottom: var(--space-lg); display: none;">
+          <label style="display: block; margin-bottom: var(--space-sm); font-weight: 500;">
+            Model
+          </label>
+          <div
+            id="readonly-model"
+            style="
+              padding: var(--space-sm) var(--space-md);
+              background: var(--bg-elevated);
+              border: 1px solid var(--border-default);
+              border-radius: var(--radius-sm);
+              color: var(--text-secondary);
+            "
+          >-</div>
+        </div>
+
+        <div id="readonly-apikey-section" style="margin-bottom: var(--space-lg); display: none;">
+          <label style="display: block; margin-bottom: var(--space-sm); font-weight: 500;">
+            API Key
+          </label>
+          <div
+            id="readonly-apikey"
+            style="
+              padding: var(--space-sm) var(--space-md);
+              background: var(--bg-elevated);
+              border: 1px solid var(--border-default);
+              border-radius: var(--radius-sm);
+              color: var(--text-secondary);
+              font-family: var(--font-mono);
+            "
+          >••••••••••••••••</div>
+        </div>
+
+        <div style="
+          padding: var(--space-md);
+          background: var(--bg-elevated);
+          border: 1px solid var(--border-default);
+          border-radius: var(--radius-sm);
+          text-align: center;
+        ">
+          <p class="text-secondary" style="font-size: 0.875rem; margin: 0;">
+            Only admins can modify LLM settings.<br/>
+            Contact your team admin if you need changes.
+          </p>
+        </div>
+      </div>
+
+      <!-- Editable form for admins -->
+      <form id="llm-form" class="card" style="display: none;">
+        <div style="margin-bottom: var(--space-lg);">
+          <label
+            for="provider"
+            style="display: block; margin-bottom: var(--space-sm); font-weight: 500;"
+          >
+            Provider
+          </label>
+          <select
+            id="provider"
+            name="provider"
+            style="
+              width: 100%;
+              padding: var(--space-sm) var(--space-md);
+              background: var(--bg-elevated);
+              border: 1px solid var(--border-default);
+              border-radius: var(--radius-sm);
+              color: var(--text-primary);
+              font-size: 1rem;
+            "
+          >
+            <option value="heuristic">Heuristic (Free - Path-based)</option>
+            <option value="anthropic">Anthropic (Claude)</option>
+            <option value="openai">OpenAI (GPT)</option>
+            <option value="google">Google (Gemini)</option>
+            <option value="xai">xAI (Grok)</option>
+          </select>
+        </div>
+
+        <div id="model-section" style="margin-bottom: var(--space-lg); display: none;">
+          <label
+            for="model"
+            style="display: block; margin-bottom: var(--space-sm); font-weight: 500;"
+          >
+            Model
+          </label>
+          <select
+            id="model"
+            name="model"
+            style="
+              width: 100%;
+              padding: var(--space-sm) var(--space-md);
+              background: var(--bg-elevated);
+              border: 1px solid var(--border-default);
+              border-radius: var(--radius-sm);
+              color: var(--text-primary);
+              font-size: 1rem;
+            "
+          >
+          </select>
+          <p class="text-muted" style="font-size: 0.75rem; margin-top: var(--space-xs);">
+            The first option is the recommended default for each provider
+          </p>
+        </div>
+
+        <div id="api-key-section" style="margin-bottom: var(--space-lg); display: none;">
+          <label
+            for="api-key"
+            style="display: block; margin-bottom: var(--space-sm); font-weight: 500;"
+          >
+            API Key
+          </label>
+          <input
+            type="password"
+            id="api-key"
+            name="api_key"
+            placeholder="sk-..."
+            style="
+              width: 100%;
+              padding: var(--space-sm) var(--space-md);
+              background: var(--bg-elevated);
+              border: 1px solid var(--border-default);
+              border-radius: var(--radius-sm);
+              color: var(--text-primary);
+              font-family: var(--font-mono);
+              font-size: 0.875rem;
+            "
+          />
+          <p class="text-muted" style="font-size: 0.75rem; margin-top: var(--space-xs);">
+            Your API key is encrypted before storage
+          </p>
+        </div>
+
+        <button type="submit" class="btn btn-primary" style="width: 100%;">
+          Save Settings
+        </button>
+
+        <p id="status-message" style="margin-top: var(--space-md); text-align: center; display: none;"></p>
+      </form>
+
+      <div class="card" style="margin-top: var(--space-lg);">
+        <h3 style="font-size: 1rem; margin-bottom: var(--space-md);">Provider Comparison</h3>
+        <table style="width: 100%; font-size: 0.875rem;">
+          <thead>
+            <tr class="text-muted">
+              <th style="text-align: left; padding: var(--space-xs) 0;">Provider</th>
+              <th style="text-align: left; padding: var(--space-xs) 0;">Cost</th>
+            </tr>
+          </thead>
+          <tbody class="text-secondary">
+            <tr>
+              <td style="padding: var(--space-xs) 0;">Heuristic</td>
+              <td style="padding: var(--space-xs) 0;">Free</td>
+            </tr>
+            <tr>
+              <td style="padding: var(--space-xs) 0;">Anthropic</td>
+              <td style="padding: var(--space-xs) 0;">$-$$$</td>
+            </tr>
+            <tr>
+              <td style="padding: var(--space-xs) 0;">OpenAI</td>
+              <td style="padding: var(--space-xs) 0;">$-$$</td>
+            </tr>
+            <tr>
+              <td style="padding: var(--space-xs) 0;">Google</td>
+              <td style="padding: var(--space-xs) 0;">$-$$</td>
+            </tr>
+            <tr>
+              <td style="padding: var(--space-xs) 0;">xAI</td>
+              <td style="padding: var(--space-xs) 0;">$-$$</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+</GGLayout>
+
+<script>
+  const form = document.getElementById('llm-form') as HTMLFormElement | null;
+  const readonlyView = document.getElementById('readonly-view') as HTMLDivElement | null;
+  const providerSelect = document.getElementById('provider') as unknown as HTMLSelectElement | null;
+  const modelSelect = document.getElementById('model') as unknown as HTMLSelectElement | null;
+  const apiKeyInput = document.getElementById('api-key') as HTMLInputElement | null;
+  const modelSection = document.getElementById('model-section') as HTMLDivElement | null;
+  const apiKeySection = document.getElementById('api-key-section') as HTMLDivElement | null;
+  const statusMessage = document.getElementById('status-message') as HTMLParagraphElement | null;
+
+  // Read-only view elements
+  const readonlyProvider = document.getElementById('readonly-provider') as HTMLDivElement | null;
+  const readonlyModel = document.getElementById('readonly-model') as HTMLDivElement | null;
+  const readonlyModelSection = document.getElementById('readonly-model-section') as HTMLDivElement | null;
+  const readonlyApikeySection = document.getElementById('readonly-apikey-section') as HTMLDivElement | null;
+
+  const providerLabels: Record<string, string> = {
+    heuristic: 'Heuristic (Free - Path-based)',
+    anthropic: 'Anthropic (Claude)',
+    openai: 'OpenAI (GPT)',
+    google: 'Google (Gemini)',
+    xai: 'xAI (Grok)',
+  };
+
+  // Model options per provider (first option is default)
+  const providerModels: Record<string, Array<{ value: string; label: string }>> = {
+    anthropic: [
+      { value: 'claude-haiku-4-5', label: 'Claude Haiku 4.5 (Recommended)' },
+      { value: 'claude-sonnet-4-5', label: 'Claude Sonnet 4.5' },
+    ],
+    openai: [
+      { value: 'gpt-5-nano', label: 'GPT-5 Nano (Recommended)' },
+      { value: 'gpt-5-mini', label: 'GPT-5 Mini' },
+      { value: 'gpt-5.2', label: 'GPT-5.2' },
+    ],
+    google: [
+      { value: 'gemini-2.5-flash-lite', label: 'Gemini 2.5 Flash Lite (Recommended)' },
+      { value: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash' },
+      { value: 'gemini-3-flash-preview', label: 'Gemini 3 Flash Preview' },
+    ],
+    xai: [
+      { value: 'grok-4-fast-non-reasoning', label: 'Grok 4 Fast (Recommended)' },
+      { value: 'grok-4-1-fast-non-reasoning', label: 'Grok 4.1 Fast' },
+    ],
+  };
+
+  // Populate model dropdown based on selected provider
+  function updateModelOptions(selectedModel?: string | null) {
+    if (!modelSelect || !providerSelect) return;
+    const provider = providerSelect.value;
+    const models = providerModels[provider] || [];
+
+    modelSelect.innerHTML = '';
+    for (const m of models) {
+      const option = document.createElement('option');
+      option.value = m.value;
+      option.textContent = m.label;
+      if (selectedModel && m.value === selectedModel) {
+        option.selected = true;
+      }
+      modelSelect.appendChild(option);
+    }
+  }
+
+  // Show/hide sections based on provider
+  function updateSections() {
+    const isHeuristic = providerSelect?.value === 'heuristic';
+    if (modelSection) modelSection.style.display = isHeuristic ? 'none' : 'block';
+    if (apiKeySection) apiKeySection.style.display = isHeuristic ? 'none' : 'block';
+    updateModelOptions();
+  }
+
+  providerSelect?.addEventListener('change', updateSections);
+
+  // Load current settings on page load
+  async function loadSettings() {
+    try {
+      const response = await fetch('/api/v1/admin/llm');
+      if (!response.ok) {
+        console.error('Failed to load LLM settings');
+        return;
+      }
+
+      const result = await response.json() as {
+        data?: {
+          provider: string;
+          model: string | null;
+          has_api_key: boolean;
+          is_admin: boolean;
+        }
+      };
+
+      if (result.data) {
+        const isAdmin = result.data.is_admin;
+        const isHeuristic = result.data.provider === 'heuristic';
+
+        if (isAdmin) {
+          // Show editable form for admins
+          if (form) form.style.display = 'block';
+          if (readonlyView) readonlyView.style.display = 'none';
+
+          // Set provider
+          if (providerSelect) {
+            providerSelect.value = result.data.provider;
+          }
+
+          // Show placeholder if API key is set
+          if (apiKeyInput && result.data.has_api_key) {
+            apiKeyInput.placeholder = '••••••••••••••••';
+          }
+
+          // Update section visibility and model dropdown
+          updateSections();
+          // Re-populate with saved model selected
+          if (result.data.model) {
+            updateModelOptions(result.data.model);
+          }
+        } else {
+          // Show read-only view for non-admins
+          if (form) form.style.display = 'none';
+          if (readonlyView) readonlyView.style.display = 'block';
+
+          // Set provider label
+          if (readonlyProvider) {
+            readonlyProvider.textContent = providerLabels[result.data.provider] || result.data.provider;
+          }
+
+          // Show model if not heuristic
+          if (!isHeuristic) {
+            if (readonlyModelSection) readonlyModelSection.style.display = 'block';
+            if (readonlyModel) {
+              readonlyModel.textContent = result.data.model || '(default)';
+            }
+            if (readonlyApikeySection) {
+              readonlyApikeySection.style.display = result.data.has_api_key ? 'block' : 'none';
+            }
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error loading LLM settings:', error);
+    }
+  }
+
+  // Load settings on page load
+  loadSettings();
+
+  form?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+
+    const formData = new FormData(form);
+    const data: Record<string, unknown> = {
+      provider: formData.get('provider'),
+    };
+
+    if (data.provider !== 'heuristic') {
+      const model = modelSelect?.value;
+      if (model) data.model = model;
+
+      const apiKey = formData.get('api_key');
+      if (apiKey) data.api_key = apiKey;
+    }
+
+    try {
+      const response = await fetch('/api/v1/admin/llm', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+
+      const result = await response.json() as { data?: { message: string }, error?: string };
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to save');
+      }
+
+      if (statusMessage) {
+        statusMessage.textContent = 'LLM settings saved successfully!';
+        statusMessage.style.color = 'var(--accent-green)';
+        statusMessage.style.display = 'block';
+
+        setTimeout(() => {
+          statusMessage.style.display = 'none';
+        }, 3000);
+      }
+    } catch (error) {
+      if (statusMessage) {
+        statusMessage.textContent = error instanceof Error ? error.message : 'Failed to save';
+        statusMessage.style.color = 'var(--accent-orange)';
+        statusMessage.style.display = 'block';
+      }
+    }
+  });
+</script>

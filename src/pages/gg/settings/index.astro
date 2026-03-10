@@ -1,0 +1,81 @@
+---
+import GGLayout from '@layouts/GGLayout.astro';
+import { GGHeader } from '@components/GGHeader';
+---
+
+<GGLayout title="Settings">
+  <GGHeader userName="Dashboard" activePage="config" client:load />
+
+  <main class="container" style="padding-top: var(--space-xl); padding-bottom: var(--space-xl);">
+    <div style="width: 100%; max-width: 800px; margin: 0 auto;">
+      <div style="display: flex; align-items: center; gap: var(--space-md); margin-bottom: var(--space-xl);">
+        <a href="/gg" class="gg-back-link">← SYS.00 // DASHBOARD</a>
+        <h1 class="gg-page-title">Settings</h1>
+      </div>
+
+      <div class="gg-sys-label" style="margin-bottom: var(--space-md);">SYS.CFG // MENU</div>
+
+      <div style="display: grid; gap: var(--space-lg);">
+        <a href="/gg/settings/profile" class="card gg-bracket" style="text-decoration: none; color: inherit;">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <div>
+              <h2 style="font-size: 1.125rem; margin-bottom: var(--space-xs);">My Account</h2>
+              <p class="text-secondary" style="font-size: 0.875rem;">
+                Tracer setup instructions and instance URL
+              </p>
+            </div>
+            <span class="text-muted" style="font-size: 1.5rem;">→</span>
+          </div>
+        </a>
+
+        <a href="/gg/settings/team" class="card gg-bracket" style="text-decoration: none; color: inherit;">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <div>
+              <h2 style="font-size: 1.125rem; margin-bottom: var(--space-xs);">Team Settings</h2>
+              <p class="text-secondary" style="font-size: 0.875rem;">
+                Team name, join code, dashboard password, and stale timeout
+              </p>
+            </div>
+            <span class="text-muted" style="font-size: 1.5rem;">→</span>
+          </div>
+        </a>
+
+        <a href="/gg/settings/users" class="card gg-bracket" style="text-decoration: none; color: inherit;">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <div>
+              <h2 style="font-size: 1.125rem; margin-bottom: var(--space-xs);">Team Members</h2>
+              <p class="text-secondary" style="font-size: 0.875rem;">
+                Add members, manage roles and access
+              </p>
+            </div>
+            <span class="text-muted" style="font-size: 1.5rem;">→</span>
+          </div>
+        </a>
+
+        <a href="/gg/settings/repos" class="card gg-bracket" style="text-decoration: none; color: inherit;">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <div>
+              <h2 style="font-size: 1.125rem; margin-bottom: var(--space-xs);">Repositories</h2>
+              <p class="text-secondary" style="font-size: 0.875rem;">
+                Add and manage tracked repositories
+              </p>
+            </div>
+            <span class="text-muted" style="font-size: 1.5rem;">→</span>
+          </div>
+        </a>
+
+        <a href="/gg/settings/llm" class="card gg-bracket" style="text-decoration: none; color: inherit;">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <div>
+              <h2 style="font-size: 1.125rem; margin-bottom: var(--space-xs);">LLM Classification</h2>
+              <p class="text-secondary" style="font-size: 0.875rem;">
+                Configure AI provider for activity summaries
+              </p>
+            </div>
+            <span class="text-muted" style="font-size: 1.5rem;">→</span>
+          </div>
+        </a>
+      </div>
+    </div>
+  </main>
+</GGLayout>

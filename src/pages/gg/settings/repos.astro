@@ -1,0 +1,327 @@
+---
+import GGLayout from '@layouts/GGLayout.astro';
+import { GGHeader } from '@components/GGHeader';
+---
+
+<GGLayout title="Repositories">
+  <GGHeader userName="Dashboard" activePage="config" client:load />
+
+  <main class="container" style="padding-top: var(--space-xl); padding-bottom: var(--space-xl);">
+    <div style="width: 100%; max-width: 700px; margin: 0 auto;">
+      <div style="display: flex; align-items: center; gap: var(--space-md); margin-bottom: var(--space-xl);">
+        <a href="/gg/settings" class="gg-back-link">← SYS.CFG // MENU</a>
+        <h1 class="gg-page-title">Repositories</h1>
+      </div>
+
+      <div class="gg-sys-label" style="margin-bottom: var(--space-md);">SYS.CFG // REPOS</div>
+
+      <!-- Add Repo Form -->
+      <div class="card" style="margin-bottom: var(--space-lg);">
+        <h3 style="font-size: 0.875rem; font-weight: 500; margin-bottom: var(--space-md);">Add Repository</h3>
+        <form id="add-repo-form" style="display: flex; gap: var(--space-sm); align-items: flex-end;">
+          <div style="flex: 1;">
+            <label for="repo-name" style="display: block; font-size: 0.75rem; color: var(--text-secondary); margin-bottom: var(--space-xs);">
+              Repository name (must match git remote basename)
+            </label>
+            <input
+              type="text"
+              id="repo-name"
+              name="name"
+              required
+              placeholder="e.g. my-project"
+              style="
+                width: 100%;
+                padding: var(--space-sm) var(--space-md);
+                background: var(--bg-elevated);
+                border: 1px solid var(--border-default);
+                border-radius: var(--radius-sm);
+                color: var(--text-primary);
+                font-family: var(--font-mono);
+                font-size: 0.875rem;
+              "
+            />
+          </div>
+          <button type="submit" class="btn btn-primary" id="add-btn" style="white-space: nowrap;">
+            Add
+          </button>
+        </form>
+        <p id="add-error" style="margin-top: var(--space-sm); font-size: 0.8rem; color: var(--accent-orange); display: none;"></p>
+        <p id="add-success" style="margin-top: var(--space-sm); font-size: 0.8rem; color: var(--accent-green); display: none;"></p>
+      </div>
+
+      <div id="repos-list">
+        <div class="loading-state">Loading...</div>
+      </div>
+
+    </div>
+  </main>
+</GGLayout>
+
+<style is:global>
+  .loading-state {
+    color: var(--text-secondary);
+    padding: var(--space-lg);
+    text-align: center;
+  }
+
+  .section-header {
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-bottom: 12px;
+    padding-left: 4px;
+  }
+
+  .repos-section {
+    margin-bottom: 32px;
+  }
+
+  .repo-card {
+    background: var(--bg-surface);
+    border: 1px solid var(--border-default);
+    border-radius: 8px;
+    padding: 16px 20px;
+    margin-bottom: 8px;
+  }
+
+  .repo-card-inner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+  }
+
+  .repo-details {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .repo-name {
+    font-weight: 500;
+    font-size: 0.95rem;
+    color: var(--text-primary);
+    font-family: var(--font-mono);
+    margin-bottom: 2px;
+  }
+
+  .repo-url {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    font-family: var(--font-mono);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .repo-description {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .repo-delete-btn {
+    background: none;
+    border: 1px solid var(--border-default);
+    color: var(--text-muted);
+    padding: 4px 10px;
+    border-radius: var(--radius-sm);
+    font-size: 0.75rem;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 0.15s ease;
+  }
+
+  .repo-delete-btn:hover {
+    border-color: var(--accent-orange);
+    color: var(--accent-orange);
+  }
+
+  .empty-state {
+    text-align: center;
+    padding: var(--space-xl);
+    color: var(--text-secondary);
+  }
+
+  .info-box {
+    margin-top: 24px;
+    padding: 16px;
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-default);
+    border-radius: 8px;
+    text-align: center;
+  }
+
+  .info-box p {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    margin: 0;
+    line-height: 1.5;
+  }
+
+  @media (max-width: 500px) {
+    .repo-card-inner {
+      flex-wrap: wrap;
+    }
+
+    .repo-details {
+      width: 100%;
+      margin-bottom: 8px;
+    }
+  }
+</style>
+
+<script>
+  type Repo = {
+    id: string;
+    name: string;
+    display_name: string | null;
+    description: string | null;
+    created_at: string;
+  };
+
+  function escapeHtml(text: string): string {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+  }
+
+  // Add repo form
+  const addForm = document.getElementById('add-repo-form') as HTMLFormElement;
+  const addBtn = document.getElementById('add-btn') as HTMLButtonElement;
+  const addError = document.getElementById('add-error') as HTMLParagraphElement;
+  const addSuccess = document.getElementById('add-success') as HTMLParagraphElement;
+
+  addForm?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    addError.style.display = 'none';
+    addSuccess.style.display = 'none';
+    addBtn.disabled = true;
+    addBtn.textContent = 'Adding...';
+
+    const formData = new FormData(addForm);
+    const name = (formData.get('name') as string).trim();
+
+    try {
+      const response = await fetch('/api/v1/repos', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name }),
+      });
+
+      const result = await response.json() as { data?: Repo; error?: string };
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to add repository');
+      }
+
+      addSuccess.textContent = `Added "${name}"`;
+      addSuccess.style.display = 'block';
+      addForm.reset();
+      setTimeout(() => { addSuccess.style.display = 'none'; }, 3000);
+      loadRepos();
+    } catch (error) {
+      addError.textContent = error instanceof Error ? error.message : 'Failed to add repository';
+      addError.style.display = 'block';
+    } finally {
+      addBtn.disabled = false;
+      addBtn.textContent = 'Add';
+    }
+  });
+
+  async function deleteRepo(id: string, name: string) {
+    if (!confirm(`Remove "${name}" from tracked repositories?`)) return;
+
+    try {
+      const response = await fetch(`/api/v1/admin/repos/${id}`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        const result = await response.json() as { error?: string };
+        throw new Error(result.error || 'Failed to delete repository');
+      }
+
+      loadRepos();
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'Failed to delete repository');
+    }
+  }
+
+  // Expose to onclick handlers
+  (window as any).deleteRepo = deleteRepo;
+
+  async function loadRepos() {
+    const container = document.getElementById('repos-list') as HTMLDivElement;
+
+    try {
+      const response = await fetch('/api/v1/admin/repos');
+      const result = await response.json() as { data?: { repos: Repo[], is_admin: boolean }, error?: string };
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to load repositories');
+      }
+
+      const repos = result.data?.repos || [];
+      const isAdmin = result.data?.is_admin ?? false;
+
+      if (repos.length === 0) {
+        container.innerHTML = `
+          <div class="empty-state">
+            <p style="margin-bottom: var(--space-sm); font-size: 1rem;">No repositories tracked yet</p>
+            <p class="text-muted" style="font-size: 0.8rem;">
+              Add repositories above so the tracer knows which repos to sync.<br>
+              The name must match the git remote basename (e.g. "my-project" for github.com/org/my-project).
+            </p>
+          </div>
+        `;
+        return;
+      }
+
+      const sortedRepos = repos.sort((a, b) => {
+        const aName = a.display_name || a.name;
+        const bName = b.display_name || b.name;
+        return aName.localeCompare(bName);
+      });
+
+      let html = `<div class="repos-section">
+        <div class="section-header">Tracked Repositories (${sortedRepos.length})</div>
+        ${sortedRepos.map(repo => renderRepoCard(repo, isAdmin)).join('')}
+      </div>`;
+
+      html += `<div class="info-box">
+        <p>The tracer matches repos by basename. Make sure the name here matches<br>the last segment of your git remote URL.</p>
+      </div>`;
+
+      container.innerHTML = html;
+    } catch (error) {
+      container.innerHTML = `<div class="loading-state" style="color: var(--accent-orange);">${error instanceof Error ? error.message : 'Failed to load repositories'}</div>`;
+    }
+  }
+
+  function renderRepoCard(repo: Repo, isAdmin: boolean): string {
+    const displayName = repo.display_name || repo.name;
+    const safeName = escapeHtml(displayName);
+    const safeRepoName = escapeHtml(repo.name);
+    const safeDescription = repo.description ? escapeHtml(repo.description) : null;
+
+    const deleteBtn = isAdmin
+      ? `<button class="repo-delete-btn" onclick="deleteRepo('${repo.id}', '${safeRepoName}')">Remove</button>`
+      : '';
+
+    return `<div class="repo-card">
+      <div class="repo-card-inner">
+        <div class="repo-details">
+          <div class="repo-name">${safeName}</div>
+          ${safeDescription ? `<div class="repo-description">${safeDescription}</div>` : `<div class="repo-url">${safeRepoName}</div>`}
+        </div>
+        ${deleteBtn}
+      </div>
+    </div>`;
+  }
+
+  loadRepos();
+</script>

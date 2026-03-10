@@ -1,0 +1,53 @@
+---
+import '@/styles/global.css';
+import '@/styles/gg.css';
+import { VERSION } from '@lib/version';
+
+type Props = {
+  title: string;
+  description?: string;
+};
+
+const { title, description = 'See where your team\'s heads are at' } = Astro.props;
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content={description} />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+    <link rel="manifest" href="/site.webmanifest" />
+    <meta name="theme-color" content="#0c0907" />
+    <!-- GG Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+    <title>{title} | Overlap</title>
+  </head>
+  <body>
+    <!-- Scanline effect -->
+    <div class="gg-scanline" aria-hidden="true"></div>
+
+    <div style="flex: 1; display: flex; flex-direction: column;" class="gg-grid">
+      <slot />
+    </div>
+
+    <footer class="gg-footer">
+      <a
+        href="https://overlap.dev"
+        target="_blank"
+        rel="noopener noreferrer"
+        style="display: inline-flex; align-items: center; gap: var(--space-sm);"
+      >
+        <img src="/logo.png" alt="Overlap" width="16" height="16" style="opacity: 0.5;" />
+        <span>OVERLAP</span>
+        <span style="opacity: 0.4;">v{VERSION}</span>
+      </a>
+    </footer>
+  </body>
+</html>

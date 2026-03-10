@@ -1,0 +1,24 @@
+---
+import GGLayout from '@layouts/GGLayout.astro';
+import { GGHeader } from '@components/GGHeader';
+import { StatsView } from '@components/StatsView';
+import { authenticateWebSession } from '@lib/auth/middleware';
+import { getTeamConfig } from '@lib/db/queries';
+
+const db = Astro.locals.runtime.env.DB;
+
+const authResult = await authenticateWebSession(Astro.request, db);
+if (!authResult.success) {
+  return Astro.redirect('/gg');
+}
+
+const teamConfig = await getTeamConfig(db);
+---
+
+<GGLayout title="Stats">
+  <GGHeader teamName={teamConfig?.team_name} userName="Dashboard" activePage="stats" client:load />
+  <main style="padding: var(--space-lg); max-width: 1200px; margin: 0 auto;">
+    <div class="gg-sys-label" style="margin-bottom: var(--space-sm);">SYS.05 // METRICS</div>
+    <StatsView client:load />
+  </main>
+</GGLayout>

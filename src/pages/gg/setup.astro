@@ -1,0 +1,374 @@
+---
+import GGLayout from '@layouts/GGLayout.astro';
+import { GGHeader } from '@components/GGHeader';
+---
+
+<GGLayout title="Setup">
+  <GGHeader client:load />
+
+  <main class="container" style="padding-top: var(--space-xl); padding-bottom: var(--space-xl);">
+    <div style="width: 100%; max-width: 500px; margin: 0 auto;">
+      <!-- Setup Form -->
+      <div id="setup-section">
+        <div class="gg-sys-label" style="margin-bottom: var(--space-sm);">SYS.INIT // DEPLOY</div>
+        <h1 style="font-size: 1.5rem; margin-bottom: var(--space-md);">Set Up Your Team</h1>
+        <p class="text-secondary" style="margin-bottom: var(--space-xl);">
+          Configure your Overlap instance. This creates your team and admin account.
+        </p>
+
+        <form id="setup-form" class="card gg-bracket">
+          <div style="margin-bottom: var(--space-lg);">
+            <label
+              for="team-name"
+              style="display: block; margin-bottom: var(--space-sm); font-weight: 500;"
+            >
+              Team Name
+            </label>
+            <input
+              type="text"
+              id="team-name"
+              name="team_name"
+              required
+              placeholder="My Awesome Team"
+              style="
+                width: 100%;
+                padding: var(--space-sm) var(--space-md);
+                background: var(--bg-elevated);
+                border: 1px solid var(--border-default);
+                border-radius: var(--radius-sm);
+                color: var(--text-primary);
+                font-size: 1rem;
+              "
+            />
+          </div>
+
+          <div style="margin-bottom: var(--space-lg);">
+            <label
+              for="admin-name"
+              style="display: block; margin-bottom: var(--space-sm); font-weight: 500;"
+            >
+              Your Name
+            </label>
+            <input
+              type="text"
+              id="admin-name"
+              name="admin_name"
+              required
+              placeholder="Jane Developer"
+              style="
+                width: 100%;
+                padding: var(--space-sm) var(--space-md);
+                background: var(--bg-elevated);
+                border: 1px solid var(--border-default);
+                border-radius: var(--radius-sm);
+                color: var(--text-primary);
+                font-size: 1rem;
+              "
+            />
+          </div>
+
+          <div style="margin-bottom: var(--space-lg);">
+            <label
+              for="admin-email"
+              style="display: block; margin-bottom: var(--space-sm); font-weight: 500;"
+            >
+              Email (optional)
+            </label>
+            <input
+              type="email"
+              id="admin-email"
+              name="admin_email"
+              placeholder="jane@example.com"
+              style="
+                width: 100%;
+                padding: var(--space-sm) var(--space-md);
+                background: var(--bg-elevated);
+                border: 1px solid var(--border-default);
+                border-radius: var(--radius-sm);
+                color: var(--text-primary);
+                font-size: 1rem;
+              "
+            />
+          </div>
+
+          <button type="submit" class="btn btn-primary" style="width: 100%;" id="submit-btn">
+            Create Team
+          </button>
+
+          <p id="error-message" style="margin-top: var(--space-md); text-align: center; color: var(--accent-orange); display: none;"></p>
+        </form>
+      </div>
+
+      <!-- Success Section (hidden initially) -->
+      <div id="success-section" style="display: none;">
+        <div style="text-align: center; margin-bottom: var(--space-xl);">
+          <div style="
+            width: 64px;
+            height: 64px;
+            margin: 0 auto var(--space-lg);
+            background: var(--accent-green);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2rem;
+          ">
+            ✓
+          </div>
+          <h1 style="font-size: 1.5rem; margin-bottom: var(--space-sm);">Team Created!</h1>
+          <p class="text-secondary">
+            Save these credentials now — they are only shown once.
+          </p>
+        </div>
+
+        <div class="card gg-bracket" style="margin-bottom: var(--space-lg);">
+          <div style="margin-bottom: var(--space-lg);">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-sm);">
+              <label style="font-weight: 500; font-size: 0.875rem;">Join Code</label>
+              <button type="button" class="copy-btn" data-target="team-token" style="
+                background: none;
+                border: 1px solid var(--border-default);
+                color: var(--text-secondary);
+                padding: 4px 8px;
+                border-radius: var(--radius-sm);
+                font-size: 0.75rem;
+                cursor: pointer;
+              ">
+                Copy
+              </button>
+            </div>
+            <input
+              type="text"
+              id="team-token"
+              readonly
+              style="
+                width: 100%;
+                padding: var(--space-sm) var(--space-md);
+                background: var(--bg-primary);
+                border: 1px solid var(--border-subtle);
+                border-radius: var(--radius-sm);
+                color: var(--text-primary);
+                font-family: var(--font-mono);
+                font-size: 0.875rem;
+              "
+            />
+            <p class="text-muted" style="font-size: 0.75rem; margin-top: var(--space-xs);">
+              Share this with team members so they can join.
+            </p>
+          </div>
+
+          <div>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-sm);">
+              <label style="font-weight: 500; font-size: 0.875rem;">Your User Token</label>
+              <button type="button" class="copy-btn" data-target="user-token" style="
+                background: none;
+                border: 1px solid var(--border-default);
+                color: var(--text-secondary);
+                padding: 4px 8px;
+                border-radius: var(--radius-sm);
+                font-size: 0.75rem;
+                cursor: pointer;
+              ">
+                Copy
+              </button>
+            </div>
+            <input
+              type="text"
+              id="user-token"
+              readonly
+              style="
+                width: 100%;
+                padding: var(--space-sm) var(--space-md);
+                background: var(--bg-primary);
+                border: 1px solid var(--border-subtle);
+                border-radius: var(--radius-sm);
+                color: var(--text-primary);
+                font-family: var(--font-mono);
+                font-size: 0.875rem;
+              "
+            />
+            <p class="text-muted" style="font-size: 0.75rem; margin-top: var(--space-xs);">
+              Your personal token for the Overlap tracer. Keep this private.
+            </p>
+          </div>
+        </div>
+
+        <div style="background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: var(--space-md); margin-bottom: var(--space-lg); font-size: 0.8rem; color: var(--text-secondary); line-height: 1.6;">
+          This token is shown only once. If you lose it, you can regenerate a new one from your <strong>Account</strong> page, or run <code style="background: var(--bg-elevated); padding: 2px 5px; border-radius: 3px;">overlap login</code> from any machine where you've joined the team to access the dashboard without your token.
+        </div>
+
+        <div style="background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: var(--space-lg); margin-bottom: var(--space-lg);">
+          <h3 style="font-size: 1rem; margin-bottom: var(--space-md);">Next Steps</h3>
+          <ol style="padding-left: var(--space-lg); color: var(--text-secondary); font-size: 0.875rem; line-height: 2.4;">
+            <li style="margin-bottom: var(--space-sm);">
+              Install the tracer:
+              <div style="font-size: 0.7rem; color: var(--text-muted); margin-top: 4px;">macOS / Linux</div>
+              <span class="cmd-block" data-cmd="curl -fsSL https://overlap.dev/install.sh | sh" style="display: flex; align-items: center; gap: var(--space-sm); background: var(--bg-elevated); padding: 4px 8px; border-radius: 3px; margin-top: 2px; cursor: pointer;" title="Click to copy">
+                <code style="flex: 1; font-size: 0.8rem;">curl -fsSL https://overlap.dev/install.sh | sh</code>
+                <span class="cmd-copy-icon" style="color: var(--text-muted); font-size: 0.7rem; white-space: nowrap;">Copy</span>
+              </span>
+              <div style="font-size: 0.7rem; color: var(--text-muted); margin-top: 4px;">Windows (PowerShell)</div>
+              <span class="cmd-block" data-cmd="irm https://overlap.dev/install.ps1 | iex" style="display: flex; align-items: center; gap: var(--space-sm); background: var(--bg-elevated); padding: 4px 8px; border-radius: 3px; margin-top: 2px; cursor: pointer;" title="Click to copy">
+                <code style="flex: 1; font-size: 0.8rem;">irm https://overlap.dev/install.ps1 | iex</code>
+                <span class="cmd-copy-icon" style="color: var(--text-muted); font-size: 0.7rem; white-space: nowrap;">Copy</span>
+              </span>
+            </li>
+            <li style="margin-bottom: var(--space-sm);">
+              Join this team:
+              <span class="cmd-block" id="join-cmd-block" style="display: flex; align-items: center; gap: var(--space-sm); background: var(--bg-elevated); padding: 4px 8px; border-radius: 3px; margin-top: 4px; cursor: pointer;" title="Click to copy">
+                <code style="flex: 1; font-size: 0.8rem;">overlap join <span id="origin-url"></span></code>
+                <span class="cmd-copy-icon" style="color: var(--text-muted); font-size: 0.7rem; white-space: nowrap;">Copy</span>
+              </span>
+            </li>
+            <li>Share the join code with your team</li>
+          </ol>
+        </div>
+
+        <a href="/gg/settings/repos" class="btn btn-primary" style="width: 100%; text-align: center; text-decoration: none;">
+          Set Up Repos
+        </a>
+      </div>
+    </div>
+  </main>
+</GGLayout>
+
+<script>
+  // Populate origin URL (can't use window in Astro template - it's server-rendered)
+  const originEl = document.getElementById('origin-url');
+  if (originEl) originEl.textContent = window.location.origin;
+
+  const form = document.getElementById('setup-form') as HTMLFormElement;
+  const setupSection = document.getElementById('setup-section') as HTMLDivElement;
+  const successSection = document.getElementById('success-section') as HTMLDivElement;
+  const errorMessage = document.getElementById('error-message') as HTMLParagraphElement;
+  const submitBtn = document.getElementById('submit-btn') as HTMLButtonElement;
+  const teamTokenInput = document.getElementById('team-token') as HTMLInputElement;
+  const userTokenInput = document.getElementById('user-token') as HTMLInputElement;
+
+  // Initialize database and check setup status on page load
+  async function init() {
+    try {
+      const response = await fetch('/api/v1/setup');
+      const result = await response.json() as { data: { initialized: boolean; team_name: string | null } };
+
+      if (result.data.initialized) {
+        // Already set up, redirect to home
+        window.location.href = '/gg';
+        return;
+      }
+
+      // Database is ready, show the form
+      if (form) {
+        form.style.opacity = '1';
+      }
+    } catch (error) {
+      console.error('Failed to initialize:', error);
+      // Show form anyway, POST will handle migration
+      if (form) {
+        form.style.opacity = '1';
+      }
+    }
+  }
+
+  // Start with form slightly dimmed, then show when ready
+  if (form) {
+    form.style.opacity = '0.5';
+    form.style.transition = 'opacity 0.3s';
+  }
+  init();
+
+  form?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+
+    // Disable submit button
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Creating...';
+    errorMessage.style.display = 'none';
+
+    const formData = new FormData(form);
+    const data = {
+      team_name: formData.get('team_name'),
+      admin_name: formData.get('admin_name'),
+      admin_email: formData.get('admin_email') || null,
+    };
+
+    try {
+      const response = await fetch('/api/v1/setup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json() as { error?: string };
+        throw new Error(errorData.error || 'Setup failed');
+      }
+
+      const result = await response.json() as {
+        data: {
+          team_join_code: string;
+          user_token: string;
+          user_id: string;
+        }
+      };
+
+      // Show tokens in the success section
+      // (Session cookie is set server-side via Set-Cookie header in the response)
+      teamTokenInput.value = result.data.team_join_code;
+      userTokenInput.value = result.data.user_token;
+
+      // Hide form, show success
+      setupSection.style.display = 'none';
+      successSection.style.display = 'block';
+
+    } catch (error) {
+      errorMessage.textContent = error instanceof Error ? error.message : 'Setup failed';
+      errorMessage.style.display = 'block';
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Create Team';
+    }
+  });
+
+  // Command block click-to-copy handlers
+  document.querySelectorAll('.cmd-block').forEach((block) => {
+    block.addEventListener('click', async () => {
+      const cmd = (block as HTMLElement).dataset.cmd || (block.querySelector('code') as HTMLElement)?.textContent || '';
+      const icon = block.querySelector('.cmd-copy-icon') as HTMLElement;
+      try {
+        await navigator.clipboard.writeText(cmd);
+        if (icon) { icon.textContent = 'Copied!'; setTimeout(() => { icon.textContent = 'Copy'; }, 2000); }
+      } catch {
+        if (icon) { icon.textContent = 'Copied!'; setTimeout(() => { icon.textContent = 'Copy'; }, 2000); }
+      }
+    });
+  });
+
+  // Set the join command data-cmd attribute dynamically
+  const joinBlock = document.getElementById('join-cmd-block');
+  if (joinBlock) joinBlock.dataset.cmd = `overlap join ${window.location.origin}`;
+
+  // Copy button handlers
+  document.querySelectorAll('.copy-btn').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      const targetId = (btn as HTMLButtonElement).dataset.target;
+      const input = document.getElementById(targetId!) as HTMLInputElement;
+
+      try {
+        await navigator.clipboard.writeText(input.value);
+        const originalText = btn.textContent;
+        btn.textContent = 'Copied!';
+        setTimeout(() => {
+          btn.textContent = originalText;
+        }, 2000);
+      } catch (err) {
+        // Fallback for older browsers
+        input.select();
+        document.execCommand('copy');
+        btn.textContent = 'Copied!';
+        setTimeout(() => {
+          btn.textContent = 'Copy';
+        }, 2000);
+      }
+    });
+  });
+</script>

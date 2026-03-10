@@ -1,0 +1,484 @@
+---
+import GGLayout from '@layouts/GGLayout.astro';
+import { GGHeader } from '@components/GGHeader';
+---
+
+<GGLayout title="Team Members">
+  <GGHeader userName="Dashboard" activePage="config" client:load />
+
+  <main class="container" style="padding-top: var(--space-xl); padding-bottom: var(--space-xl);">
+    <div style="width: 100%; max-width: 700px; margin: 0 auto;">
+      <div style="display: flex; align-items: center; gap: var(--space-md); margin-bottom: var(--space-xl);">
+        <a href="/gg/settings" class="gg-back-link">← SYS.CFG // MENU</a>
+        <h1 class="gg-page-title">Team Members</h1>
+      </div>
+
+      <div class="gg-sys-label" style="margin-bottom: var(--space-md);">SYS.CFG // MEMBERS</div>
+
+      <!-- Add Member Form (admin only, shown after load) -->
+      <div id="add-member-section" style="display: none;">
+        <div class="card" style="margin-bottom: var(--space-lg);">
+          <h3 style="font-size: 0.875rem; font-weight: 500; margin-bottom: var(--space-md);">Add Member</h3>
+          <form id="add-member-form">
+            <div style="display: flex; gap: var(--space-sm); align-items: flex-end;">
+              <div style="flex: 1;">
+                <label for="member-name" style="display: block; font-size: 0.75rem; color: var(--text-secondary); margin-bottom: var(--space-xs);">
+                  Display name
+                </label>
+                <input
+                  type="text"
+                  id="member-name"
+                  name="display_name"
+                  required
+                  placeholder="e.g. Jane Developer"
+                  style="
+                    width: 100%;
+                    padding: var(--space-sm) var(--space-md);
+                    background: var(--bg-elevated);
+                    border: 1px solid var(--border-default);
+                    border-radius: var(--radius-sm);
+                    color: var(--text-primary);
+                    font-size: 0.875rem;
+                  "
+                />
+              </div>
+              <button type="submit" class="btn btn-primary" id="add-member-btn" style="white-space: nowrap;">
+                Add
+              </button>
+            </div>
+            <p id="add-member-error" style="margin-top: var(--space-sm); font-size: 0.8rem; color: var(--accent-orange); display: none;"></p>
+          </form>
+        </div>
+
+        <!-- New Member Token (shown after creation) -->
+        <div id="new-member-token-section" style="display: none; margin-bottom: var(--space-lg);">
+          <div class="card" style="border-color: var(--accent-green);">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-sm);">
+              <h3 style="font-size: 0.875rem; font-weight: 500;">
+                Token for <span id="new-member-name"></span>
+              </h3>
+              <button type="button" id="copy-new-token" style="
+                background: none;
+                border: 1px solid var(--border-default);
+                color: var(--text-secondary);
+                padding: 4px 8px;
+                border-radius: var(--radius-sm);
+                font-size: 0.75rem;
+                cursor: pointer;
+              ">Copy</button>
+            </div>
+            <input
+              type="text"
+              id="new-member-token"
+              readonly
+              style="
+                width: 100%;
+                padding: var(--space-sm) var(--space-md);
+                background: var(--bg-primary);
+                border: 1px solid var(--border-subtle);
+                border-radius: var(--radius-sm);
+                color: var(--text-primary);
+                font-family: var(--font-mono);
+                font-size: 0.875rem;
+              "
+            />
+            <p class="text-muted" style="font-size: 0.75rem; margin-top: var(--space-xs);">
+              Share this token with the new member. They'll use it with <code style="background: var(--bg-elevated); padding: 1px 4px; border-radius: 3px;">overlap join</code>. This is the only time it's shown.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div id="users-list">
+        <div class="loading-state">Loading...</div>
+      </div>
+
+      <div id="toast" class="toast"></div>
+    </div>
+  </main>
+</GGLayout>
+
+<style is:global>
+  .loading-state {
+    color: var(--text-secondary);
+    padding: var(--space-lg);
+    text-align: center;
+  }
+
+  .section-header {
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-bottom: 12px;
+    padding-left: 4px;
+  }
+
+  .users-section {
+    margin-bottom: 32px;
+  }
+
+  .user-card {
+    background: var(--bg-surface);
+    border: 1px solid var(--border-default);
+    border-radius: 8px;
+    padding: 16px 20px;
+    margin-bottom: 8px;
+  }
+
+  .user-card-inner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+  }
+
+  .user-details {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .user-name {
+    font-weight: 500;
+    font-size: 0.95rem;
+    color: var(--text-primary);
+    margin-bottom: 2px;
+  }
+
+  .user-email {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .user-role { flex-shrink: 0; }
+
+  .badge {
+    display: inline-block;
+    font-size: 0.7rem;
+    font-weight: 500;
+    padding: 4px 10px;
+    border-radius: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+  }
+
+  .badge-admin {
+    background: rgba(255, 152, 0, 0.15);
+    color: var(--accent-orange);
+    border: 1px solid rgba(255, 152, 0, 0.3);
+  }
+
+  .badge-member {
+    background: var(--bg-elevated);
+    color: var(--text-secondary);
+    border: 1px solid var(--border-default);
+  }
+
+  .user-actions { display: flex; gap: 8px; flex-shrink: 0; }
+
+  .btn-action {
+    font-size: 0.75rem;
+    font-weight: 500;
+    padding: 6px 12px;
+    border-radius: 4px;
+    border: 1px solid var(--border-default);
+    background: var(--bg-elevated);
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+
+  .btn-action:hover {
+    background: var(--bg-surface);
+    border-color: var(--text-muted);
+    color: var(--text-primary);
+  }
+
+  .btn-danger { color: #e57373; border-color: rgba(229, 115, 115, 0.3); }
+  .btn-danger:hover { background: rgba(229, 115, 115, 0.1); border-color: #e57373; color: #ef5350; }
+
+  .info-box {
+    margin-top: 24px;
+    padding: 16px;
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-default);
+    border-radius: 8px;
+    text-align: center;
+  }
+
+  .info-box p { font-size: 0.85rem; color: var(--text-secondary); margin: 0; line-height: 1.5; }
+
+  .toast {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--bg-elevated);
+    padding: 12px 24px;
+    border-radius: 8px;
+    font-size: 0.875rem;
+    display: none;
+    z-index: 1000;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  }
+
+  .toast.success { border: 1px solid var(--accent-green); color: var(--accent-green); }
+  .toast.error { border: 1px solid var(--accent-orange); color: var(--accent-orange); }
+
+  @media (max-width: 500px) {
+    .user-card-inner { flex-wrap: wrap; }
+    .user-details { width: 100%; margin-bottom: 12px; }
+    .user-actions { width: 100%; justify-content: flex-start; }
+  }
+</style>
+
+<script>
+  type User = {
+    id: string;
+    name: string;
+    email: string | null;
+    role: 'admin' | 'member';
+    last_active_at: string | null;
+    created_at: string;
+  };
+
+  const toast = document.getElementById('toast') as HTMLDivElement;
+  let isCurrentUserAdmin = false;
+  let currentUserId = '';
+  let teamJoinCode = '';
+
+  function showToast(message: string, isError = true) {
+    toast.textContent = message;
+    toast.className = `toast ${isError ? 'error' : 'success'}`;
+    toast.style.display = 'block';
+    setTimeout(() => { toast.style.display = 'none'; }, 4000);
+  }
+
+  function escapeHtml(text: string): string {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+  }
+
+  // Fetch team join code for adding members
+  async function fetchJoinCode() {
+    try {
+      const response = await fetch('/api/v1/admin/team');
+      if (response.ok) {
+        const result = await response.json() as { data?: { team_join_code: string } };
+        teamJoinCode = result.data?.team_join_code || '';
+      }
+    } catch { /* not admin */ }
+  }
+
+  // Add member form
+  const addForm = document.getElementById('add-member-form') as HTMLFormElement;
+  const addBtn = document.getElementById('add-member-btn') as HTMLButtonElement;
+  const addError = document.getElementById('add-member-error') as HTMLParagraphElement;
+  const tokenSection = document.getElementById('new-member-token-section') as HTMLDivElement;
+  const tokenInput = document.getElementById('new-member-token') as HTMLInputElement;
+  const memberNameSpan = document.getElementById('new-member-name') as HTMLSpanElement;
+  const copyBtn = document.getElementById('copy-new-token') as HTMLButtonElement;
+
+  addForm?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    addError.style.display = 'none';
+    tokenSection.style.display = 'none';
+    addBtn.disabled = true;
+    addBtn.textContent = 'Adding...';
+
+    const formData = new FormData(addForm);
+    const displayName = (formData.get('display_name') as string).trim();
+
+    try {
+      const response = await fetch('/api/v1/join', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          team_join_code: teamJoinCode,
+          display_name: displayName,
+        }),
+      });
+
+      const result = await response.json() as { data?: { user_token: string }; error?: string };
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to add member');
+      }
+
+      memberNameSpan.textContent = displayName;
+      tokenInput.value = result.data?.user_token || '';
+      tokenSection.style.display = 'block';
+      addForm.reset();
+      loadUsers();
+    } catch (error) {
+      addError.textContent = error instanceof Error ? error.message : 'Failed to add member';
+      addError.style.display = 'block';
+    } finally {
+      addBtn.disabled = false;
+      addBtn.textContent = 'Add';
+    }
+  });
+
+  copyBtn?.addEventListener('click', async () => {
+    try {
+      await navigator.clipboard.writeText(tokenInput.value);
+      copyBtn.textContent = 'Copied!';
+      setTimeout(() => { copyBtn.textContent = 'Copy'; }, 2000);
+    } catch {
+      tokenInput.select();
+      document.execCommand('copy');
+      copyBtn.textContent = 'Copied!';
+      setTimeout(() => { copyBtn.textContent = 'Copy'; }, 2000);
+    }
+  });
+
+  async function loadUsers() {
+    const container = document.getElementById('users-list') as HTMLDivElement;
+
+    try {
+      const response = await fetch('/api/v1/admin/users');
+      const result = await response.json() as {
+        data?: { users: User[], is_admin: boolean, current_user_id?: string },
+        error?: string
+      };
+
+      if (!response.ok) throw new Error(result.error || 'Failed to load users');
+
+      const users = result.data?.users || [];
+      isCurrentUserAdmin = result.data?.is_admin || false;
+      currentUserId = result.data?.current_user_id || '';
+
+      // Show add member form for admins
+      if (isCurrentUserAdmin) {
+        const addSection = document.getElementById('add-member-section');
+        if (addSection) addSection.style.display = 'block';
+      }
+
+      if (users.length === 0) {
+        container.innerHTML = '<div class="loading-state">No team members yet.</div>';
+        return;
+      }
+
+      const admins = users.filter(u => u.role === 'admin').sort((a, b) => a.name.localeCompare(b.name));
+      const members = users.filter(u => u.role === 'member').sort((a, b) => a.name.localeCompare(b.name));
+
+      let html = '';
+
+      if (admins.length > 0) {
+        html += `<div class="users-section">
+          <div class="section-header">Admins (${admins.length})</div>
+          ${admins.map(user => renderUserCard(user)).join('')}
+        </div>`;
+      }
+
+      if (members.length > 0) {
+        html += `<div class="users-section">
+          <div class="section-header">Members (${members.length})</div>
+          ${members.map(user => renderUserCard(user)).join('')}
+        </div>`;
+      }
+
+      html += `<div class="info-box">
+        <p>Members can also self-register via the <a href="/gg/join" style="color: var(--accent-blue);">/join</a> page using the team join code.</p>
+      </div>`;
+
+      container.innerHTML = html;
+    } catch (error) {
+      container.innerHTML = `<div class="loading-state" style="color: var(--accent-orange);">${error instanceof Error ? error.message : 'Failed to load users'}</div>`;
+    }
+  }
+
+  function renderUserCard(user: User): string {
+    const isSelf = user.id === currentUserId;
+    const safeName = escapeHtml(user.name);
+    const safeEmail = user.email ? escapeHtml(user.email) : 'No email';
+
+    let actionsHtml = '';
+    if (isCurrentUserAdmin) {
+      const buttons: string[] = [];
+      buttons.push(`<button class="btn-action" onclick="regenerateToken('${user.id}', '${safeName}')">Regenerate Token</button>`);
+      if (user.role === 'member') {
+        buttons.push(`<button class="btn-action" onclick="promoteUser('${user.id}', '${safeName}')">Promote</button>`);
+      } else if (!isSelf) {
+        buttons.push(`<button class="btn-action" onclick="demoteUser('${user.id}', '${safeName}')">Demote</button>`);
+      }
+      if (!isSelf) {
+        buttons.push(`<button class="btn-action btn-danger" onclick="removeUser('${user.id}', '${safeName}')">Remove</button>`);
+      }
+      if (buttons.length > 0) {
+        actionsHtml = `<div class="user-actions">${buttons.join('')}</div>`;
+      }
+    }
+
+    return `<div class="user-card">
+      <div class="user-card-inner">
+        <div class="user-details">
+          <div class="user-name">${safeName}${isSelf ? ' (you)' : ''}</div>
+          <div class="user-email">${safeEmail}</div>
+        </div>
+        <div class="user-role">
+          <span class="badge badge-${user.role}">${user.role}</span>
+        </div>
+        ${actionsHtml}
+      </div>
+    </div>`;
+  }
+
+  async function promoteUser(userId: string, userName: string) {
+    if (!confirm(`Promote ${userName} to admin?`)) return;
+    try {
+      const r = await fetch(`/api/v1/admin/users/${userId}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ role: 'admin' }) });
+      if (!r.ok) { const d = await r.json() as { error?: string }; throw new Error(d.error || 'Failed'); }
+      showToast(`${userName} promoted to admin`, false);
+      loadUsers();
+    } catch (e) { showToast(e instanceof Error ? e.message : 'Failed'); }
+  }
+
+  async function demoteUser(userId: string, userName: string) {
+    if (!confirm(`Demote ${userName} to member?`)) return;
+    try {
+      const r = await fetch(`/api/v1/admin/users/${userId}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ role: 'member' }) });
+      if (!r.ok) { const d = await r.json() as { error?: string }; throw new Error(d.error || 'Failed'); }
+      showToast(`${userName} demoted to member`, false);
+      loadUsers();
+    } catch (e) { showToast(e instanceof Error ? e.message : 'Failed'); }
+  }
+
+  async function removeUser(userId: string, userName: string) {
+    if (!confirm(`Remove ${userName} from the team?\n\nThey will need to rejoin using the team invite link.`)) return;
+    try {
+      const r = await fetch(`/api/v1/admin/users/${userId}`, { method: 'DELETE' });
+      if (!r.ok) { const d = await r.json() as { error?: string }; throw new Error(d.error || 'Failed'); }
+      showToast(`${userName} removed from team`, false);
+      loadUsers();
+    } catch (e) { showToast(e instanceof Error ? e.message : 'Failed'); }
+  }
+
+  async function regenerateToken(userId: string, userName: string) {
+    if (!confirm(`Regenerate token for ${userName}?\n\nTheir current token will stop working immediately. You'll need to share the new token with them.`)) return;
+    try {
+      const r = await fetch(`/api/v1/admin/users/${userId}/rotate-token`, { method: 'POST' });
+      const result = await r.json() as { data?: { user_token: string }; error?: string };
+      if (!r.ok) throw new Error(result.error || 'Failed');
+
+      // Show the new token in the existing token display section
+      memberNameSpan.textContent = userName;
+      tokenInput.value = result.data?.user_token || '';
+      tokenSection.style.display = 'block';
+      showToast(`Token regenerated for ${userName}`, false);
+    } catch (e) { showToast(e instanceof Error ? e.message : 'Failed'); }
+  }
+
+  (window as any).regenerateToken = regenerateToken;
+  (window as any).promoteUser = promoteUser;
+  (window as any).demoteUser = demoteUser;
+  (window as any).removeUser = removeUser;
+
+  fetchJoinCode();
+  loadUsers();
+</script>

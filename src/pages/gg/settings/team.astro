@@ -1,0 +1,237 @@
+---
+import GGLayout from '@layouts/GGLayout.astro';
+import { GGHeader } from '@components/GGHeader';
+---
+
+<GGLayout title="Team Settings">
+  <GGHeader userName="Dashboard" activePage="config" client:load />
+
+  <main class="container" style="padding-top: var(--space-xl); padding-bottom: var(--space-xl);">
+    <div style="width: 100%; max-width: 600px; margin: 0 auto;">
+      <div style="display: flex; align-items: center; gap: var(--space-md); margin-bottom: var(--space-xl);">
+        <a href="/gg/settings" class="gg-back-link">← SYS.CFG // MENU</a>
+        <h1 class="gg-page-title">Team Settings</h1>
+      </div>
+
+      <div class="gg-sys-label" style="margin-bottom: var(--space-md);">SYS.CFG // TEAM</div>
+
+      <div id="loading-state" class="card" style="text-align: center; padding: var(--space-xl);">
+        <img src="/loading.gif" alt="Loading" width="48" height="48" style="opacity: 0.8;" />
+      </div>
+
+      <div id="error-state" class="card" style="display: none; text-align: center; padding: var(--space-xl);">
+        <p style="color: var(--accent-orange); margin-bottom: var(--space-md);" id="load-error-message">Failed to load settings</p>
+        <a href="/gg/settings" class="btn btn-secondary">Back to Settings</a>
+      </div>
+
+      <div id="form-container" style="display: none;">
+        <!-- Team Join Code Section -->
+        <div class="card" style="margin-bottom: var(--space-lg);">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-sm);">
+            <label style="font-weight: 500;">Team Join Code</label>
+            <button type="button" id="copy-code-btn" style="
+              background: none;
+              border: 1px solid var(--border-default);
+              color: var(--text-secondary);
+              padding: 4px 8px;
+              border-radius: var(--radius-sm);
+              font-size: 0.75rem;
+              cursor: pointer;
+            ">
+              Copy
+            </button>
+          </div>
+          <input
+            type="text"
+            id="team-join-code"
+            readonly
+            style="
+              width: 100%;
+              padding: var(--space-sm) var(--space-md);
+              background: var(--bg-primary);
+              border: 1px solid var(--border-subtle);
+              border-radius: var(--radius-sm);
+              color: var(--text-primary);
+              font-family: var(--font-mono);
+              font-size: 0.875rem;
+            "
+          />
+          <p class="text-muted" style="font-size: 0.75rem; margin-top: var(--space-xs);">
+            Share this with team members so they can join via /join page.
+          </p>
+        </div>
+
+        <!-- Settings Form -->
+        <form id="team-form" class="card">
+          <div style="margin-bottom: var(--space-lg);">
+            <label
+              for="team-name"
+              style="display: block; margin-bottom: var(--space-sm); font-weight: 500;"
+            >
+              Team Name
+            </label>
+            <input
+              type="text"
+              id="team-name"
+              name="team_name"
+              placeholder="My Team"
+              style="
+                width: 100%;
+                padding: var(--space-sm) var(--space-md);
+                background: var(--bg-elevated);
+                border: 1px solid var(--border-default);
+                border-radius: var(--radius-sm);
+                color: var(--text-primary);
+                font-size: 1rem;
+              "
+            />
+          </div>
+
+          <div style="margin-bottom: var(--space-lg);">
+            <label
+              for="stale-timeout"
+              style="display: block; margin-bottom: var(--space-sm); font-weight: 500;"
+            >
+              Stale Session Timeout (hours)
+            </label>
+            <input
+              type="number"
+              id="stale-timeout"
+              name="stale_timeout_hours"
+              min="1"
+              max="168"
+              value="8"
+              style="
+                width: 100%;
+                padding: var(--space-sm) var(--space-md);
+                background: var(--bg-elevated);
+                border: 1px solid var(--border-default);
+                border-radius: var(--radius-sm);
+                color: var(--text-primary);
+                font-size: 1rem;
+              "
+            />
+            <p class="text-muted" style="font-size: 0.75rem; margin-top: var(--space-xs);">
+              Sessions without activity will be marked stale after this time
+            </p>
+          </div>
+
+          <button type="submit" class="btn btn-primary" style="width: 100%;">
+            Save Changes
+          </button>
+
+          <p id="status-message" style="margin-top: var(--space-md); text-align: center; display: none;"></p>
+        </form>
+      </div>
+    </div>
+  </main>
+</GGLayout>
+
+<script>
+  type TeamSettings = {
+    team_name: string;
+    team_join_code: string;
+    stale_timeout_hours: number;
+    llm_provider: string | null;
+    llm_model: string | null;
+    has_llm_api_key: boolean;
+  };
+
+  const loadingState = document.getElementById('loading-state') as HTMLDivElement;
+  const errorState = document.getElementById('error-state') as HTMLDivElement;
+  const loadErrorMessage = document.getElementById('load-error-message') as HTMLParagraphElement;
+  const formContainer = document.getElementById('form-container') as HTMLDivElement;
+  const form = document.getElementById('team-form') as HTMLFormElement;
+  const statusMessage = document.getElementById('status-message') as HTMLParagraphElement;
+  const teamJoinCodeInput = document.getElementById('team-join-code') as HTMLInputElement;
+  const teamNameInput = document.getElementById('team-name') as HTMLInputElement;
+  const staleTimeoutInput = document.getElementById('stale-timeout') as HTMLInputElement;
+  const copyCodeBtn = document.getElementById('copy-code-btn') as HTMLButtonElement;
+
+  // Load existing settings
+  async function loadSettings() {
+    try {
+      const response = await fetch('/api/v1/admin/team');
+      const result = await response.json() as { data?: TeamSettings, error?: string };
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to load settings');
+      }
+
+      const settings = result.data!;
+
+      // Populate form
+      teamJoinCodeInput.value = settings.team_join_code;
+      teamNameInput.value = settings.team_name;
+      staleTimeoutInput.value = String(settings.stale_timeout_hours);
+
+      // Show form
+      loadingState.style.display = 'none';
+      formContainer.style.display = 'block';
+    } catch (error) {
+      loadingState.style.display = 'none';
+      loadErrorMessage.textContent = error instanceof Error ? error.message : 'Failed to load settings';
+      errorState.style.display = 'block';
+    }
+  }
+
+  loadSettings();
+
+  // Copy join code handler
+  copyCodeBtn?.addEventListener('click', async () => {
+    try {
+      await navigator.clipboard.writeText(teamJoinCodeInput.value);
+      copyCodeBtn.textContent = 'Copied!';
+      setTimeout(() => {
+        copyCodeBtn.textContent = 'Copy';
+      }, 2000);
+    } catch (err) {
+      teamJoinCodeInput.select();
+      document.execCommand('copy');
+      copyCodeBtn.textContent = 'Copied!';
+      setTimeout(() => {
+        copyCodeBtn.textContent = 'Copy';
+      }, 2000);
+    }
+  });
+
+  // Form submit handler
+  form?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+
+    const formData = new FormData(form);
+    const data: Record<string, unknown> = {};
+
+    const name = formData.get('team_name');
+    if (name) data.team_name = name;
+
+    const staleTimeout = formData.get('stale_timeout_hours');
+    if (staleTimeout) data.stale_timeout_hours = parseInt(staleTimeout as string, 10);
+
+    try {
+      const response = await fetch('/api/v1/admin/team', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+
+      const result = await response.json() as { data?: { message: string }, error?: string };
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to save');
+      }
+
+      statusMessage.textContent = 'Settings saved successfully!';
+      statusMessage.style.color = 'var(--accent-green)';
+      statusMessage.style.display = 'block';
+
+      setTimeout(() => {
+        statusMessage.style.display = 'none';
+      }, 3000);
+    } catch (error) {
+      statusMessage.textContent = error instanceof Error ? error.message : 'Failed to save';
+      statusMessage.style.color = 'var(--accent-orange)';
+      statusMessage.style.display = 'block';
+    }
+  });
+</script>
