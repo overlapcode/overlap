@@ -1,0 +1,26 @@
+---
+import GGLayout from '@layouts/GGLayout.astro';
+import { GGHeader } from '@components/GGHeader';
+import { Search as SearchView } from '@components/Search';
+import { authenticateWebSession } from '@lib/auth/middleware';
+import { ensureMigrated } from '@lib/db/migrate';
+
+const db = Astro.locals.runtime.env.DB;
+
+const authResult = await authenticateWebSession(Astro.request, db);
+if (!authResult.success) {
+  return Astro.redirect('/');
+}
+
+await ensureMigrated(db);
+
+const teamConfig = await import('@lib/db/queries').then(m => m.getTeamConfig(db));
+---
+
+<GGLayout title="Search">
+  <GGHeader teamName={teamConfig?.team_name} userName={authResult.context.member.display_name} activePage="search" client:load />
+  <main style="padding: var(--space-lg); max-width: 800px; margin: 0 auto;">
+    <div class="gg-sys-label" style="margin-bottom: var(--space-sm);">SYS.06 // SEARCH</div>
+    <SearchView client:load />
+  </main>
+</GGLayout>

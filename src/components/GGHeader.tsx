@@ -6,6 +6,7 @@ type GGHeaderProps = {
 
 export function GGHeader({ teamName, userName, activePage }: GGHeaderProps) {
   const navLinks = [
+    { href: '/search', label: 'Search' },
     { href: '/stats', label: 'Stats' },
     { href: '/insights', label: 'Insights' },
     { href: '/overlaps', label: 'Overlaps' },
