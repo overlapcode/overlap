@@ -51,6 +51,9 @@ jobs:
       - name: Sync with upstream
         if: steps.check.outputs.has_updates == 'true'
         run: |
+          # Save workflow files (GITHUB_TOKEN can't push workflow changes)
+          cp -r .github/workflows/ /tmp/workflows-backup/
+
           # Try normal merge first
           if git merge upstream/main --no-edit -m "Sync with upstream overlapcode/overlap"; then
             echo "Merge successful"
@@ -61,6 +64,11 @@ jobs:
             # Reset to upstream - safe because user data is in Cloudflare D1, not git
             git reset --hard upstream/main
           fi
+
+          # Restore workflow files so push doesn't touch .github/workflows/
+          cp -r /tmp/workflows-backup/* .github/workflows/
+          git add .github/workflows/
+          git diff --staged --quiet || git commit -m "Preserve fork workflows"
 
       - name: Push changes
         if: steps.check.outputs.has_updates == 'true'
