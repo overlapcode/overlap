@@ -59,6 +59,13 @@ export function Header({ teamName, userName }: HeaderProps) {
             {userName}
           </a>
           <a
+            href="/gg/search"
+            className="btn btn-secondary"
+            style={{ fontSize: '0.75rem', padding: 'var(--space-xs) var(--space-sm)' }}
+          >
+            Search
+          </a>
+          <a
             href="/gg/stats"
             className="btn btn-secondary"
             style={{ fontSize: '0.75rem', padding: 'var(--space-xs) var(--space-sm)' }}

@@ -11,7 +11,7 @@
  *   4. Periodically refine block name/description as more context arrives
  */
 
-import type { D1Database } from '@cloudflare/workers-types';
+import type { D1Database, D1PreparedStatement } from '@cloudflare/workers-types';
 import { getTeamConfig } from '@lib/db/queries';
 import { decrypt } from '@lib/utils/crypto';
 import type { ActivityBlock } from '@lib/db/types';
@@ -220,23 +220,29 @@ export async function classifyActivity(
       const raw = await provider.call(prompt, apiKey, teamConfig.llm_model ?? undefined);
       const result = parseJSON<SeedResult>(raw);
 
-      await db
-        .prepare(
-          `INSERT INTO activity_blocks (session_id, user_id, repo_name, block_index, started_at, ended_at, name, description, task_type, confidence)
-           VALUES (?, ?, ?, 0, ?, ?, ?, ?, ?, ?)`
-        )
-        .bind(
-          sessionId,
-          userId,
-          repoName,
-          promptTimestamp,
-          promptTimestamp,
-          result?.name ?? promptText.slice(0, 100),
-          result?.description ?? null,
-          result?.task_type ?? null,
-          result ? 0.8 : 0.3,
-        )
-        .run();
+      const blockName = result?.name ?? promptText.slice(0, 100);
+      const blockDesc = result?.description ?? null;
+      const blockStatements = [
+        db
+          .prepare(
+            `INSERT INTO activity_blocks (session_id, user_id, repo_name, block_index, started_at, ended_at, name, description, task_type, confidence)
+             VALUES (?, ?, ?, 0, ?, ?, ?, ?, ?, ?)`
+          )
+          .bind(sessionId, userId, repoName, promptTimestamp, promptTimestamp, blockName, blockDesc, result?.task_type ?? null, result ? 0.8 : 0.3),
+      ];
+      // Index activity block in FTS5
+      blockStatements.push(
+        db.prepare(
+          `INSERT INTO search_index (session_id, user_id, repo_name, source_type, source_id, timestamp, content) VALUES (?, ?, ?, 'activity_block', ?, ?, ?)`
+        ).bind(sessionId, userId, repoName, `${sessionId}:ab:0`, promptTimestamp, `${blockName}${blockDesc ? ' — ' + blockDesc : ''}`)
+      );
+      try { await db.batch(blockStatements); } catch (e) {
+        // FTS5 may not exist yet — fall back to just the block insert
+        const msg = e instanceof Error ? e.message : String(e);
+        if (msg.includes('no such table')) {
+          await blockStatements[0].run();
+        } else { throw e; }
+      }
       return;
     }
 
@@ -285,28 +291,26 @@ export async function classifyActivity(
         .run();
     } else {
       // New activity — close current block, create new one
-      await db.batch([
-        db
-          .prepare(`UPDATE activity_blocks SET updated_at = datetime('now') WHERE id = ?`)
-          .bind(currentBlock.id),
-        db
-          .prepare(
-            `INSERT INTO activity_blocks (session_id, user_id, repo_name, block_index, started_at, ended_at, name, description, task_type, confidence)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-          )
-          .bind(
-            sessionId,
-            userId,
-            repoName,
-            currentBlock.block_index + 1,
-            promptTimestamp,
-            promptTimestamp,
-            result.name,
-            result.description,
-            result.task_type,
-            0.8,
-          ),
-      ]);
+      const newBlockIndex = currentBlock.block_index + 1;
+      const newBlockStmts: D1PreparedStatement[] = [
+        db.prepare(`UPDATE activity_blocks SET updated_at = datetime('now') WHERE id = ?`).bind(currentBlock.id),
+        db.prepare(
+          `INSERT INTO activity_blocks (session_id, user_id, repo_name, block_index, started_at, ended_at, name, description, task_type, confidence)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        ).bind(sessionId, userId, repoName, newBlockIndex, promptTimestamp, promptTimestamp, result.name, result.description, result.task_type, 0.8),
+      ];
+      // Index new activity block in FTS5
+      newBlockStmts.push(
+        db.prepare(
+          `INSERT INTO search_index (session_id, user_id, repo_name, source_type, source_id, timestamp, content) VALUES (?, ?, ?, 'activity_block', ?, ?, ?)`
+        ).bind(sessionId, userId, repoName, `${sessionId}:ab:${newBlockIndex}`, promptTimestamp, `${result.name}${result.description ? ' — ' + result.description : ''}`)
+      );
+      try { await db.batch(newBlockStmts); } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        if (msg.includes('no such table')) {
+          await db.batch(newBlockStmts.slice(0, 2));
+        } else { throw e; }
+      }
     }
   } catch (error) {
     // Activity classification failure should never break ingest

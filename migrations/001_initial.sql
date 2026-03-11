@@ -269,3 +269,19 @@ CREATE TABLE IF NOT EXISTS session_facets (
 
 CREATE UNIQUE INDEX IF NOT EXISTS idx_session_facets_session ON session_facets(session_id);
 CREATE INDEX IF NOT EXISTS idx_session_facets_user ON session_facets(user_id, generated_at DESC);
+
+-- SEARCH_INDEX (FTS5)
+-- Full-text search across prompts, agent responses, and activity blocks.
+-- Populated at ingest time; backfilled on migration for existing data.
+-- Note: FTS5 virtual tables do not support IF NOT EXISTS — auto-migration
+-- in migrate.ts handles idempotent creation via sqlite_master check.
+CREATE VIRTUAL TABLE search_index USING fts5(
+    session_id UNINDEXED,
+    user_id UNINDEXED,
+    repo_name UNINDEXED,
+    source_type UNINDEXED,
+    source_id UNINDEXED,
+    timestamp UNINDEXED,
+    content,
+    tokenize='porter unicode61'
+);

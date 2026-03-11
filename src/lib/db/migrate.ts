@@ -341,4 +341,86 @@ export async function ensureMigrated(db: D1Database): Promise<void> {
   } catch (error) {
     console.error('public_id backfill error:', error instanceof Error ? error.message : String(error));
   }
+
+  // ── FTS5 Search Index ────────────────────────────────────────────────
+  // Create FTS5 virtual table for full-text search across activities.
+  // FTS5 doesn't support IF NOT EXISTS, so we check first then create.
+  try {
+    // Check if search_index already exists
+    const existing = await db.prepare(
+      `SELECT name FROM sqlite_master WHERE type='table' AND name='search_index'`
+    ).first<{ name: string }>();
+
+    if (!existing) {
+      await db.prepare(`
+        CREATE VIRTUAL TABLE search_index USING fts5(
+          session_id UNINDEXED,
+          user_id UNINDEXED,
+          repo_name UNINDEXED,
+          source_type UNINDEXED,
+          source_id UNINDEXED,
+          timestamp UNINDEXED,
+          content,
+          tokenize='porter unicode61'
+        )
+      `).run();
+      console.log('Created FTS5 search_index table');
+
+      // Backfill from existing prompts (LIMIT 10000 to avoid D1 timeout)
+      const prompts = await db.prepare(
+        `SELECT id, session_id, user_id, repo_name, timestamp, prompt_text, turn_number FROM prompts WHERE prompt_text IS NOT NULL LIMIT 10000`
+      ).all<{ id: number; session_id: string; user_id: string; repo_name: string; timestamp: string; prompt_text: string; turn_number: number | null }>();
+
+      if (prompts.results.length > 0) {
+        for (let i = 0; i < prompts.results.length; i += 50) {
+          const chunk = prompts.results.slice(i, i + 50);
+          const stmts = chunk.map((p) =>
+            db.prepare(
+              `INSERT INTO search_index (session_id, user_id, repo_name, source_type, source_id, timestamp, content) VALUES (?, ?, ?, 'prompt', ?, ?, ?)`
+            ).bind(p.session_id, p.user_id, p.repo_name, `${p.session_id}:p:${p.turn_number ?? p.timestamp}`, p.timestamp, p.prompt_text)
+          );
+          await db.batch(stmts);
+        }
+        console.log(`Backfilled ${prompts.results.length} prompts into search_index`);
+      }
+
+      // Backfill from existing agent_responses (text only, not thinking, LIMIT 10000)
+      const responses = await db.prepare(
+        `SELECT id, session_id, user_id, repo_name, timestamp, response_text, turn_number FROM agent_responses WHERE response_text IS NOT NULL AND response_type = 'text' LIMIT 10000`
+      ).all<{ id: number; session_id: string; user_id: string; repo_name: string; timestamp: string; response_text: string; turn_number: number | null }>();
+
+      if (responses.results.length > 0) {
+        for (let i = 0; i < responses.results.length; i += 50) {
+          const chunk = responses.results.slice(i, i + 50);
+          const stmts = chunk.map((r) =>
+            db.prepare(
+              `INSERT INTO search_index (session_id, user_id, repo_name, source_type, source_id, timestamp, content) VALUES (?, ?, ?, 'response', ?, ?, ?)`
+            ).bind(r.session_id, r.user_id, r.repo_name, `${r.session_id}:r:${r.turn_number ?? r.timestamp}`, r.timestamp, r.response_text)
+          );
+          await db.batch(stmts);
+        }
+        console.log(`Backfilled ${responses.results.length} agent_responses into search_index`);
+      }
+
+      // Backfill from existing activity_blocks (LIMIT 10000)
+      const blocks = await db.prepare(
+        `SELECT id, session_id, user_id, repo_name, started_at, name, description, block_index FROM activity_blocks WHERE name IS NOT NULL LIMIT 10000`
+      ).all<{ id: number; session_id: string; user_id: string; repo_name: string; started_at: string; name: string; description: string | null; block_index: number }>();
+
+      if (blocks.results.length > 0) {
+        for (let i = 0; i < blocks.results.length; i += 50) {
+          const chunk = blocks.results.slice(i, i + 50);
+          const stmts = chunk.map((b) =>
+            db.prepare(
+              `INSERT INTO search_index (session_id, user_id, repo_name, source_type, source_id, timestamp, content) VALUES (?, ?, ?, 'activity_block', ?, ?, ?)`
+            ).bind(b.session_id, b.user_id, b.repo_name, `${b.session_id}:ab:${b.block_index}`, b.started_at, `${b.name}${b.description ? ' — ' + b.description : ''}`)
+          );
+          await db.batch(stmts);
+        }
+        console.log(`Backfilled ${blocks.results.length} activity_blocks into search_index`);
+      }
+    }
+  } catch (error) {
+    console.error('FTS5 search_index setup error:', error instanceof Error ? error.message : String(error));
+  }
 }

@@ -137,6 +137,7 @@ export async function POST(context: APIContext) {
   const eventCountIncrements = new Map<string, number>();
   const promptsForClassification: Array<{ sessionId: string; userId: string; repoName: string; promptText: string; timestamp: string }> = [];
   const sessionTokenUpdates = new Map<string, { input: number; output: number; cacheCreate: number; cacheRead: number }>();
+  const searchIndexStatements: D1PreparedStatement[] = [];
 
   for (const event of payload.events) {
     try {
@@ -359,6 +360,20 @@ export async function POST(context: APIContext) {
           eventCountIncrements.set(event.session_id, (eventCountIncrements.get(event.session_id) ?? 0) + 1);
           sessionsForSummary.add(event.session_id);
 
+          // Index in FTS5 search
+          if (event.prompt_text) {
+            searchIndexStatements.push(
+              db.prepare(
+                `INSERT INTO search_index (session_id, user_id, repo_name, source_type, source_id, timestamp, content)
+                 VALUES (?, ?, ?, 'prompt', ?, ?, ?)`
+              ).bind(
+                event.session_id, event.user_id, event.repo_name,
+                `${event.session_id}:p:${event.turn_number ?? event.timestamp}`,
+                event.timestamp, event.prompt_text
+              )
+            );
+          }
+
           // Collect for activity classification
           if (event.prompt_text) {
             promptsForClassification.push({
@@ -417,6 +432,20 @@ export async function POST(context: APIContext) {
           results.agent_responses_created++;
           eventCountIncrements.set(event.session_id, (eventCountIncrements.get(event.session_id) ?? 0) + 1);
           sessionsForSummary.add(event.session_id);
+
+          // Index text responses in FTS5 search (skip thinking responses)
+          if (event.response_text && (event.response_type ?? 'text') === 'text') {
+            searchIndexStatements.push(
+              db.prepare(
+                `INSERT INTO search_index (session_id, user_id, repo_name, source_type, source_id, timestamp, content)
+                 VALUES (?, ?, ?, 'response', ?, ?, ?)`
+              ).bind(
+                event.session_id, event.user_id, event.repo_name,
+                `${event.session_id}:r:${event.turn_number ?? event.timestamp}`,
+                event.timestamp, event.response_text
+              )
+            );
+          }
           break;
         }
 
@@ -467,6 +496,19 @@ export async function POST(context: APIContext) {
   // ── Phase 4: Execute all statements in one batch round-trip ─────────
   if (statements.length > 0) {
     await db.batch(statements);
+  }
+
+  // ── Phase 4b: Index searchable content in FTS5 (best-effort, non-blocking) ──
+  if (searchIndexStatements.length > 0) {
+    context.locals.runtime.ctx.waitUntil(
+      db.batch(searchIndexStatements).catch((err: unknown) => {
+        // FTS5 table may not exist yet on first deploy — silently skip
+        const msg = err instanceof Error ? err.message : String(err);
+        if (!msg.includes('no such table')) {
+          console.error('Search index error:', msg);
+        }
+      })
+    );
   }
 
   // ── Phase 5: Background post-processing (waitUntil) ─────────────────
