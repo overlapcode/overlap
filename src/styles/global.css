@@ -291,3 +291,16 @@ a:hover {
   --diffs-font-size: 13px;
   --diffs-line-height: 20px;
 }
+
+/* Search highlight styling */
+.search-snippet mark {
+  background: color-mix(in srgb, var(--accent-orange) 25%, transparent);
+  color: var(--accent-orange);
+  padding: 1px 2px;
+  border-radius: 2px;
+}
+
+.search-snippet {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}

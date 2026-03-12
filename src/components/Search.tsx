@@ -99,8 +99,14 @@ function MatchCard({ match, sessionId }: { match: SearchMatch; sessionId: string
           {match.source_type === 'prompt' ? 'prompt' : match.source_type === 'response' ? 'response' : 'activity'}
         </span>
         <span
-          className="text-secondary"
-          style={{ fontSize: '0.875rem', lineHeight: 1.5 }}
+          className="text-secondary search-snippet"
+          style={{
+            fontSize: '0.875rem',
+            lineHeight: 1.5,
+            overflowWrap: 'anywhere',
+            wordBreak: 'break-word',
+            minWidth: 0,
+          }}
           dangerouslySetInnerHTML={{ __html: match.snippet }}
         />
       </div>

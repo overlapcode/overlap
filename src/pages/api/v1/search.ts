@@ -48,9 +48,17 @@ type SearchResult = {
 
 /**
  * HTML-escape a string to prevent XSS, then restore <mark> tags from FTS5 snippet().
+ * Also cleans up noisy content (long dashes, markdown table pipes, etc.)
  */
 function sanitizeSnippet(raw: string): string {
-  const escaped = raw
+  // Clean up noisy content before escaping
+  let cleaned = raw
+    .replace(/[─━—–-]{4,}/g, '—')       // collapse long dash runs
+    .replace(/\|/g, ' ')                  // strip markdown table pipes
+    .replace(/\s{2,}/g, ' ')              // collapse multiple spaces
+    .trim();
+
+  const escaped = cleaned
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
