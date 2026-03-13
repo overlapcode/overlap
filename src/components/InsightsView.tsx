@@ -646,7 +646,7 @@ function contentToPrintHTML(content: InsightContent, periodLabel: string, insigh
   // Next Steps (moved lower in the report)
   const nextStepsHTML = content.top_actions?.length
     ? `<div class="section accent-section" style="background:rgba(107,158,221,0.06);border:1px solid rgba(107,158,221,0.15);border-radius:8px;padding:20px 24px;border-left:4px solid rgba(107,158,221,0.5)">`
-      + `<h2 style="color:var(--accent-blue)">Next Steps</h2><ul style="list-style:none;padding:0">${content.top_actions.map(a => `<li style="padding:6px 0;border-bottom:1px solid #eee;padding-left:16px;position:relative"><span style="position:absolute;left:0;color:var(--accent-blue)">\u2192</span>${esc(typeof a === 'string' ? a : (a as any).title || (a as any).description || JSON.stringify(a))}</li>`).join('')}</ul></div>`
+      + `<h2 style="color:#6b9edd">Next Steps</h2><ul style="list-style:none;padding:0">${content.top_actions.map(a => `<li style="padding:6px 0;border-bottom:1px solid #eee;padding-left:16px;position:relative"><span style="position:absolute;left:0;color:#6b9edd">\u2192</span>${esc(typeof a === 'string' ? a : (a as any).title || (a as any).description || JSON.stringify(a))}</li>`).join('')}</ul></div>`
     : '';
 
   // Highlights
@@ -674,7 +674,7 @@ function contentToPrintHTML(content: InsightContent, periodLabel: string, insigh
     const total = Object.values(breakdown).reduce((a, b) => a + b, 0);
     let barHTML = '';
     if (total > 0) {
-      const colors: Record<string, string> = { fully_achieved: 'var(--accent-green)', mostly_achieved: '#8abe6f', partially_achieved: '#d4a843', not_achieved: 'var(--accent-red)' };
+      const colors: Record<string, string> = { fully_achieved: '#8a9e6d', mostly_achieved: '#8abe6f', partially_achieved: '#d4a843', not_achieved: '#d97757' };
       barHTML = `<div style="display:flex;border-radius:4px;overflow:hidden;height:20px;margin-bottom:8px">`
         + Object.entries(breakdown).sort((a, b) => b[1] - a[1]).map(([key, count]) =>
           `<div style="width:${(count / total) * 100}%;background:${colors[key] || '#888'};display:flex;align-items:center;justify-content:center;font-size:0.75rem;color:#fff;min-width:${count > 0 ? '20px' : '0'}">${count}</div>`
@@ -684,8 +684,8 @@ function contentToPrintHTML(content: InsightContent, periodLabel: string, insigh
       barHTML
       + `<p>${esc(oa.interpretation)}</p>`
       + `<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:8px">`
-      + `<div><strong style="color:var(--accent-green);font-size:0.75rem;text-transform:uppercase">Highest Completion</strong><p>${esc(oa.highest_completion_pattern)}</p></div>`
-      + `<div><strong style="color:var(--accent-red);font-size:0.75rem;text-transform:uppercase">Lowest Completion</strong><p>${esc(oa.lowest_completion_pattern)}</p></div>`
+      + `<div><strong style="color:#8a9e6d;font-size:0.75rem;text-transform:uppercase">Highest Completion</strong><p>${esc(oa.highest_completion_pattern)}</p></div>`
+      + `<div><strong style="color:#d97757;font-size:0.75rem;text-transform:uppercase">Lowest Completion</strong><p>${esc(oa.lowest_completion_pattern)}</p></div>`
       + `</div>`,
       '#9c27b0'
     );
@@ -719,8 +719,8 @@ function contentToPrintHTML(content: InsightContent, periodLabel: string, insigh
       const sorted = Object.entries(fs.outcomes).sort((a, b) => b[1] - a[1]);
       sorted.forEach(([outcome, count]) => {
         const pct = (count / fs.total_facets) * 100;
-        const color = outcome === 'fully_achieved' ? 'var(--accent-green)' : outcome === 'mostly_achieved' ? '#8abe6f'
-          : outcome === 'partially_achieved' ? '#d4a843' : 'var(--accent-red)';
+        const color = outcome === 'fully_achieved' ? '#8a9e6d' : outcome === 'mostly_achieved' ? '#8abe6f'
+          : outcome === 'partially_achieved' ? '#d4a843' : '#d97757';
         inner += `<div class="bar-row"><span class="bar-lbl">${esc(formatCategory(outcome))}</span>`
           + `<div class="bar-track"><div class="bar-fill" style="width:${pct}%;background:${color}"></div></div>`
           + `<span class="bar-ct">${count}</span></div>`;
@@ -766,28 +766,28 @@ function contentToPrintHTML(content: InsightContent, periodLabel: string, insigh
   // Accomplishments
   const accomplishmentsHTML = content.accomplishments?.length
     ? accentSection('Accomplishments', content.accomplishments.map(a =>
-      `<div class="item"><div class="item-title" style="color:var(--accent-green)">${esc(a.title)}</div><p>${esc(a.description)}</p></div>`
-    ).join(''), 'var(--accent-green)')
+      `<div class="item"><div class="item-title" style="color:#8a9e6d">${esc(a.title)}</div><p>${esc(a.description)}</p></div>`
+    ).join(''), '#8a9e6d')
     : '';
 
   // Friction
   const frictionHTML = content.friction_analysis?.length
     ? accentSection('Where Things Went Wrong', content.friction_analysis.map(f =>
-      `<div class="item"><div class="item-title" style="color:var(--accent-red)">${esc(f.category)}</div>`
+      `<div class="item"><div class="item-title" style="color:#d97757">${esc(f.category)}</div>`
       + `<p>${esc(f.description)}</p>`
       + (f.examples?.length ? `<ul class="examples">${f.examples.map(ex => `<li>${esc(typeof ex === 'string' ? ex : (ex as any).title || (ex as any).description || JSON.stringify(ex))}</li>`).join('')}</ul>` : '')
       + '</div>'
-    ).join(''), 'var(--accent-red)')
+    ).join(''), '#d97757')
     : '';
 
   // Member insights (team scope)
   const memberInsightsHTML = content.member_insights?.length
     ? accentSection('Team Members', content.member_insights.map(m =>
-      `<div class="item"><div class="item-title" style="color:var(--accent-blue)">${esc(m.name)}</div>`
+      `<div class="item"><div class="item-title" style="color:#6b9edd">${esc(m.name)}</div>`
       + `<p style="font-size:0.75rem;color:#888;margin-bottom:4px">${m.session_count} session${m.session_count !== 1 ? 's' : ''} · ${m.focus_areas.map(a => esc(a)).join(', ')}</p>`
       + `<p>${esc(m.strengths)}</p>`
       + `<p style="margin-top:4px"><strong>Suggestion:</strong> ${esc(m.suggestion)}</p></div>`
-    ).join(''), 'var(--accent-blue)')
+    ).join(''), '#6b9edd')
     : '';
 
   // Environment recommendations
@@ -821,7 +821,7 @@ function contentToPrintHTML(content: InsightContent, periodLabel: string, insigh
     const max = content.tool_usage[0]?.count || 1;
     toolHTML = section('Tool Usage', `<div class="tool-bars">${content.tool_usage.slice(0, 8).map(t =>
       `<div class="bar-row"><span class="bar-lbl">${esc(t.tool_name)}</span>`
-      + `<div class="bar-track"><div class="bar-fill" style="width:${(t.count / max) * 100}%;background:var(--accent-blue)"></div></div>`
+      + `<div class="bar-track"><div class="bar-fill" style="width:${(t.count / max) * 100}%;background:#6b9edd"></div></div>`
       + `<span class="bar-ct">${t.count}</span></div>`
     ).join('')}</div>`);
   }
@@ -834,9 +834,9 @@ function contentToPrintHTML(content: InsightContent, periodLabel: string, insigh
 
   const recsHTML = recs.length
     ? accentSection('Recommendations', recs.map(r =>
-      `<div class="item"><div class="item-title" style="color:var(--accent-green)">${esc(r.title)}</div>`
+      `<div class="item"><div class="item-title" style="color:#8a9e6d">${esc(r.title)}</div>`
       + (r.description ? `<p>${esc(r.description)}</p>` : '') + '</div>'
-    ).join(''), 'var(--accent-green)')
+    ).join(''), '#8a9e6d')
     : '';
 
   return `<!DOCTYPE html>
@@ -1416,7 +1416,7 @@ function InsightReport({ content, insight, periodLabel, onRegenerate, canRegener
                   const breakdown = content.outcome_analysis!.completion_breakdown;
                   const total = Object.values(breakdown).reduce((a, b) => a + b, 0);
                   if (total === 0) return null;
-                  const colors: Record<string, string> = { fully_achieved: '#8a9e6d', mostly_achieved: '#8abe6f', partially_achieved: '#d4a843', not_achieved: '#d97757' };
+                  const colors: Record<string, string> = { fully_achieved: 'var(--accent-green)', mostly_achieved: '#8abe6f', partially_achieved: '#d4a843', not_achieved: 'var(--accent-red)' };
                   return Object.entries(breakdown).sort((a, b) => b[1] - a[1]).map(([key, count]) => (
                     <div
                       key={key}
@@ -1434,7 +1434,7 @@ function InsightReport({ content, insight, periodLabel, onRegenerate, canRegener
               </div>
               <div style={{ display: 'flex', gap: 'var(--space-md)', marginTop: 'var(--space-xs)', flexWrap: 'wrap' }}>
                 {Object.entries(content.outcome_analysis!.completion_breakdown).sort((a, b) => b[1] - a[1]).map(([key]) => {
-                  const colors: Record<string, string> = { fully_achieved: '#8a9e6d', mostly_achieved: '#8abe6f', partially_achieved: '#d4a843', not_achieved: '#d97757' };
+                  const colors: Record<string, string> = { fully_achieved: 'var(--accent-green)', mostly_achieved: '#8abe6f', partially_achieved: '#d4a843', not_achieved: 'var(--accent-red)' };
                   return (
                     <span key={key} style={{ fontSize: '0.7rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '4px' }}>
                       <span style={{ width: '8px', height: '8px', borderRadius: '2px', background: colors[key] || 'var(--text-muted)', display: 'inline-block' }} />
@@ -1454,7 +1454,7 @@ function InsightReport({ content, insight, periodLabel, onRegenerate, canRegener
               <p style={{ marginTop: '4px' }}>{content.outcome_analysis.highest_completion_pattern}</p>
             </div>
             <div style={{ fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
-              <strong style={{ color: '#d97757', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Lowest Completion</strong>
+              <strong style={{ color: 'var(--accent-red)', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Lowest Completion</strong>
               <p style={{ marginTop: '4px' }}>{content.outcome_analysis.lowest_completion_pattern}</p>
             </div>
           </div>
