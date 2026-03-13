@@ -34,7 +34,7 @@ const SCOPE_LABELS: Record<string, string> = {
 };
 
 const DECISION_STYLES: Record<string, { label: string; color: string }> = {
-  block: { label: 'BLOCKED', color: '#d95757' },
+  block: { label: 'BLOCKED', color: 'var(--accent-red)' },
   warn: { label: 'WARNED', color: 'var(--accent-orange)' },
 };
 
@@ -129,7 +129,7 @@ function OverlapCard({ overlap }: { overlap: Overlap }) {
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 'var(--space-xs)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-sm)', flexWrap: 'wrap' }}>
             <span style={{
-              fontSize: '0.6875rem',
+              fontSize: '0.75rem',
               padding: '1px 6px',
               borderRadius: '4px',
               backgroundColor: 'var(--bg-elevated)',
@@ -142,7 +142,7 @@ function OverlapCard({ overlap }: { overlap: Overlap }) {
             </span>
             {decisionStyle && (
               <span style={{
-                fontSize: '0.6875rem',
+                fontSize: '0.75rem',
                 padding: '1px 6px',
                 borderRadius: '4px',
                 backgroundColor: 'var(--bg-primary)',

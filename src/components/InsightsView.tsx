@@ -646,7 +646,7 @@ function contentToPrintHTML(content: InsightContent, periodLabel: string, insigh
   // Next Steps (moved lower in the report)
   const nextStepsHTML = content.top_actions?.length
     ? `<div class="section accent-section" style="background:rgba(107,158,221,0.06);border:1px solid rgba(107,158,221,0.15);border-radius:8px;padding:20px 24px;border-left:4px solid rgba(107,158,221,0.5)">`
-      + `<h2 style="color:#6b9edd">Next Steps</h2><ul style="list-style:none;padding:0">${content.top_actions.map(a => `<li style="padding:6px 0;border-bottom:1px solid #eee;padding-left:16px;position:relative"><span style="position:absolute;left:0;color:#6b9edd">\u2192</span>${esc(typeof a === 'string' ? a : (a as any).title || (a as any).description || JSON.stringify(a))}</li>`).join('')}</ul></div>`
+      + `<h2 style="color:var(--accent-blue)">Next Steps</h2><ul style="list-style:none;padding:0">${content.top_actions.map(a => `<li style="padding:6px 0;border-bottom:1px solid #eee;padding-left:16px;position:relative"><span style="position:absolute;left:0;color:var(--accent-blue)">\u2192</span>${esc(typeof a === 'string' ? a : (a as any).title || (a as any).description || JSON.stringify(a))}</li>`).join('')}</ul></div>`
     : '';
 
   // Highlights
@@ -674,18 +674,18 @@ function contentToPrintHTML(content: InsightContent, periodLabel: string, insigh
     const total = Object.values(breakdown).reduce((a, b) => a + b, 0);
     let barHTML = '';
     if (total > 0) {
-      const colors: Record<string, string> = { fully_achieved: '#8a9e6d', mostly_achieved: '#8abe6f', partially_achieved: '#d4a843', not_achieved: '#d97757' };
+      const colors: Record<string, string> = { fully_achieved: 'var(--accent-green)', mostly_achieved: '#8abe6f', partially_achieved: '#d4a843', not_achieved: 'var(--accent-red)' };
       barHTML = `<div style="display:flex;border-radius:4px;overflow:hidden;height:20px;margin-bottom:8px">`
         + Object.entries(breakdown).sort((a, b) => b[1] - a[1]).map(([key, count]) =>
-          `<div style="width:${(count / total) * 100}%;background:${colors[key] || '#888'};display:flex;align-items:center;justify-content:center;font-size:0.65rem;color:#fff;min-width:${count > 0 ? '20px' : '0'}">${count}</div>`
+          `<div style="width:${(count / total) * 100}%;background:${colors[key] || '#888'};display:flex;align-items:center;justify-content:center;font-size:0.75rem;color:#fff;min-width:${count > 0 ? '20px' : '0'}">${count}</div>`
         ).join('') + `</div>`;
     }
     outcomeAnalysisHTML = accentSection('Outcome Analysis',
       barHTML
       + `<p>${esc(oa.interpretation)}</p>`
       + `<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:8px">`
-      + `<div><strong style="color:#8a9e6d;font-size:0.75rem;text-transform:uppercase">Highest Completion</strong><p>${esc(oa.highest_completion_pattern)}</p></div>`
-      + `<div><strong style="color:#d97757;font-size:0.75rem;text-transform:uppercase">Lowest Completion</strong><p>${esc(oa.lowest_completion_pattern)}</p></div>`
+      + `<div><strong style="color:var(--accent-green);font-size:0.75rem;text-transform:uppercase">Highest Completion</strong><p>${esc(oa.highest_completion_pattern)}</p></div>`
+      + `<div><strong style="color:var(--accent-red);font-size:0.75rem;text-transform:uppercase">Lowest Completion</strong><p>${esc(oa.lowest_completion_pattern)}</p></div>`
       + `</div>`,
       '#9c27b0'
     );
@@ -699,7 +699,7 @@ function contentToPrintHTML(content: InsightContent, periodLabel: string, insigh
         `<div style="background:#f7f8fa;border:1px solid #e5e7eb;border-radius:8px;padding:16px;margin-bottom:10px">`
         + `<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">`
         + `<span style="font-family:'SF Mono','Consolas',monospace;font-size:0.82rem;font-weight:600;color:#1a1a2e">${esc(od.file_path.split('/').pop() || od.file_path)}</span>`
-        + `<span style="font-size:0.6rem;text-transform:uppercase;padding:2px 8px;border-radius:4px;background:rgba(255,152,0,0.1);color:#e68a00;font-weight:600">${esc(od.scope)}</span>`
+        + `<span style="font-size:0.75rem;text-transform:uppercase;padding:2px 8px;border-radius:4px;background:rgba(255,152,0,0.1);color:#e68a00;font-weight:600">${esc(od.scope)}</span>`
         + `</div>`
         + `<div style="font-size:0.75rem;color:#888;margin-bottom:8px">${esc(od.users.join(', '))}</div>`
         + `<div style="font-size:0.85rem;color:#444;line-height:1.6;margin-bottom:8px">${esc(od.description)}</div>`
@@ -719,8 +719,8 @@ function contentToPrintHTML(content: InsightContent, periodLabel: string, insigh
       const sorted = Object.entries(fs.outcomes).sort((a, b) => b[1] - a[1]);
       sorted.forEach(([outcome, count]) => {
         const pct = (count / fs.total_facets) * 100;
-        const color = outcome === 'fully_achieved' ? '#8a9e6d' : outcome === 'mostly_achieved' ? '#8abe6f'
-          : outcome === 'partially_achieved' ? '#d4a843' : '#d97757';
+        const color = outcome === 'fully_achieved' ? 'var(--accent-green)' : outcome === 'mostly_achieved' ? '#8abe6f'
+          : outcome === 'partially_achieved' ? '#d4a843' : 'var(--accent-red)';
         inner += `<div class="bar-row"><span class="bar-lbl">${esc(formatCategory(outcome))}</span>`
           + `<div class="bar-track"><div class="bar-fill" style="width:${pct}%;background:${color}"></div></div>`
           + `<span class="bar-ct">${count}</span></div>`;
@@ -766,28 +766,28 @@ function contentToPrintHTML(content: InsightContent, periodLabel: string, insigh
   // Accomplishments
   const accomplishmentsHTML = content.accomplishments?.length
     ? accentSection('Accomplishments', content.accomplishments.map(a =>
-      `<div class="item"><div class="item-title" style="color:#8a9e6d">${esc(a.title)}</div><p>${esc(a.description)}</p></div>`
-    ).join(''), '#8a9e6d')
+      `<div class="item"><div class="item-title" style="color:var(--accent-green)">${esc(a.title)}</div><p>${esc(a.description)}</p></div>`
+    ).join(''), 'var(--accent-green)')
     : '';
 
   // Friction
   const frictionHTML = content.friction_analysis?.length
     ? accentSection('Where Things Went Wrong', content.friction_analysis.map(f =>
-      `<div class="item"><div class="item-title" style="color:#d97757">${esc(f.category)}</div>`
+      `<div class="item"><div class="item-title" style="color:var(--accent-red)">${esc(f.category)}</div>`
       + `<p>${esc(f.description)}</p>`
       + (f.examples?.length ? `<ul class="examples">${f.examples.map(ex => `<li>${esc(typeof ex === 'string' ? ex : (ex as any).title || (ex as any).description || JSON.stringify(ex))}</li>`).join('')}</ul>` : '')
       + '</div>'
-    ).join(''), '#d97757')
+    ).join(''), 'var(--accent-red)')
     : '';
 
   // Member insights (team scope)
   const memberInsightsHTML = content.member_insights?.length
     ? accentSection('Team Members', content.member_insights.map(m =>
-      `<div class="item"><div class="item-title" style="color:#6b9edd">${esc(m.name)}</div>`
+      `<div class="item"><div class="item-title" style="color:var(--accent-blue)">${esc(m.name)}</div>`
       + `<p style="font-size:0.75rem;color:#888;margin-bottom:4px">${m.session_count} session${m.session_count !== 1 ? 's' : ''} · ${m.focus_areas.map(a => esc(a)).join(', ')}</p>`
       + `<p>${esc(m.strengths)}</p>`
       + `<p style="margin-top:4px"><strong>Suggestion:</strong> ${esc(m.suggestion)}</p></div>`
-    ).join(''), '#6b9edd')
+    ).join(''), 'var(--accent-blue)')
     : '';
 
   // Environment recommendations
@@ -821,7 +821,7 @@ function contentToPrintHTML(content: InsightContent, periodLabel: string, insigh
     const max = content.tool_usage[0]?.count || 1;
     toolHTML = section('Tool Usage', `<div class="tool-bars">${content.tool_usage.slice(0, 8).map(t =>
       `<div class="bar-row"><span class="bar-lbl">${esc(t.tool_name)}</span>`
-      + `<div class="bar-track"><div class="bar-fill" style="width:${(t.count / max) * 100}%;background:#6b9edd"></div></div>`
+      + `<div class="bar-track"><div class="bar-fill" style="width:${(t.count / max) * 100}%;background:var(--accent-blue)"></div></div>`
       + `<span class="bar-ct">${t.count}</span></div>`
     ).join('')}</div>`);
   }
@@ -834,9 +834,9 @@ function contentToPrintHTML(content: InsightContent, periodLabel: string, insigh
 
   const recsHTML = recs.length
     ? accentSection('Recommendations', recs.map(r =>
-      `<div class="item"><div class="item-title" style="color:#8a9e6d">${esc(r.title)}</div>`
+      `<div class="item"><div class="item-title" style="color:var(--accent-green)">${esc(r.title)}</div>`
       + (r.description ? `<p>${esc(r.description)}</p>` : '') + '</div>'
-    ).join(''), '#8a9e6d')
+    ).join(''), 'var(--accent-green)')
     : '';
 
   return `<!DOCTYPE html>
@@ -858,7 +858,7 @@ function contentToPrintHTML(content: InsightContent, periodLabel: string, insigh
   .stats-grid { display: grid; grid-template-columns: repeat(${statItems.length > 6 ? 4 : 3}, 1fr); gap: 10px; margin-bottom: 28px; }
   .stat { background: #f7f8fa; border: 1px solid #e5e7eb; border-radius: 6px; padding: 12px 10px; text-align: center; }
   .stat-val { font-size: 1.2rem; font-weight: 700; color: #1a1a2e; font-family: 'SF Mono', 'Consolas', monospace; }
-  .stat-lbl { font-size: 0.65rem; color: #888; text-transform: uppercase; letter-spacing: 0.05em; margin-top: 2px; }
+  .stat-lbl { font-size: 0.75rem; color: #888; text-transform: uppercase; letter-spacing: 0.05em; margin-top: 2px; }
   .section { margin-bottom: 24px; break-inside: avoid; }
   .section h2 { font-size: 1rem; font-weight: 700; color: #1a1a2e; margin-bottom: 10px; padding-bottom: 6px; border-bottom: 1px solid #e5e7eb; }
   .section h3 { font-size: 0.85rem; font-weight: 600; color: #555; margin-bottom: 6px; }
@@ -1425,7 +1425,7 @@ function InsightReport({ content, insight, periodLabel, onRegenerate, canRegener
                         width: `${(count / total) * 100}%`,
                         background: colors[key] || 'var(--text-muted)',
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        fontSize: '0.65rem', color: '#fff', fontFamily: 'var(--font-mono)',
+                        fontSize: '0.75rem', color: '#fff', fontFamily: 'var(--font-mono)',
                         minWidth: count > 0 ? '24px' : '0',
                       }}
                     >{count}</div>

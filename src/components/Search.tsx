@@ -88,7 +88,7 @@ function MatchCard({ match, sessionId }: { match: SearchMatch; sessionId: string
       {/* Match snippet with highlighted terms */}
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 'var(--space-sm)' }}>
         <span style={{
-          fontSize: '0.6875rem',
+          fontSize: '0.75rem',
           padding: '1px 6px',
           borderRadius: 'var(--radius-sm)',
           background: match.source_type === 'prompt' ? 'var(--accent-blue)' : match.source_type === 'response' ? 'var(--accent-green)' : 'var(--accent-purple)',
@@ -152,7 +152,7 @@ function MatchCard({ match, sessionId }: { match: SearchMatch; sessionId: string
                 }}
               >
                 <div style={{ display: 'flex', alignItems: 'baseline', gap: 'var(--space-xs)' }}>
-                  <span className="text-muted" style={{ fontSize: '0.6875rem', flexShrink: 0 }}>
+                  <span className="text-muted" style={{ fontSize: '0.75rem', flexShrink: 0 }}>
                     {ctx.source_type === 'prompt' ? '>' : '<'}
                   </span>
                   <span
@@ -162,7 +162,7 @@ function MatchCard({ match, sessionId }: { match: SearchMatch; sessionId: string
                     {ctx.content}
                   </span>
                 </div>
-                <span className="text-muted" style={{ fontSize: '0.6875rem', marginLeft: 'var(--space-md)' }}>
+                <span className="text-muted" style={{ fontSize: '0.75rem', marginLeft: 'var(--space-md)' }}>
                   {formatRelativeTime(ctx.timestamp)}
                 </span>
               </div>

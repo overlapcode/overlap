@@ -144,7 +144,7 @@ function SessionHeader({ session }: { session: SessionInfo }) {
             <span className="text-muted">·</span>
             <span
               style={{
-                fontSize: '0.6875rem',
+                fontSize: '0.75rem',
                 padding: '2px 6px',
                 borderRadius: '4px',
                 backgroundColor: 'var(--bg-elevated)',
@@ -161,7 +161,7 @@ function SessionHeader({ session }: { session: SessionInfo }) {
             <span className="text-muted">·</span>
             <span
               style={{
-                fontSize: '0.6875rem',
+                fontSize: '0.75rem',
                 padding: '2px 6px',
                 borderRadius: '4px',
                 backgroundColor: 'var(--bg-elevated)',
@@ -186,7 +186,7 @@ function SessionHeader({ session }: { session: SessionInfo }) {
             <span className="text-muted">·</span>
             <span
               style={{
-                fontSize: '0.6875rem',
+                fontSize: '0.75rem',
                 padding: '2px 6px',
                 borderRadius: '4px',
                 backgroundColor: 'var(--bg-elevated)',
@@ -275,7 +275,7 @@ const ActivityRow = memo(function ActivityRow({ activity, session, githubBaseUrl
       {activity.summary && (
         <div style={{ marginBottom: 'var(--space-sm)' }}>
           <span style={{
-            fontSize: '0.6875rem',
+            fontSize: '0.75rem',
             fontWeight: 600,
             color: 'var(--accent-green)',
             textTransform: 'uppercase',
@@ -340,7 +340,7 @@ const ActivityRow = memo(function ActivityRow({ activity, session, githubBaseUrl
               }}
             >
               <span style={{
-                fontSize: '0.6875rem',
+                fontSize: '0.75rem',
                 fontWeight: 600,
                 color: resp.type === 'thinking' ? 'var(--text-muted)' : 'var(--accent-blue)',
                 textTransform: 'uppercase',
@@ -396,7 +396,7 @@ function BlockHeader({ block }: { block: ActivityBlockInfo }) {
 
       {block.task_type && (
         <span style={{
-          fontSize: '0.6875rem',
+          fontSize: '0.75rem',
           padding: '1px 6px',
           borderRadius: '4px',
           backgroundColor: 'var(--bg-primary)',

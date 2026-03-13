@@ -9,22 +9,23 @@
   /* Text */
   --text-primary: #faf9f5;
   --text-secondary: #b0aea5;
-  --text-muted: #6b6a65;
+  --text-muted: #8a8983;
 
   /* Borders */
-  --border-subtle: #2a2a28;
-  --border-default: #3a3a38;
+  --border-subtle: #333331;
+  --border-default: #444442;
 
   /* Accents */
   --accent-orange: #d97757;
   --accent-blue: #6a9bcc;
-  --accent-green: #788c5d;
+  --accent-green: #8ea06d;
+  --accent-red: #d95757;
   --accent-gold: #c4a35a;
 
   /* Status colors */
   --status-active: #d97757;
   --status-stale: #b0aea5;
-  --status-ended: #788c5d;
+  --status-ended: #8ea06d;
 
   /* Spacing */
   --space-xs: 0.25rem;
@@ -274,11 +275,23 @@ a:hover {
   border: 1px solid var(--border-default);
   border-radius: var(--radius-sm);
   color: var(--text-primary);
-  font-size: 0.6875rem;
+  font-size: 0.75rem;
   font-family: var(--font-mono);
   white-space: nowrap;
   z-index: 10;
   pointer-events: none;
+}
+
+/* Focus styles for keyboard navigation */
+:focus-visible {
+  outline: 2px solid var(--accent-orange);
+  outline-offset: 2px;
+}
+
+button:focus-visible,
+.btn:focus-visible {
+  outline: 2px solid var(--accent-orange);
+  outline-offset: 2px;
 }
 
 /* @pierre/diffs theme overrides */

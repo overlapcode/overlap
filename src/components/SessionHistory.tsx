@@ -55,7 +55,7 @@ function HistoryCard({ session }: { session: HistorySession }) {
               transition: 'transform 0.2s ease',
               display: 'inline-block',
               color: 'var(--text-muted)',
-              fontSize: '0.625rem',
+              fontSize: '0.75rem',
             }}
           >
             ▶
@@ -178,7 +178,7 @@ function HistoryCard({ session }: { session: HistorySession }) {
                     {formatRelativeTime(act.created_at)}
                   </span>
                   {act.semantic_scope && (
-                    <span className="scope-badge" style={{ fontSize: '0.6875rem' }}>{act.semantic_scope}</span>
+                    <span className="scope-badge" style={{ fontSize: '0.75rem' }}>{act.semantic_scope}</span>
                   )}
                   {act.summary && (
                     <span className="text-secondary" style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>

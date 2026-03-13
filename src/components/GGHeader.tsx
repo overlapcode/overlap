@@ -73,7 +73,7 @@ export function GGHeader({ teamName, userName, activePage }: GGHeaderProps) {
           href="/"
           style={{
             fontFamily: 'var(--font-mono)',
-            fontSize: '0.65rem',
+            fontSize: '0.75rem',
             textTransform: 'uppercase',
             letterSpacing: '0.15em',
             color: 'var(--text-secondary)',
@@ -92,7 +92,7 @@ export function GGHeader({ teamName, userName, activePage }: GGHeaderProps) {
           <span className="gg-status-dot" style={{ width: 6, height: 6 }} />
           <span style={{
             fontFamily: 'var(--font-mono)',
-            fontSize: '0.55rem',
+            fontSize: '0.75rem',
             textTransform: 'uppercase',
             letterSpacing: '0.15em',
             color: 'var(--text-muted)',
@@ -118,7 +118,7 @@ export function GGHeader({ teamName, userName, activePage }: GGHeaderProps) {
           <span style={{
             marginLeft: '12px',
             fontFamily: 'var(--font-mono)',
-            fontSize: '0.6rem',
+            fontSize: '0.75rem',
             textTransform: 'uppercase',
             letterSpacing: '0.1em',
             color: 'var(--text-muted)',

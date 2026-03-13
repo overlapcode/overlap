@@ -188,7 +188,7 @@ export function StatsView() {
           <div style={{ fontSize: '2rem', fontWeight: 600, color: 'var(--accent-blue)' }}>
             {formatTokens(stats.total_input_tokens + stats.total_output_tokens)}
           </div>
-          <div className="text-muted" style={{ fontSize: '0.625rem', marginTop: '2px' }}>
+          <div className="text-muted" style={{ fontSize: '0.75rem', marginTop: '2px' }}>
             {formatTokens(stats.total_input_tokens)} in · {formatTokens(stats.total_output_tokens)} out
           </div>
         </div>
@@ -205,7 +205,7 @@ export function StatsView() {
           <div style={{ fontSize: '2rem', fontWeight: 600, color: 'var(--accent-orange)' }}>
             {stats.savings.estimated_savings_usd < 0.01 ? '$0.00' : `$${stats.savings.estimated_savings_usd.toFixed(2)}`}
           </div>
-          <div className="text-muted" style={{ fontSize: '0.625rem', marginTop: '2px' }}>
+          <div className="text-muted" style={{ fontSize: '0.75rem', marginTop: '2px' }}>
             {stats.savings.block_count} blocked · {stats.savings.warn_count} warned
           </div>
         </div>
@@ -323,7 +323,7 @@ export function StatsView() {
                       ) : (
                         <span>{f.file_path}</span>
                       )}
-                      <span className="text-muted" style={{ fontSize: '0.6875rem', marginLeft: 'var(--space-xs)' }}>{f.repo_name}</span>
+                      <span className="text-muted" style={{ fontSize: '0.75rem', marginLeft: 'var(--space-xs)' }}>{f.repo_name}</span>
                     </div>
                     <span className="text-secondary" style={{ fontSize: '0.75rem', width: '5.5rem', textAlign: 'right', flexShrink: 0 }}>{f.session_count} {f.session_count === 1 ? 'session' : 'sessions'}</span>
                     <span className="text-muted" style={{ fontSize: '0.75rem', width: '4.5rem', textAlign: 'right', flexShrink: 0 }}>{f.user_count} {f.user_count === 1 ? 'person' : 'people'}</span>

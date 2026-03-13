@@ -166,7 +166,7 @@ const teamConfig = await getTeamConfig(db);
   }
 
   :global(.period-dropdown-arrow) {
-    font-size: 0.65rem;
+    font-size: 0.75rem;
     color: var(--text-muted);
   }
 
@@ -194,7 +194,7 @@ const teamConfig = await getTeamConfig(db);
 
   :global(.dropdown-month-header) {
     font-family: var(--font-mono);
-    font-size: 0.6rem;
+    font-size: 0.75rem;
     color: var(--text-muted);
     text-transform: uppercase;
     letter-spacing: 0.06em;
@@ -253,7 +253,7 @@ const teamConfig = await getTeamConfig(db);
 
   :global(.dropdown-session-count) {
     font-family: var(--font-mono);
-    font-size: 0.65rem;
+    font-size: 0.75rem;
     color: var(--text-dimmed);
   }
 
@@ -271,7 +271,7 @@ const teamConfig = await getTeamConfig(db);
     color: var(--accent-orange);
     border: 1px solid var(--accent-orange);
     border-radius: var(--radius-sm);
-    font-size: 0.6rem;
+    font-size: 0.75rem;
     font-family: var(--font-mono);
     cursor: pointer;
   }
@@ -300,7 +300,7 @@ const teamConfig = await getTeamConfig(db);
 
   /* Status badges */
   :global(.status-badge) {
-    font-size: 0.6rem;
+    font-size: 0.75rem;
     font-family: var(--font-mono);
     padding: 1px 6px;
     border-radius: var(--radius-sm);
@@ -324,7 +324,7 @@ const teamConfig = await getTeamConfig(db);
 
   :global(.status-badge.failed) {
     background: rgba(217, 119, 87, 0.2);
-    color: #d97757;
+    color: var(--accent-red);
   }
 
   /* Error & loading */
@@ -374,7 +374,7 @@ const teamConfig = await getTeamConfig(db);
     height: 36px;
     border-radius: 50%;
     background: rgba(217, 119, 87, 0.15);
-    color: #d97757;
+    color: var(--accent-red);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -384,7 +384,7 @@ const teamConfig = await getTeamConfig(db);
   }
 
   :global(.failed-state p:first-of-type) {
-    color: #d97757;
+    color: var(--accent-red);
     font-weight: 600;
   }
 
@@ -718,7 +718,7 @@ const teamConfig = await getTeamConfig(db);
   :global(.outcome-fill-fully_achieved) { background: var(--accent-green); }
   :global(.outcome-fill-mostly_achieved) { background: #8abe6f; }
   :global(.outcome-fill-partially_achieved) { background: var(--accent-orange); }
-  :global(.outcome-fill-not_achieved) { background: #d97757; }
+  :global(.outcome-fill-not_achieved) { background: var(--accent-red); }
 
   :global(.outcome-count) {
     width: 24px;
@@ -1054,7 +1054,7 @@ const teamConfig = await getTeamConfig(db);
   }
 
   :global(.env-rec-type) {
-    font-size: 0.68rem;
+    font-size: 0.75rem;
     text-transform: uppercase;
     letter-spacing: 0.05em;
     color: var(--text-muted);
@@ -1066,7 +1066,7 @@ const teamConfig = await getTeamConfig(db);
   }
 
   :global(.env-rec-repo) {
-    font-size: 0.68rem;
+    font-size: 0.75rem;
     color: var(--text-muted);
     background: var(--bg-elevated);
     border: 1px solid var(--border-subtle);
@@ -1141,7 +1141,7 @@ const teamConfig = await getTeamConfig(db);
   }
 
   :global(.dropdown-caret) {
-    font-size: 0.65rem;
+    font-size: 0.75rem;
     opacity: 0.6;
   }
 
@@ -1249,7 +1249,7 @@ const teamConfig = await getTeamConfig(db);
   :global(.trends-delta-label) {
     flex-shrink: 0;
     width: 80px;
-    font-size: 0.65rem;
+    font-size: 0.75rem;
     color: var(--text-muted);
     text-transform: uppercase;
     letter-spacing: 0.06em;
@@ -1340,7 +1340,7 @@ const teamConfig = await getTeamConfig(db);
   /* Project area status badge */
   :global(.project-status-badge) {
     display: inline-block;
-    font-size: 0.6rem;
+    font-size: 0.75rem;
     font-family: var(--font-mono);
     padding: 1px 6px;
     border-radius: var(--radius-sm);
@@ -1362,7 +1362,7 @@ const teamConfig = await getTeamConfig(db);
 
   :global(.status-badge.status-stalled) {
     background: rgba(217, 119, 87, 0.2);
-    color: #d97757;
+    color: var(--accent-red);
   }
 
   :global(.status-badge.status-planning) {
@@ -1372,7 +1372,7 @@ const teamConfig = await getTeamConfig(db);
 
   /* Scope badge in overlap table */
   :global(.scope-badge) {
-    font-size: 0.65rem;
+    font-size: 0.75rem;
     font-family: var(--font-mono);
     padding: 1px 6px;
     border-radius: var(--radius-sm);
@@ -1381,7 +1381,7 @@ const teamConfig = await getTeamConfig(db);
 
   :global(.scope-badge.scope-line) {
     background: rgba(217, 119, 87, 0.15);
-    color: #d97757;
+    color: var(--accent-red);
   }
 
   :global(.scope-badge.scope-function) {
@@ -1404,7 +1404,7 @@ const teamConfig = await getTeamConfig(db);
 
   :global(.escalation-badge) {
     display: inline-block;
-    font-size: 0.6rem;
+    font-size: 0.75rem;
     font-family: var(--font-mono);
     padding: 1px 6px;
     border-radius: var(--radius-sm);
@@ -1422,7 +1422,7 @@ const teamConfig = await getTeamConfig(db);
 
   :global(.escalation-badge.escalation-recurring) {
     background: rgba(217, 119, 87, 0.2);
-    color: #d97757;
+    color: var(--accent-red);
   }
 
   :global(.escalation-badge.escalation-improving) {
@@ -1433,7 +1433,7 @@ const teamConfig = await getTeamConfig(db);
   /* Priority badge for recommendations */
   :global(.priority-badge) {
     display: inline-block;
-    font-size: 0.6rem;
+    font-size: 0.75rem;
     font-family: var(--font-mono);
     padding: 1px 6px;
     border-radius: var(--radius-sm);
@@ -1446,7 +1446,7 @@ const teamConfig = await getTeamConfig(db);
 
   :global(.priority-badge.priority-high) {
     background: rgba(217, 119, 87, 0.2);
-    color: #d97757;
+    color: var(--accent-red);
   }
 
   :global(.priority-badge.priority-medium) {

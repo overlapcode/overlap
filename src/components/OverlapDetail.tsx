@@ -56,7 +56,7 @@ const USER_COLORS = {
 };
 
 const DECISION_DISPLAY: Record<string, { label: string; color: string }> = {
-  block: { label: 'BLOCKED', color: '#d95757' },
+  block: { label: 'BLOCKED', color: 'var(--accent-red)' },
   warn: { label: 'WARNED', color: 'var(--accent-orange)' },
 };
 
@@ -86,7 +86,7 @@ function EditCard({ edit }: { edit: FileOp }) {
         </span>
         {edit.tool_name && (
           <span style={{
-            fontSize: '0.6875rem',
+            fontSize: '0.75rem',
             padding: '1px 6px',
             borderRadius: '4px',
             backgroundColor: 'var(--bg-elevated)',
@@ -147,7 +147,7 @@ function UserEditsSection({ edits, userName, userColor, isFirst, sessionId, deci
     : decision === 'block' ? 'BLOCKED' : decision === 'warn' ? 'WARNED' : 'OVERLAPPING';
   const badgeColor = isFirst
     ? 'var(--accent-green)'
-    : decision === 'block' ? '#d95757' : 'var(--accent-orange)';
+    : decision === 'block' ? 'var(--accent-red)' : 'var(--accent-orange)';
 
   return (
     <div>
@@ -169,7 +169,7 @@ function UserEditsSection({ edits, userName, userColor, isFirst, sessionId, deci
           <strong style={{ fontSize: '1rem' }}>{userName}</strong>
         )}
         <span style={{
-          fontSize: '0.6875rem',
+          fontSize: '0.75rem',
           padding: '1px 6px',
           borderRadius: '4px',
           backgroundColor: 'var(--bg-primary)',
@@ -222,7 +222,7 @@ function OverlapHeader({ data }: { data: OverlapData }) {
         </span>
         {decisionInfo && (
           <span style={{
-            fontSize: '0.6875rem',
+            fontSize: '0.75rem',
             padding: '2px 8px',
             borderRadius: '4px',
             backgroundColor: 'var(--bg-primary)',
@@ -334,7 +334,7 @@ export function OverlapDetail({ overlapId }: { overlapId: string }) {
           {decisionInfo && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-sm)', marginBottom: data.description ? 'var(--space-sm)' : 0 }}>
               <span style={{
-                fontSize: '0.6875rem',
+                fontSize: '0.75rem',
                 padding: '2px 8px',
                 borderRadius: '4px',
                 backgroundColor: 'var(--bg-primary)',
@@ -355,7 +355,7 @@ export function OverlapDetail({ overlapId }: { overlapId: string }) {
           {data.description && (
             <>
               <span style={{
-                fontSize: '0.6875rem',
+                fontSize: '0.75rem',
                 fontWeight: 600,
                 color: 'var(--text-muted)',
                 textTransform: 'uppercase',
